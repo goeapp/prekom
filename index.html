@@ -10,388 +10,390 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <style>
-  /* ============================================================
-     DESIGN TOKENS — sistema de diseño del stack
-     ============================================================ */
-  :root{
-    --amber:#d97706;
-    --amber-dark:#92400e;
-    --amber-tint:#fef3e2;
-    --dark:#0f172a;
-    --dark-soft:#1e293b;
-    --surface:#f1f5f9;
-    --surface-card:#ffffff;
-    --border:#e2e8f0;
-    --text:#0f172a;
-    --text-muted:#64748b;
-    --text-faint:#94a3b8;
-    --radius:10px;
-    --shadow:0 1px 2px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.05);
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;height:100%;}
-  body{
-    background:var(--surface);
-    color:var(--text);
-    font-family:'DM Sans',Arial,sans-serif;
-    font-size:15px;
-    line-height:1.5;
-    -webkit-font-smoothing:antialiased;
-  }
-  h1,h2,h3,.display{
-    font-family:'Bebas Neue',Arial,sans-serif;
-    letter-spacing:.5px;
-    font-weight:400;
-  }
-  button{font-family:inherit;cursor:pointer;}
-  a{color:var(--amber-dark);}
+/* ─────────────────────────────────────────────────
+   DESIGN TOKENS — mismos que Mesa de Trabajo / BDC
+   (v002: se dejan de inventar valores propios — se
+   copian tal cual de index_bdc_v6_0_0.html)
+───────────────────────────────────────────────── */
+:root {
+  --bg       : #f1f5f9;
+  --surface  : #ffffff;
+  --border   : #e2e8f0;
+  --accent   : #d97706;
+  --accent2  : #0f172a;
+  --tag-bg   : #fef3c7;
+  --tag-fg   : #92400e;
+  --accent-border: #92400e;
+  --text     : #1e293b;
+  --muted    : #64748b;
+  --radius   : 12px;
+  --radius-sm: 8px;
+  --shadow   : 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.10);
+  --header-h : 52px;
+}
 
-  /* ---------- Header ---------- */
-  .app-header{
-    background:var(--dark);
-    color:#fff;
-    padding:14px 20px;
-    display:flex;
-    align-items:center;
-    gap:14px;
-    position:sticky;
-    top:0;
-    z-index:20;
-  }
-  .app-header .brand{
-    font-family:'Bebas Neue',Arial,sans-serif;
-    font-size:26px;
-    letter-spacing:1px;
-    display:flex;
-    align-items:baseline;
-    gap:8px;
-  }
-  .app-header .brand small{
-    font-family:'DM Sans',Arial,sans-serif;
-    font-size:11px;
-    color:#94a3b8;
-    letter-spacing:.5px;
-  }
-  .app-header .obra-nombre{
-    font-size:13px;
-    color:#cbd5e1;
-    border-left:1px solid #334155;
-    padding-left:14px;
-    flex:1;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-  }
-  .header-btn{
-    background:transparent;
-    border:1px solid #334155;
-    color:#e2e8f0;
-    border-radius:8px;
-    padding:7px 12px;
-    font-size:13px;
-    display:flex;
-    align-items:center;
-    gap:6px;
-    white-space:nowrap;
-  }
-  .header-btn:hover{background:#1e293b;}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { min-height: 100%; }
+body {
+  background : var(--bg);
+  color      : var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size  : 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+button { font-family: inherit; cursor: pointer; }
+a { color: inherit; }
+input { font-family: inherit; }
+.hidden { display: none !important; }
 
-  /* ---------- Layout ---------- */
-  .view{max-width:960px;margin:0 auto;padding:24px 20px 60px;}
-  .hidden{display:none !important;}
+/* ─────────────────────────────────────────────────
+   PANTALLAS FULL-SCREEN (login / obras) — de BDC
+───────────────────────────────────────────────── */
+.pantalla-centrada {
+  display        : none;
+  flex-direction : column;
+  align-items    : center;
+  justify-content: center;
+  min-height     : 100vh;
+  gap            : 24px;
+  padding        : 20px;
+}
+.pantalla-centrada.visible { display: flex; }
 
-  /* ---------- Breadcrumb ---------- */
-  .breadcrumb{
-    display:flex;
-    flex-wrap:wrap;
-    align-items:center;
-    gap:6px;
-    margin-bottom:18px;
-    font-size:13px;
-    color:var(--text-muted);
-  }
-  .breadcrumb button{
-    background:none;border:none;color:var(--amber-dark);
-    font-size:13px;padding:2px 4px;
-  }
-  .breadcrumb button:hover{text-decoration:underline;}
-  .breadcrumb .sep{color:var(--text-faint);}
+.caja {
+  background   : var(--surface);
+  border       : 1px solid var(--border);
+  border-radius: var(--radius);
+  padding      : 40px 36px;
+  max-width    : 380px;
+  width        : 100%;
+  text-align   : center;
+  box-shadow   : var(--shadow-md);
+}
+.caja-logo    { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent); letter-spacing: 3px; margin-bottom: 4px; }
+.caja-version { font-size: .62rem; color: var(--muted); letter-spacing: .03em; margin-bottom: 4px; }
+.caja-sub     { font-size: .78rem; color: var(--muted); margin-bottom: 28px; }
+.caja-title   { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
+.caja-desc    { font-size: .8rem; color: var(--muted); margin-bottom: 22px; line-height: 1.6; }
 
-  /* ---------- Home cards (14 puntos) ---------- */
-  .cards-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
-    gap:14px;
-  }
-  .card{
-    background:var(--surface-card);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:18px;
-    box-shadow:var(--shadow);
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    text-align:left;
-    transition:transform .12s ease, box-shadow .12s ease;
-  }
-  .card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(15,23,42,.09);}
-  .card .card-titulo{
-    font-family:'Bebas Neue',Arial,sans-serif;
-    font-size:19px;
-    color:var(--dark);
-    line-height:1.15;
-  }
-  .card .card-desc{
-    font-size:13px;
-    color:var(--text-muted);
-    flex:1;
-    min-height:32px;
-  }
-  .card .card-footer{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    font-size:12px;
-    color:var(--text-faint);
-    border-top:1px solid var(--border);
-    padding-top:10px;
-    margin-top:2px;
-  }
-  .card .ver-mas{
-    background:none;border:none;color:var(--amber-dark);
-    font-size:13px;font-weight:700;padding:0;
-  }
+.login-paso { display: none; }
+.login-paso.activo { display: block; }
 
-  /* ---------- Árbol (nivel 2 / 3) ---------- */
-  .arbol-lista{display:flex;flex-direction:column;gap:8px;}
-  .arbol-item{
-    background:var(--surface-card);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:14px 16px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    text-align:left;
-  }
-  .arbol-item:hover{border-color:var(--amber);}
-  .arbol-item .punto{
-    font-size:11px;color:var(--text-faint);
-    font-variant-numeric:tabular-nums;
-    min-width:44px;
-  }
-  .arbol-item .titulo{flex:1;font-size:14px;font-weight:500;}
-  .arbol-item .flecha{color:var(--amber-dark);font-size:15px;}
+.input-email, .input-pin {
+  width        : 100%;
+  padding      : 11px 14px;
+  border       : 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size    : .9rem;
+  color        : var(--text);
+  margin-bottom: 14px;
+  text-align   : center;
+  transition   : border-color .15s;
+}
+.input-email:focus, .input-pin:focus { outline: none; border-color: var(--accent); }
+.input-pin { font-size: 1.4rem; letter-spacing: 6px; font-family: monospace; }
 
-  /* ---------- Nodo hoja (Resumen) ---------- */
-  .nodo-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:16px;
-    margin-bottom:14px;
-  }
-  .nodo-titulo{font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:var(--dark);}
-  .btn-editar{
-    background:var(--amber);
-    color:#fff;
-    border:none;
-    border-radius:8px;
-    padding:8px 16px;
-    font-size:13px;
-    font-weight:700;
-    white-space:nowrap;
-  }
-  .btn-editar:hover{background:var(--amber-dark);}
-  .resumen-box{
-    background:var(--surface-card);
-    border:1px solid var(--border);
-    border-radius:var(--radius);
-    padding:20px;
-    box-shadow:var(--shadow);
-    min-height:80px;
-  }
-  .resumen-box.vacio{color:var(--text-faint);font-style:italic;}
-  .resumen-box p:first-child{margin-top:0;}
-  .resumen-box p:last-child{margin-bottom:0;}
+.btn-accion {
+  width        : 100%;
+  padding      : 10px 18px;
+  border       : 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background   : var(--accent);
+  color        : #fff;
+  font-size    : .82rem;
+  font-weight  : 600;
+  transition   : background .15s;
+}
+.btn-accion:hover:not(:disabled) { background: #b45309; }
+.btn-accion:disabled { opacity: .5; cursor: not-allowed; }
+.btn-secundario {
+  width        : 100%;
+  padding      : 9px 16px;
+  border       : 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background   : var(--surface);
+  color        : var(--muted);
+  font-size    : .78rem;
+  margin-top   : 10px;
+  transition   : all .15s;
+}
+.btn-secundario:hover:not(:disabled) { background: #f8fafc; }
+.btn-secundario:disabled { opacity: .5; cursor: not-allowed; }
 
-  /* ---------- Modales genéricos ---------- */
-  .modal-overlay{
-    position:fixed;inset:0;
-    background:rgba(15,23,42,.5);
-    display:flex;align-items:center;justify-content:center;
-    padding:20px;
-    z-index:100;
-  }
-  .modal-box{
-    background:#fff;
-    border-radius:14px;
-    width:100%;
-    max-width:420px;
-    box-shadow:0 20px 60px rgba(0,0,0,.25);
-    overflow:hidden;
-  }
-  .modal-box.wide{max-width:640px;}
-  .modal-head{
-    background:var(--dark);
-    color:#fff;
-    padding:16px 20px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-  }
-  .modal-head h3{margin:0;font-size:18px;}
-  .modal-close{background:none;border:none;color:#94a3b8;font-size:20px;line-height:1;}
-  .modal-close:hover{color:#fff;}
-  .modal-body{padding:22px 20px;}
-  .modal-body p{margin:0 0 14px;font-size:14px;color:var(--text-muted);}
-  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+.msg-error {
+  background   : #fef2f2;
+  border       : 1px solid #fecaca;
+  color        : #991b1b;
+  border-radius: var(--radius-sm);
+  padding      : 9px 12px;
+  font-size    : .78rem;
+  margin-bottom: 14px;
+  text-align   : left;
+  display      : none;
+}
+.msg-error.visible { display: block; }
 
-  input[type=email],input[type=text]{
-    width:100%;
-    padding:11px 12px;
-    border:1px solid var(--border);
-    border-radius:8px;
-    font-size:15px;
-    font-family:inherit;
-  }
-  input:focus{outline:2px solid var(--amber);outline-offset:1px;}
+.spinner {
+  width        : 28px;
+  height       : 28px;
+  border       : 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  margin       : 0 auto 16px;
+  animation    : girar .8s linear infinite;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
 
-  .btn-primary{
-    background:var(--amber);color:#fff;border:none;border-radius:8px;
-    padding:10px 18px;font-size:14px;font-weight:700;
-  }
-  .btn-primary:hover{background:var(--amber-dark);}
-  .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
-  .btn-secondary{
-    background:none;border:1px solid var(--border);border-radius:8px;
-    color:var(--text-muted);padding:10px 16px;font-size:14px;
-  }
-  .btn-secondary:hover{background:var(--surface);}
+/* ─────────────────────────────────────────────────
+   OBRAS SCREEN — de BDC ("Cambiar obra")
+───────────────────────────────────────────────── */
+#obras-screen .caja { max-width: 460px; text-align: left; }
+#lista-obras { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.obra-card {
+  display        : flex;
+  align-items    : center;
+  justify-content: space-between;
+  padding        : 14px 16px;
+  border         : 1.5px solid var(--border);
+  border-radius  : var(--radius-sm);
+  background     : var(--surface);
+  cursor         : pointer;
+  transition     : all .15s;
+}
+.obra-card:hover { border-color: var(--accent); background: #fffbeb; }
+.obra-nombre { font-weight: 600; font-size: .88rem; }
+.obra-flecha { color: var(--muted); font-size: 1.1rem; }
+.obras-vacio { font-size: .82rem; color: var(--muted); text-align: center; padding: 20px 0; }
 
-  .pin-input{
-    text-align:center;font-size:26px;letter-spacing:8px;
-    font-family:monospace;
-  }
-  .login-error{
-    background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;
-    border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;
-  }
-  .login-spinner{
-    display:flex;flex-direction:column;align-items:center;gap:14px;
-    padding:20px 0;color:var(--text-muted);font-size:14px;
-  }
-  .spinner{
-    width:30px;height:30px;border-radius:50%;
-    border:3px solid var(--border);border-top-color:var(--amber);
-    animation:spin .8s linear infinite;
-  }
-  @keyframes spin{to{transform:rotate(360deg);}}
+/* ─────────────────────────────────────────────────
+   APP — HEADER — de BDC
+───────────────────────────────────────────────── */
+#app { display: none; flex-direction: column; min-height: 100vh; }
+#app-header {
+  height       : var(--header-h);
+  background   : var(--accent2);
+  display      : flex;
+  align-items  : center;
+  padding      : 0 18px;
+  gap          : 12px;
+  flex-shrink  : 0;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  position     : sticky;
+  top          : 0;
+  z-index      : 20;
+}
+.hdr-logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--accent); letter-spacing: 2px; white-space: nowrap; }
+.hdr-version { font-size: .62rem; color: rgba(255,255,255,.4); white-space: nowrap; }
+.hdr-obra-nombre {
+  font-size    : .8rem;
+  color        : rgba(255,255,255,.75);
+  white-space  : nowrap;
+  overflow     : hidden;
+  text-overflow: ellipsis;
+  max-width    : 220px;
+}
+.hdr-btn-cambiar-obra {
+  background   : transparent;
+  border       : 1px solid rgba(255,255,255,.18);
+  color        : rgba(255,255,255,.6);
+  border-radius: var(--radius-sm);
+  padding      : 4px 10px;
+  font-size    : .68rem;
+  transition   : all .15s;
+  white-space  : nowrap;
+}
+.hdr-btn-cambiar-obra:hover { border-color: var(--accent); color: var(--accent); }
+.hdr-sep { flex: 1; }
+.hdr-email { font-size: .72rem; color: rgba(255,255,255,.4); white-space: nowrap; }
 
-  /* ---------- Links modal ---------- */
-  .links-lista{display:flex;flex-direction:column;gap:8px;}
-  .links-lista a{
-    display:block;
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:8px;
-    padding:12px 14px;
-    font-size:14px;
-    color:var(--text);
-    text-decoration:none;
-  }
-  .links-lista a:hover{border-color:var(--amber);}
+/* ─────────────────────────────────────────────────
+   DIALOG "Sesión actual" (Ctrl+Alt+U) — de BDC
+───────────────────────────────────────────────── */
+#session-dialog-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(15,23,42,.4); z-index: 200;
+  align-items: center; justify-content: center;
+}
+#session-dialog-overlay.visible { display: flex; }
+.session-dialog {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow-md); padding: 24px; max-width: 320px; width: 100%;
+}
+.session-dialog-title { font-size: .9rem; font-weight: 600; margin-bottom: 14px; }
+.session-dialog-row { display: flex; justify-content: space-between; font-size: .78rem; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.session-dialog-row:last-of-type { border-bottom: none; }
+.session-dialog-label { color: var(--muted); }
+.badge-noexpira { background: var(--tag-bg); color: var(--tag-fg); font-size: .64rem; font-weight: 700; padding: 2px 7px; border-radius: 99px; }
+.btn-cerrar-sesion {
+  width: 100%; margin-top: 16px; padding: 9px; border-radius: var(--radius-sm);
+  border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; font-size: .78rem; font-weight: 600;
+}
+.btn-cerrar-sesion:hover { background: #fee2e2; }
 
-  /* ---------- Quill override (tema del stack) ---------- */
-  .ql-toolbar.ql-snow{border-color:var(--border);border-radius:8px 8px 0 0;}
-  .ql-container.ql-snow{border-color:var(--border);border-radius:0 0 8px 8px;min-height:220px;font-size:14px;font-family:'DM Sans',Arial,sans-serif;}
+/* ─────────────────────────────────────────────────
+   VISTA PRINCIPAL — específico de PreKOM
+───────────────────────────────────────────────── */
+.view { max-width: 960px; margin: 0 auto; padding: 24px 20px 60px; }
 
-  .estado-vacio{
-    text-align:center;color:var(--text-faint);padding:60px 20px;font-size:14px;
-  }
+/* Breadcrumb — patrón real de BDC (#explorador-breadcrumb) */
+#prekom-breadcrumb { font-size: .78rem; color: var(--muted); margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; }
+.breadcrumb-item { cursor: pointer; }
+.breadcrumb-item:hover { color: var(--accent); text-decoration: underline; }
+.breadcrumb-item:last-child { color: var(--text); font-weight: 600; cursor: default; }
+.breadcrumb-item:last-child:hover { text-decoration: none; }
+.breadcrumb-sep { margin: 0 6px; color: var(--border); }
 
-  @media (max-width:560px){
-    .app-header .obra-nombre{display:none;}
-    .cards-grid{grid-template-columns:1fr;}
-  }
+/* Home — 14 cards */
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
+  text-align: left; transition: transform .12s ease, box-shadow .12s ease;
+}
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.card .card-titulo { font-family: 'Bebas Neue', sans-serif; font-size: 19px; color: var(--accent2); line-height: 1.15; }
+.card .card-desc { font-size: 13px; color: var(--muted); flex: 1; min-height: 32px; }
+.card .card-footer {
+  display: flex; justify-content: space-between; align-items: center; font-size: 12px;
+  color: var(--muted); border-top: 1px solid var(--border); padding-top: 10px; margin-top: 2px;
+}
+.card .ver-mas { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 700; padding: 0; }
+
+/* Árbol — lista de hijos (nivel 2/3) */
+.arbol-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
+.arbol-item {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; text-align: left; width: 100%;
+}
+.arbol-item:hover { border-color: var(--accent); }
+.arbol-item .punto { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 44px; }
+.arbol-item .titulo { flex: 1; font-size: 14px; font-weight: 500; }
+.arbol-item .flecha { color: var(--accent); font-size: 15px; }
+.arbol-subtitulo { font-size: .78rem; color: var(--muted); font-weight: 600; margin: 4px 0 -4px; text-transform: uppercase; letter-spacing: .03em; }
+
+/* Nodo — Resumen */
+.nodo-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+.nodo-titulo { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--accent2); }
+.btn-editar { background: var(--accent); color: #fff; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); padding: 8px 16px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.btn-editar:hover { background: #b45309; }
+.resumen-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; box-shadow: var(--shadow); min-height: 60px;
+}
+.resumen-box.vacio { color: var(--muted); font-style: italic; }
+.resumen-box p:first-child { margin-top: 0; }
+.resumen-box p:last-child { margin-bottom: 0; }
+
+/* Modales de edición y links (propios de PreKOM) */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
+.modal-box { background: var(--surface); border-radius: 14px; width: 100%; max-width: 420px; box-shadow: var(--shadow-md); overflow: hidden; }
+.modal-box.wide { max-width: 640px; }
+.modal-head { background: var(--accent2); color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+.modal-head h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.modal-close { background: none; border: none; color: rgba(255,255,255,.5); font-size: 20px; line-height: 1; }
+.modal-close:hover { color: #fff; }
+.modal-body { padding: 22px 20px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+
+.links-lista { display: flex; flex-direction: column; gap: 8px; }
+.links-lista a { display: block; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px; color: var(--text); text-decoration: none; }
+.links-lista a:hover { border-color: var(--accent); }
+
+.ql-toolbar.ql-snow { border-color: var(--border); border-radius: 8px 8px 0 0; }
+.ql-container.ql-snow { border-color: var(--border); border-radius: 0 0 8px 8px; min-height: 220px; font-size: 14px; font-family: 'DM Sans', sans-serif; }
+
+.estado-vacio { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 14px; }
+
+@media (max-width: 560px) {
+  .hdr-obra-nombre { display: none; }
+  .cards-grid { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
 
-<header class="app-header">
-  <div class="brand">PreKOM <small id="version-label">v001</small></div>
-  <div class="obra-nombre" id="obra-nombre-label"></div>
-  <button class="header-btn hidden" id="btn-links" title="Links de la obra">🔗 Links</button>
-</header>
+<!-- ═══════════════ LOGIN SCREEN ═══════════════ -->
+<div id="login-screen" class="pantalla-centrada">
+  <div class="caja">
+    <div class="caja-logo">PreKOM</div>
+    <div class="caja-version" id="version-label">v002</div>
+    <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
-<main class="view" id="main-view">
-  <div class="estado-vacio" id="estado-carga">Cargando PreKOM…</div>
-</main>
-
-<!-- ============================================================
-     MODAL — Login pwa_pin (5 estados internos)
-     ============================================================ -->
-<div class="modal-overlay hidden" id="modal-login">
-  <div class="modal-box">
-    <div class="modal-head">
-      <h3>PreKOM</h3>
+    <div id="paso-email" class="login-paso activo">
+      <div class="caja-title">Ingresá tu email</div>
+      <div class="caja-desc">Te vamos a enviar un código de acceso.</div>
+      <div id="login-error-email" class="msg-error"></div>
+      <input type="email" id="input-email" class="input-email" placeholder="nombre@empresa.com" autocomplete="email">
+      <button class="btn-accion" id="btn-pedir-pin">Enviar código</button>
     </div>
-    <div class="modal-body">
 
-      <!-- Paso: pedir email -->
-      <div id="paso-email">
-        <p>Ingresá tu email para acceder.</p>
-        <div id="login-error-email" class="login-error hidden"></div>
-        <input type="email" id="input-email" placeholder="nombre@empresa.com" autocomplete="email">
-        <div class="modal-actions">
-          <button class="btn-primary" id="btn-pedir-pin">Enviar código</button>
-        </div>
-      </div>
+    <div id="paso-codigo" class="login-paso">
+      <div class="caja-title">Ingresá el código</div>
+      <div class="caja-desc">Te enviamos un código de 6 dígitos a <strong id="email-confirmado"></strong>.</div>
+      <div id="login-error-pin" class="msg-error"></div>
+      <input type="text" id="input-pin" class="input-pin" maxlength="6" inputmode="numeric" placeholder="······">
+      <button class="btn-accion" id="btn-validar-pin">Ingresar</button>
+      <button class="btn-secundario" id="btn-reenviar-pin">Reenviar código</button>
+    </div>
 
-      <!-- Paso: esperando código -->
-      <div id="paso-codigo" class="hidden">
-        <p>Te enviamos un código de 6 dígitos a <strong id="email-confirmado"></strong>.</p>
-        <div id="login-error-pin" class="login-error hidden"></div>
-        <input type="text" id="input-pin" class="pin-input" maxlength="6" inputmode="numeric" placeholder="······">
-        <div class="modal-actions" style="justify-content:space-between;">
-          <button class="btn-secondary" id="btn-reenviar-pin">Reenviar código</button>
-          <button class="btn-primary" id="btn-validar-pin">Ingresar</button>
-        </div>
-      </div>
+    <div id="paso-validando" class="login-paso">
+      <div class="spinner"></div>
+      <div class="caja-desc" style="margin-bottom:0">Validando usuario…</div>
+    </div>
 
-      <!-- Paso: validando sesión (revalidación al abrir) -->
-      <div id="paso-validando" class="hidden">
-        <div class="login-spinner">
-          <div class="spinner"></div>
-          <span>Validando usuario…</span>
-        </div>
-      </div>
+    <div id="paso-sin-conexion" class="login-paso">
+      <div class="caja-desc">No pudimos conectar con el servidor. Reintentá cuando tengas conexión.</div>
+      <button class="btn-accion" id="btn-reintentar-conexion">Reintentar</button>
+    </div>
 
-      <!-- Paso: sin conexión -->
-      <div id="paso-sin-conexion" class="hidden">
-        <p>No pudimos conectar con el servidor. Tus datos guardados siguen ahí — reintentá cuando tengas conexión.</p>
-        <div class="modal-actions">
-          <button class="btn-primary" id="btn-reintentar-conexion">Reintentar</button>
-        </div>
-      </div>
-
-      <!-- Paso: error de auth (usuario no encontrado / inactivo / bloqueado) -->
-      <div id="paso-error-auth" class="hidden">
-        <p id="texto-error-auth"></p>
-        <div class="modal-actions">
-          <button class="btn-primary" id="btn-volver-email">Volver</button>
-        </div>
-      </div>
-
+    <div id="paso-error-auth" class="login-paso">
+      <div class="caja-desc" id="texto-error-auth"></div>
+      <button class="btn-accion" id="btn-volver-email">Volver</button>
     </div>
   </div>
 </div>
 
-<!-- ============================================================
-     MODAL — Editar Resumen (Quill)
-     ============================================================ -->
+<!-- ═══════════════ OBRAS SCREEN ("Cambiar obra") ═══════════════ -->
+<div id="obras-screen" class="pantalla-centrada">
+  <div class="caja">
+    <div class="caja-logo">PreKOM</div>
+    <div class="caja-sub">Elegí una obra</div>
+    <div id="lista-obras"><div class="obras-vacio">Cargando obras…</div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP ═══════════════ -->
+<div id="app">
+  <header id="app-header">
+    <div class="hdr-logo">PreKOM</div>
+    <div class="hdr-version" id="version-label-app">v002</div>
+    <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
+    <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
+    <button class="hdr-btn-cambiar-obra hidden" id="btn-links">Links</button>
+    <div class="hdr-sep"></div>
+    <div class="hdr-email" id="hdr-email"></div>
+  </header>
+
+  <main class="view" id="main-view">
+    <div class="estado-vacio">Cargando…</div>
+  </main>
+</div>
+
+<!-- ═══════════════ DIALOG "Sesión actual" (Ctrl+Alt+U) ═══════════════ -->
+<div id="session-dialog-overlay" onclick="if(event.target===this) cerrarSessionDialog()">
+  <div class="session-dialog">
+    <div class="session-dialog-title">Sesión actual</div>
+    <div class="session-dialog-row"><span class="session-dialog-label">Email</span><span id="sd-email"></span></div>
+    <div class="session-dialog-row"><span class="session-dialog-label">Nombre</span><span id="sd-nombre"></span></div>
+    <div class="session-dialog-row"><span class="session-dialog-label">Vence</span><span id="sd-vence"></span></div>
+    <button class="btn-cerrar-sesion" onclick="cerrarSesion()">Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- ═══════════════ MODAL — Editar Resumen (Quill) ═══════════════ -->
 <div class="modal-overlay hidden" id="modal-editar">
   <div class="modal-box wide">
     <div class="modal-head">
@@ -401,16 +403,14 @@
     <div class="modal-body">
       <div id="quill-editor"></div>
       <div class="modal-actions">
-        <button class="btn-secondary" id="btn-cancelar-editar">Cancelar</button>
-        <button class="btn-primary" id="btn-guardar-editar">Guardar</button>
+        <button class="btn-secundario" style="width:auto" id="btn-cancelar-editar">Cancelar</button>
+        <button class="btn-accion" style="width:auto" id="btn-guardar-editar">Guardar</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- ============================================================
-     MODAL — Links de la obra (header, tope 5)
-     ============================================================ -->
+<!-- ═══════════════ MODAL — Links de la obra ═══════════════ -->
 <div class="modal-overlay hidden" id="modal-links">
   <div class="modal-box">
     <div class="modal-head">
@@ -425,174 +425,154 @@
 
 <script>
 // ============================================================
-// CONFIG — PreKOM v001 (Módulo 1: Árbol documental)
+// PreKOM — index_prekom_v002.html — lógica
+// v002: reescrito para reutilizar los patrones reales de BDC
+// (index_bdc_v6_0_0.html) — tokens, pantallas de login/obras,
+// header, dialog de sesión (Ctrl+Alt+U) y breadcrumb, en vez de
+// la versión inventada de v001.
 // ============================================================
-const APP_VERSION = 'v001';
-const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
-const APP_KEY = 'prekom';
-const SESION_KEY = APP_KEY + '_sesion';
 
-// v001 es mono-obra en uso (una sola obra real, Pluspetrol), pero la
-// arquitectura de backend ya es multi-obra (config_obras). En vez de
-// hardcodear un ObraId, al loguearse se pide listarObras y se toma
-// la primera — hoy hay una sola, y esto no rompe si en el futuro hay
-// más (un selector de obra queda para una iteración posterior).
-let ESTADO = {
-  email: null,
-  nombreApellido: null,
-  esAdmin: false,
-  obraId: null,
-  nombreObra: null,
-  arbol: [],       // todos los nodos (Punto|Nivel|Titulo|Resumen)
-  links: [],
-  configObra: null,
-  camino: []       // pila de nodos actuales para navegación en árbol (breadcrumb)
-};
+// ── CONFIG ──────────────────────────────────────────────────
+const APP_VERSION = 'v002';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
+const SESION_KEY = 'prekom_sesion';
+const OBRA_KEY = 'prekom_obra_actual';
+const SESION_DIAS = 7;
+
+document.getElementById('version-label').textContent = APP_VERSION;
+document.getElementById('version-label-app').textContent = APP_VERSION;
+
+// ── ESTADO EN MEMORIA ───────────────────────────────────────
+let emailActual = '';
+let esAdmin = false;
+let obraActual = null;      // { obraId, nombreObra }
+let arbol = [];             // ArbolContenido completo de la obra
+let links = [];
+let configObra = null;
+let caminoActual = [];      // nodos del breadcrumb actual
 
 let quill = null;
+let puntoEnEdicion = null;
 
-// ---------------------------------------------------------------------------
-// Helper de llamadas al backend
-// ---------------------------------------------------------------------------
-async function api(action, params) {
+// ── HELPERS DE FETCH ────────────────────────────────────────
+async function llamarBackend(action, params) {
   const body = Object.assign({ action: action }, params || {});
-  const resp = await fetch(API_URL, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
+  const resp = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
   return resp.json();
 }
 
-// ---------------------------------------------------------------------------
-// Sesión (localStorage, 7 días — o sin vencimiento si noExpira)
-// ---------------------------------------------------------------------------
-function leerSesionGuardada() {
+// ── SESIÓN (localStorage) — mismo patrón que BDC ────────────
+function leerSesion() {
   try {
     const raw = localStorage.getItem(SESION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
-    return null;
-  }
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) { return null; }
 }
-
 function guardarSesion(email, nombreApellido, noExpira) {
-  const vencimiento = noExpira ? null : (Date.now() + 7 * 24 * 60 * 60 * 1000);
-  localStorage.setItem(SESION_KEY, JSON.stringify({
+  const sesion = {
     email: email,
     nombreApellido: nombreApellido || '',
     noExpira: !!noExpira,
-    vence: vencimiento
-  }));
+    exp: Date.now() + SESION_DIAS * 24 * 60 * 60 * 1000
+  };
+  localStorage.setItem(SESION_KEY, JSON.stringify(sesion));
+  return sesion;
 }
-
 function borrarSesion() {
   localStorage.removeItem(SESION_KEY);
+  localStorage.removeItem(OBRA_KEY);
 }
-
-function sesionVencida(sesion) {
+function sesionVencidaLocalmente(sesion) {
   if (sesion.noExpira) return false;
-  if (!sesion.vence) return true;
-  return Date.now() > sesion.vence;
+  return Date.now() > sesion.exp;
 }
 
-// ---------------------------------------------------------------------------
-// Boot
-// ---------------------------------------------------------------------------
+// ── OBRA (localStorage) — mismo patrón que BDC ("Cambiar obra") ──
+function leerObraGuardada() {
+  try {
+    const raw = localStorage.getItem(OBRA_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) { return null; }
+}
+function guardarObraActual(obra) { localStorage.setItem(OBRA_KEY, JSON.stringify(obra)); }
+function cambiarObra() {
+  localStorage.removeItem(OBRA_KEY);
+  obraActual = null;
+  cargarObras();
+}
+
+// ── BOOT ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', boot);
 
-async function boot() {
-  const sesion = leerSesionGuardada();
-  if (!sesion || sesionVencida(sesion)) {
+function boot() {
+  document.addEventListener('keydown', onKeydownGlobal);
+
+  const sesion = leerSesion();
+  if (!sesion || sesionVencidaLocalmente(sesion)) {
     borrarSesion();
-    mostrarModalLogin();
+    mostrarPantalla('login-screen');
     mostrarPasoLogin('email');
     return;
   }
 
-  mostrarModalLogin();
+  mostrarPantalla('login-screen');
   mostrarPasoLogin('validando');
+  revalidarSesion(sesion.email);
+}
 
+async function revalidarSesion(email) {
   let resultado;
   try {
-    resultado = await api('validarSesion', { email: sesion.email });
+    resultado = await llamarBackend('validarSesion', { email: email });
   } catch (err) {
     mostrarPasoLogin('sin-conexion');
     return;
   }
-
   if (!resultado.ok) {
     borrarSesion();
     mostrarTextoErrorAuth(resultado.motivo);
     mostrarPasoLogin('error-auth');
     return;
   }
-
-  await onLoginOk(sesion.email, resultado.nombreApellido);
+  await onLoginOk(email, resultado.nombreApellido);
 }
 
 async function onLoginOk(email, nombreApellido) {
-  ESTADO.email = email;
-  ESTADO.nombreApellido = nombreApellido || '';
-
-  ocultarModalLogin();
-  document.getElementById('estado-carga').textContent = 'Cargando datos de la obra…';
+  emailActual = email;
 
   try {
-    const [resAdmin, resObras] = await Promise.all([
-      api('verificarAdmin', { email: email }),
-      api('listarObras', {})
-    ]);
-
-    ESTADO.esAdmin = !!(resAdmin && resAdmin.esAdmin);
-
-    if (!resObras.ok || !resObras.obras || !resObras.obras.length) {
-      renderEstadoVacioGlobal('Todavía no hay ninguna obra creada en el Maestro. Creála desde el menú "PreKOM Admin → Crear nueva obra" en el Sheet.');
-      return;
-    }
-
-    // Mono-obra en uso: se toma la primera obra registrada.
-    const obra = resObras.obras[0];
-    ESTADO.obraId = obra.obraId;
-    ESTADO.nombreObra = obra.nombreObra;
-
-    const [resArbol, resLinks, resConfig] = await Promise.all([
-      api('leerArbolContenido', { obraId: ESTADO.obraId }),
-      api('leerLinks', { obraId: ESTADO.obraId }),
-      api('leerConfigObra', { obraId: ESTADO.obraId })
-    ]);
-
-    ESTADO.arbol = (resArbol.ok && resArbol.arbol) ? resArbol.arbol : [];
-    ESTADO.links = (resLinks.ok && resLinks.links) ? resLinks.links : [];
-    ESTADO.configObra = (resConfig.ok && resConfig.config) ? resConfig.config : null;
-
-    document.getElementById('obra-nombre-label').textContent =
-      (ESTADO.configObra && ESTADO.configObra.nombre) ? ESTADO.configObra.nombre : ESTADO.nombreObra;
-
-    if (ESTADO.links.length > 0) {
-      document.getElementById('btn-links').classList.remove('hidden');
-    }
-
-    renderHome();
+    const resAdmin = await llamarBackend('verificarAdmin', { email: email });
+    esAdmin = !!(resAdmin && resAdmin.esAdmin);
   } catch (err) {
-    renderEstadoVacioGlobal('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.');
+    esAdmin = false;
+  }
+
+  const obraGuardada = leerObraGuardada();
+  if (obraGuardada) {
+    obraActual = obraGuardada;
+    await mostrarApp();
+  } else {
+    cargarObras();
   }
 }
 
-function renderEstadoVacioGlobal(mensaje) {
-  document.getElementById('main-view').innerHTML =
-    '<div class="estado-vacio">' + escaparHtml(mensaje) + '</div>';
+// ── PANTALLAS ────────────────────────────────────────────────
+function mostrarPantalla(id) {
+  document.getElementById('login-screen').classList.remove('visible');
+  document.getElementById('obras-screen').classList.remove('visible');
+  document.getElementById('app').style.display = 'none';
+  if (id === 'app') {
+    document.getElementById('app').style.display = 'flex';
+  } else {
+    document.getElementById(id).classList.add('visible');
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Modal de login — control de pasos
-// ---------------------------------------------------------------------------
-function mostrarModalLogin() { document.getElementById('modal-login').classList.remove('hidden'); }
-function ocultarModalLogin() { document.getElementById('modal-login').classList.add('hidden'); }
-
+// ── LOGIN — pasos ────────────────────────────────────────────
 function mostrarPasoLogin(paso) {
   ['email', 'codigo', 'validando', 'sin-conexion', 'error-auth'].forEach(function (p) {
-    document.getElementById('paso-' + p).classList.toggle('hidden', p !== paso);
+    document.getElementById('paso-' + p).classList.toggle('activo', p === paso);
   });
 }
 
@@ -601,7 +581,6 @@ const MOTIVOS_AUTH = {
   inactivo: 'Tu usuario está inactivo. Consultá con el administrador.',
   bloqueado: 'Tu usuario quedó bloqueado por intentos fallidos. Consultá con el administrador.'
 };
-
 function mostrarTextoErrorAuth(motivo) {
   document.getElementById('texto-error-auth').textContent =
     MOTIVOS_AUTH[motivo] || 'No pudimos validar tu sesión. Iniciá sesión de nuevo.';
@@ -610,16 +589,15 @@ function mostrarTextoErrorAuth(motivo) {
 document.getElementById('btn-pedir-pin').addEventListener('click', async function () {
   const email = document.getElementById('input-email').value.trim();
   const errBox = document.getElementById('login-error-email');
-  errBox.classList.add('hidden');
-
+  errBox.classList.remove('visible');
   if (!email) return;
 
   this.disabled = true;
   try {
-    const res = await api('solicitarPIN', { email: email });
+    const res = await llamarBackend('solicitarPIN', { email: email });
     if (!res.ok) {
       errBox.textContent = textoErrorSolicitarPin(res.motivo, res.restanteSegundos);
-      errBox.classList.remove('hidden');
+      errBox.classList.add('visible');
       this.disabled = false;
       return;
     }
@@ -649,16 +627,15 @@ document.getElementById('btn-validar-pin').addEventListener('click', async funct
   const email = document.getElementById('input-email').dataset.pendiente;
   const pin = document.getElementById('input-pin').value.trim();
   const errBox = document.getElementById('login-error-pin');
-  errBox.classList.add('hidden');
-
+  errBox.classList.remove('visible');
   if (!pin) return;
 
   this.disabled = true;
   try {
-    const res = await api('validarPIN', { email: email, pin: pin });
+    const res = await llamarBackend('validarPIN', { email: email, pin: pin });
     if (!res.ok) {
       errBox.textContent = textoErrorValidarPin(res.motivo, res.restantes);
-      errBox.classList.remove('hidden');
+      errBox.classList.add('visible');
       this.disabled = false;
       return;
     }
@@ -679,17 +656,115 @@ function textoErrorValidarPin(motivo, restantes) {
 }
 
 document.getElementById('btn-reintentar-conexion').addEventListener('click', boot);
-document.getElementById('btn-volver-email').addEventListener('click', function () {
-  mostrarPasoLogin('email');
-});
+document.getElementById('btn-volver-email').addEventListener('click', function () { mostrarPasoLogin('email'); });
 
-// ---------------------------------------------------------------------------
-// Utilidades de árbol
-// ---------------------------------------------------------------------------
-// El campo Nivel del Sheet ya garantiza la profundidad — alcanza con
-// pedir ese Nivel exacto y que el Punto empiece con el prefijo del padre.
+// ── DIALOG "Sesión actual" (Ctrl+Alt+U) — de BDC ────────────
+function onKeydownGlobal(e) {
+  if (e.ctrlKey && e.altKey && (e.key === 'u' || e.key === 'U')) {
+    e.preventDefault();
+    abrirSessionDialog();
+  }
+}
+function abrirSessionDialog() {
+  const sesion = leerSesion();
+  if (!sesion) return;
+  document.getElementById('sd-email').textContent = sesion.email;
+  document.getElementById('sd-nombre').textContent = sesion.nombreApellido || '—';
+  document.getElementById('sd-vence').innerHTML = sesion.noExpira
+    ? '<span class="badge-noexpira">No expira</span>'
+    : new Date(sesion.exp).toLocaleDateString('es-AR');
+  document.getElementById('session-dialog-overlay').classList.add('visible');
+}
+function cerrarSessionDialog() { document.getElementById('session-dialog-overlay').classList.remove('visible'); }
+function cerrarSesion() {
+  borrarSesion();
+  cerrarSessionDialog();
+  location.reload();
+}
+
+// ── SELECCIÓN DE OBRA ("Cambiar obra") — de BDC ─────────────
+async function cargarObras() {
+  mostrarPantalla('obras-screen');
+  document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Cargando obras…</div>';
+
+  try {
+    const r = await llamarBackend('listarObras', {});
+    if (!r.ok) {
+      document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">No pudimos cargar las obras.</div>';
+      return;
+    }
+    if (!r.obras || r.obras.length === 0) {
+      document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Todavía no hay obras creadas.<br>Creá una desde el menú "PreKOM Admin" del Sheet.</div>';
+      return;
+    }
+    // Si hay una sola obra, se entra directo (sin pantalla intermedia)
+    if (r.obras.length === 1) {
+      obraActual = r.obras[0];
+      guardarObraActual(obraActual);
+      await mostrarApp();
+      return;
+    }
+    renderObras(r.obras);
+  } catch (err) {
+    document.getElementById('lista-obras').innerHTML =
+      '<div class="obras-vacio">Sin conexión. <button class="btn-secundario" style="width:auto;display:inline-block;margin-top:8px" onclick="cargarObras()">Reintentar</button></div>';
+  }
+}
+
+function renderObras(obras) {
+  const cont = document.getElementById('lista-obras');
+  cont.innerHTML = '';
+  obras.forEach(function (obra) {
+    const card = document.createElement('div');
+    card.className = 'obra-card';
+    card.onclick = async function () {
+      obraActual = obra;
+      guardarObraActual(obra);
+      await mostrarApp();
+    };
+    card.innerHTML =
+      '<span class="obra-nombre">' + escaparHtml(obra.nombreObra) + '</span>' +
+      '<span class="obra-flecha">›</span>';
+    cont.appendChild(card);
+  });
+}
+
+document.getElementById('btn-cambiar-obra').addEventListener('click', cambiarObra);
+
+// ── APP (Módulo 1 — Árbol documental) ───────────────────────
+async function mostrarApp() {
+  mostrarPantalla('app');
+  document.getElementById('hdr-email').textContent = emailActual;
+  document.getElementById('main-view').innerHTML = '<div class="estado-vacio">Cargando datos de la obra…</div>';
+
+  try {
+    const [resArbol, resLinks, resConfig] = await Promise.all([
+      llamarBackend('leerArbolContenido', { obraId: obraActual.obraId }),
+      llamarBackend('leerLinks', { obraId: obraActual.obraId }),
+      llamarBackend('leerConfigObra', { obraId: obraActual.obraId })
+    ]);
+
+    arbol = (resArbol.ok && resArbol.arbol) ? resArbol.arbol : [];
+    links = (resLinks.ok && resLinks.links) ? resLinks.links : [];
+    configObra = (resConfig.ok && resConfig.config) ? resConfig.config : null;
+
+    document.getElementById('hdr-obra-nombre').textContent =
+      (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
+        ? configObra.nombre
+        : obraActual.nombreObra;
+
+    document.getElementById('btn-links').classList.toggle('hidden', links.length === 0);
+
+    renderHome();
+  } catch (err) {
+    document.getElementById('main-view').innerHTML =
+      '<div class="estado-vacio">No se pudo conectar con el backend. Revisá tu conexión y recargá la página.</div>';
+  }
+}
+
+// ── UTILIDADES DE ÁRBOL ──────────────────────────────────────
 function nodosNivel(nivel, prefijoPadre) {
-  return ESTADO.arbol
+  return arbol
     .filter(function (n) {
       if (n.nivel !== nivel) return false;
       if (!prefijoPadre) return true;
@@ -697,13 +772,9 @@ function nodosNivel(nivel, prefijoPadre) {
     })
     .sort(comparePorPunto);
 }
-
 function contarSubpuntos(punto) {
-  return ESTADO.arbol.filter(function (n) {
-    return n.punto !== punto && n.punto.indexOf(punto + '.') === 0;
-  }).length;
+  return arbol.filter(function (n) { return n.punto !== punto && n.punto.indexOf(punto + '.') === 0; }).length;
 }
-
 function comparePorPunto(a, b) {
   const pa = a.punto.split('.').map(Number);
   const pb = b.punto.split('.').map(Number);
@@ -713,29 +784,25 @@ function comparePorPunto(a, b) {
   }
   return 0;
 }
-
 function primerosCaracteres(html, n) {
   const tmp = document.createElement('div');
   tmp.innerHTML = html || '';
   const texto = (tmp.textContent || '').trim();
   return texto.length > n ? texto.slice(0, n) + '…' : texto;
 }
-
 function escaparHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
   return d.innerHTML;
 }
 
-// ---------------------------------------------------------------------------
-// Render — Home (14 cards, nivel 1)
-// ---------------------------------------------------------------------------
+// ── RENDER — Home (14 cards, nivel 1) ────────────────────────
 function renderHome() {
-  ESTADO.camino = [];
+  caminoActual = [];
   const nodos = nodosNivel(1, null);
 
   if (!nodos.length) {
-    renderEstadoVacioGlobal('Todavía no hay contenido cargado en ArbolContenido para esta obra.');
+    document.getElementById('main-view').innerHTML = '<div class="estado-vacio">Todavía no hay contenido cargado en ArbolContenido para esta obra.</div>';
     return;
   }
 
@@ -744,7 +811,7 @@ function renderHome() {
     return '' +
       '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
         '<div class="card-titulo">' + escaparHtml(n.titulo) + '</div>' +
-        '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, 30)) + '</div>' +
+        '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, 60)) + '</div>' +
         '<div class="card-footer">' +
           '<span>' + sub + (sub === 1 ? ' subpunto' : ' subpuntos') + '</span>' +
           '<span class="ver-mas">Ver más →</span>' +
@@ -755,21 +822,12 @@ function renderHome() {
   document.getElementById('main-view').innerHTML = html;
 }
 
-// ---------------------------------------------------------------------------
-// Render — navegación en árbol (nivel 2 / 3) y nodo hoja
-// ---------------------------------------------------------------------------
+// ── RENDER — navegación en árbol + nodo ──────────────────────
 function abrirNodo(punto) {
-  const nodo = ESTADO.arbol.find(function (n) { return n.punto === punto; });
+  const nodo = arbol.find(function (n) { return n.punto === punto; });
   if (!nodo) return;
-
-  ESTADO.camino = caminoHasta(punto);
-
-  const hijos = nodosNivel(nodo.nivel + 1, punto);
-  if (hijos.length > 0 && nodo.nivel < 3) {
-    renderListaHijos(nodo, hijos);
-  } else {
-    renderNodoHoja(nodo);
-  }
+  caminoActual = caminoHasta(punto);
+  renderNodo(nodo);
 }
 
 function caminoHasta(punto) {
@@ -777,48 +835,31 @@ function caminoHasta(punto) {
   const camino = [];
   for (let i = 1; i <= partes.length; i++) {
     const p = partes.slice(0, i).join('.');
-    const n = ESTADO.arbol.find(function (x) { return x.punto === p; });
+    const n = arbol.find(function (x) { return x.punto === p; });
     if (n) camino.push(n);
   }
   return camino;
 }
 
 function renderBreadcrumb() {
-  let html = '<button onclick="renderHome()">Inicio</button>';
-  ESTADO.camino.forEach(function (n, i) {
-    html += '<span class="sep">/</span>';
-    if (i === ESTADO.camino.length - 1) {
-      html += '<span>' + escaparHtml(n.titulo) + '</span>';
-    } else {
-      html += '<button onclick="abrirNodo(\'' + n.punto + '\')">' + escaparHtml(n.titulo) + '</button>';
-    }
+  let html = '<span class="breadcrumb-item" onclick="renderHome()">Inicio</span>';
+  caminoActual.forEach(function (n) {
+    html += '<span class="breadcrumb-sep">›</span>';
+    html += '<span class="breadcrumb-item" onclick="abrirNodo(\'' + n.punto + '\')">' + escaparHtml(n.titulo) + '</span>';
   });
-  return '<div class="breadcrumb">' + html + '</div>';
+  return '<div id="prekom-breadcrumb">' + html + '</div>';
 }
 
-function renderListaHijos(nodo, hijos) {
-  const filas = hijos.map(function (n) {
-    return '' +
-      '<button class="arbol-item" onclick="abrirNodo(\'' + n.punto + '\')">' +
-        '<span class="punto">' + escaparHtml(n.punto) + '</span>' +
-        '<span class="titulo">' + escaparHtml(n.titulo) + '</span>' +
-        '<span class="flecha">→</span>' +
-      '</button>';
-  }).join('');
-
-  document.getElementById('main-view').innerHTML =
-    renderBreadcrumb() +
-    '<div class="arbol-lista">' + filas + '</div>';
-}
-
-function renderNodoHoja(nodo) {
+// v002: un nodo siempre muestra su propio Resumen; si además tiene
+// subpuntos (nivel < 3), se lista la navegación hacia ellos debajo
+// — antes era resumen O lista de hijos, nunca los dos juntos.
+function renderNodo(nodo) {
   const resumenLimpio = nodo.resumen ? DOMPurify.sanitize(nodo.resumen) : '';
-  const btnEditar = ESTADO.esAdmin
+  const btnEditar = esAdmin
     ? '<button class="btn-editar" onclick="abrirEditor(\'' + nodo.punto + '\')">Editar</button>'
     : '';
 
-  document.getElementById('main-view').innerHTML =
-    renderBreadcrumb() +
+  let html = renderBreadcrumb() +
     '<div class="nodo-header">' +
       '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
       btnEditar +
@@ -826,15 +867,28 @@ function renderNodoHoja(nodo) {
     '<div class="resumen-box' + (resumenLimpio ? '' : ' vacio') + '">' +
       (resumenLimpio || 'Todavía no hay Resumen cargado para este punto.') +
     '</div>';
+
+  if (nodo.nivel < 3) {
+    const hijos = nodosNivel(nodo.nivel + 1, nodo.punto);
+    if (hijos.length > 0) {
+      html += '<div class="arbol-subtitulo">Subpuntos</div>' +
+        '<div class="arbol-lista">' + hijos.map(function (n) {
+          return '' +
+            '<button class="arbol-item" onclick="abrirNodo(\'' + n.punto + '\')">' +
+              '<span class="punto">' + escaparHtml(n.punto) + '</span>' +
+              '<span class="titulo">' + escaparHtml(n.titulo) + '</span>' +
+              '<span class="flecha">›</span>' +
+            '</button>';
+        }).join('') + '</div>';
+    }
+  }
+
+  document.getElementById('main-view').innerHTML = html;
 }
 
-// ---------------------------------------------------------------------------
-// Modal — Editar Resumen (Quill)
-// ---------------------------------------------------------------------------
-let puntoEnEdicion = null;
-
+// ── MODAL — Editar Resumen (Quill) ───────────────────────────
 function abrirEditor(punto) {
-  const nodo = ESTADO.arbol.find(function (n) { return n.punto === punto; });
+  const nodo = arbol.find(function (n) { return n.punto === punto; });
   if (!nodo) return;
   puntoEnEdicion = punto;
 
@@ -860,12 +914,10 @@ function abrirEditor(punto) {
     quill.clipboard.dangerouslyPasteHTML(DOMPurify.sanitize(nodo.resumen));
   }
 }
-
 function cerrarEditor() {
   document.getElementById('modal-editar').classList.add('hidden');
   puntoEnEdicion = null;
 }
-
 document.getElementById('btn-cerrar-editar').addEventListener('click', cerrarEditor);
 document.getElementById('btn-cancelar-editar').addEventListener('click', cerrarEditor);
 
@@ -875,33 +927,30 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
 
   this.disabled = true;
   try {
-    const res = await api('guardarResumen', {
-      obraId: ESTADO.obraId,
+    const res = await llamarBackend('guardarResumen', {
+      obraId: obraActual.obraId,
       punto: puntoEnEdicion,
       resumen: html,
-      email: ESTADO.email
+      email: emailActual
     });
     if (!res.ok) {
       alert(res.error || 'No se pudo guardar.');
       this.disabled = false;
       return;
     }
-    const nodo = ESTADO.arbol.find(function (n) { return n.punto === puntoEnEdicion; });
+    const nodo = arbol.find(function (n) { return n.punto === puntoEnEdicion; });
     if (nodo) nodo.resumen = html;
-
     cerrarEditor();
-    renderNodoHoja(nodo);
+    renderNodo(nodo);
   } catch (err) {
     alert('No se pudo conectar con el backend.');
   }
   this.disabled = false;
 });
 
-// ---------------------------------------------------------------------------
-// Modal — Links de la obra
-// ---------------------------------------------------------------------------
+// ── MODAL — Links de la obra ──────────────────────────────────
 document.getElementById('btn-links').addEventListener('click', function () {
-  const html = ESTADO.links.map(function (l) {
+  const html = links.map(function (l) {
     return '<a href="' + escaparHtml(l.url) + '" target="_blank" rel="noopener">' + escaparHtml(l.nombre) + '</a>';
   }).join('');
   document.getElementById('links-lista').innerHTML = html;
