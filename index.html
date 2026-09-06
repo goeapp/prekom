@@ -245,14 +245,20 @@ input { font-family: inherit; }
 .breadcrumb-item:last-child:hover { text-decoration: none; }
 .breadcrumb-sep { margin: 0 6px; color: var(--border); }
 
-/* Home — 14 cards */
-.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+/* Home — 14 cards (v003: 4 columnas fijas, con breakpoints —
+   antes era auto-fill por ancho mínimo, lo que dejaba 1 sola
+   columna en ventanas angostas) */
+.cards-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+@media (max-width: 1100px) { .cards-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 820px)  { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px)  { .cards-grid { grid-template-columns: 1fr; } }
 .card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
   text-align: left; transition: transform .12s ease, box-shadow .12s ease;
 }
 .card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.card .card-punto { font-size: 11px; color: var(--muted); font-weight: 700; letter-spacing: .03em; }
 .card .card-titulo { font-family: 'Bebas Neue', sans-serif; font-size: 19px; color: var(--accent2); line-height: 1.15; }
 .card .card-desc { font-size: 13px; color: var(--muted); flex: 1; min-height: 32px; }
 .card .card-footer {
@@ -276,6 +282,7 @@ input { font-family: inherit; }
 
 /* Nodo — Resumen */
 .nodo-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+.nodo-punto { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .03em; margin-bottom: 2px; }
 .nodo-titulo { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--accent2); }
 .btn-editar { background: var(--accent); color: #fff; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); padding: 8px 16px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .btn-editar:hover { background: #b45309; }
@@ -319,7 +326,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v002</div>
+    <div class="caja-version" id="version-label">v003</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -369,7 +376,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v002</div>
+    <div class="hdr-version" id="version-label-app">v003</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
     <button class="hdr-btn-cambiar-obra hidden" id="btn-links">Links</button>
@@ -425,7 +432,15 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v002.html — lógica
+// PreKOM — index_prekom_v003.html — lógica
+// v003: Ale probó v002 (OK en colores/tipografías/tamaños) y pidió 4
+// ajustes puntuales: (1) grilla de cards a 4 columnas fijas con
+// breakpoints, en vez de auto-fill por ancho mínimo (dejaba 1 sola
+// columna en ventanas angostas); (2) [pendiente — falta que Ale mande
+// screenshot comparando Home vs nivel 2/3 para entender qué se corría
+// horizontalmente]; (3) ya estaba en 60 caracteres desde v002, sin
+// cambios; (4) número de Punto arriba del título, en las cards del
+// Home y en el header del nodo.
 // v002: reescrito para reutilizar los patrones reales de BDC
 // (index_bdc_v6_0_0.html) — tokens, pantallas de login/obras,
 // header, dialog de sesión (Ctrl+Alt+U) y breadcrumb, en vez de
@@ -433,7 +448,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v002';
+const APP_VERSION = 'v003';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -810,6 +825,7 @@ function renderHome() {
     const sub = contarSubpuntos(n.punto);
     return '' +
       '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
+        '<div class="card-punto">' + escaparHtml(n.punto) + '</div>' +
         '<div class="card-titulo">' + escaparHtml(n.titulo) + '</div>' +
         '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, 60)) + '</div>' +
         '<div class="card-footer">' +
@@ -861,7 +877,10 @@ function renderNodo(nodo) {
 
   let html = renderBreadcrumb() +
     '<div class="nodo-header">' +
-      '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
+      '<div>' +
+        '<div class="nodo-punto">' + escaparHtml(nodo.punto) + '</div>' +
+        '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
+      '</div>' +
       btnEditar +
     '</div>' +
     '<div class="resumen-box' + (resumenLimpio ? '' : ' vacio') + '">' +
