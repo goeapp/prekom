@@ -237,7 +237,7 @@ input { font-family: inherit; }
 /* ─────────────────────────────────────────────────
    VISTA PRINCIPAL — específico de PreKOM
 ───────────────────────────────────────────────── */
-.view { width: 100%; max-width: 1280px; margin: 0 auto; padding: 24px 28px 60px; }
+.view { width: 100%; max-width: 1680px; margin: 0 auto; padding: 24px 28px 60px; }
 
 /* Breadcrumb — patrón real de BDC (#explorador-breadcrumb) */
 #prekom-breadcrumb { font-size: .78rem; color: var(--muted); margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; }
@@ -360,7 +360,7 @@ input { font-family: inherit; }
 
 /* Tabulator — retema para calzar con los tokens del stack */
 .tabulator { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; box-shadow: var(--shadow); }
-.tabulator .tabulator-header { background: var(--accent2) !important; border-bottom: none; }
+.tabulator .tabulator-header { background: transparent !important; border-bottom: none; }
 .tabulator .tabulator-col { background: var(--accent2) !important; border-right: 1px solid rgba(255,255,255,.08); }
 .tabulator .tabulator-col-title,
 .tabulator .tabulator-col-title-holder,
@@ -384,8 +384,15 @@ input { font-family: inherit; }
 }
 .input-buscador:focus { outline: none; border-color: var(--accent); }
 .tabulator .tabulator-footer { background: var(--surface); border-top: 1px solid var(--border); }
-.tabulator .tabulator-page { border-radius: var(--radius-sm); font-size: 12px; }
+.tabulator .tabulator-page {
+  border-radius: var(--radius-sm); font-size: 12px; padding: 5px 11px; margin: 0 2px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.tabulator .tabulator-page:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: #fffbeb; }
 .tabulator .tabulator-page.active { background: var(--accent); color: #fff; border-color: var(--accent-border); }
+.tabulator .tabulator-page[disabled] { opacity: .45; }
+.tabulator .tabulator-paginator { display: flex; align-items: center; gap: 2px; }
+.tabulator .tabulator-page-size { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; color: var(--text); }
 
 /* ─────────────────────────────────────────────────
    MÓDULO 2 — Panel lateral de Comentarios
@@ -426,7 +433,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.04</div>
+    <div class="caja-version" id="version-label">v1.05</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -476,7 +483,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.04</div>
+    <div class="hdr-version" id="version-label-app">v1.05</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol">Árbol</button>
@@ -552,7 +559,19 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.04.html — lógica
+// PreKOM — index_prekom_v1.05.html — lógica
+// v1.05 — 4 ajustes de UX pedidos por Ale tras probar paginado/buscador:
+//  1) Más ancho lateral: .view de max-width 1280px → 1680px.
+//  2) Etiquetas del paginado traducidas al español (locale 'es-ar' +
+//     langs de Tabulator) — antes salían en inglés (First/Prev/Next...).
+//  3) Contraste de los botones de paginado (First/Prev/Next/Last):
+//     no tenían estilo propio (solo .active), quedaban ilegibles.
+//  4) Columna "fantasma" en el header: `fitDataFill` agrega espacio de
+//     relleno a la derecha de la última columna real, y el fondo oscuro
+//     del header (aplicado a todo el contenedor) lo pintaba igual que
+//     una columna más. Se saca el fondo del contenedor y se deja solo
+//     en cada .tabulator-col real — el relleno ahora se ve como espacio
+//     vacío, no como una columna sin título.
 // v1.04 — 3 ajustes de UX de la grilla, pedidos por Ale tras probar
 // Comentarios OK:
 //  1) Paginación nativa de Tabulator (10 filas por página, selector
@@ -602,7 +621,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.04';
+const APP_VERSION = 'v1.05';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1385,7 +1404,25 @@ function montarTabulator(nombreTab, schema, datos) {
     pagination: true,
     paginationSize: 10,
     paginationSizeSelector: [10, 20, 50],
-    paginationCounter: 'rows'
+    paginationCounter: 'rows',
+    locale: 'es-ar',
+    langs: {
+      'es-ar': {
+        pagination: {
+          page_size: 'Filas por página',
+          first: 'Primera',
+          first_title: 'Primera página',
+          last: 'Última',
+          last_title: 'Última página',
+          prev: 'Anterior',
+          prev_title: 'Página anterior',
+          next: 'Siguiente',
+          next_title: 'Página siguiente',
+          all: 'Todas',
+          counter: { showing: 'Mostrando', of: 'de', rows: 'filas', pages: 'páginas' }
+        }
+      }
+    }
   });
 
   tablaListaTabulator.setFilter(filtroBusquedaGlobal);
