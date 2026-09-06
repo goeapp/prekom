@@ -378,6 +378,14 @@ input { font-family: inherit; }
 .btn-borrar-fila { background: none; border: none; color: #dc2626; font-size: 15px; padding: 0 4px; }
 .btn-borrar-fila:hover { color: #991b1b; }
 .tabulator-wrap { margin-top: 4px; }
+.input-buscador {
+  width: 100%; max-width: 320px; padding: 8px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: .82rem; margin-bottom: 12px; color: var(--text); transition: border-color .15s;
+}
+.input-buscador:focus { outline: none; border-color: var(--accent); }
+.tabulator .tabulator-footer { background: var(--surface); border-top: 1px solid var(--border); }
+.tabulator .tabulator-page { border-radius: var(--radius-sm); font-size: 12px; }
+.tabulator .tabulator-page.active { background: var(--accent); color: #fff; border-color: var(--accent-border); }
 
 /* ─────────────────────────────────────────────────
    MÓDULO 2 — Panel lateral de Comentarios
@@ -418,7 +426,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.03</div>
+    <div class="caja-version" id="version-label">v1.04</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -468,7 +476,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.03</div>
+    <div class="hdr-version" id="version-label-app">v1.04</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol">Árbol</button>
@@ -544,7 +552,20 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.03.html — lógica
+// PreKOM — index_prekom_v1.04.html — lógica
+// v1.04 — 3 ajustes de UX de la grilla, pedidos por Ale tras probar
+// Comentarios OK:
+//  1) Paginación nativa de Tabulator (10 filas por página, selector
+//     10/20/50) — soluciona que el header se perdiera con listas largas.
+//  2) Buscador global (una caja arriba de la grilla) que filtra
+//     dinámicamente por coincidencia en cualquier columna — vía
+//     tabla.setFilter(filtroBusquedaGlobal) + refreshFilter() en cada
+//     tecla.
+//  3) layout cambiado de 'fitColumns' a 'fitDataFill': antes todas las
+//     columnas sin ancho fijo se repartían el espacio por igual y se
+//     recalculaban solas, perdiendo cualquier resize manual. Ahora las
+//     columnas arrancan con ancho natural según el contenido y el
+//     resize manual se mantiene.
 // v1.03 — CAUSA REAL encontrada del bug de v1.00-v1.02 (los cambios de
 // celda no llegaban al backend, sin ningún error visible): "cellEdited"
 // estaba puesto como opción del constructor de Tabulator, pero en
@@ -581,7 +602,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.03';
+const APP_VERSION = 'v1.04';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -622,6 +643,14 @@ let listaAbierta = null;         // nombreTab de la lista abierta en detalle
 let schemaListaAbierta = [];     // schema de la lista abierta
 let tablaListaTabulator = null;  // instancia Tabulator activa
 let comentariosListaAbierta = null; // nombreTab con el panel de Comentarios abierto
+let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
+
+function filtroBusquedaGlobal(data) {
+  if (!terminoBusquedaLista) return true;
+  return Object.keys(data).some(function (k) {
+    return String(data[k] || '').toLowerCase().indexOf(terminoBusquedaLista) !== -1;
+  });
+}
 
 const COLOR_MAP = {
   gris: '#64748b', celeste: '#0ea5e9', verde: '#16a34a', rojo: '#dc2626',
@@ -1266,7 +1295,14 @@ async function abrirLista(nombreTab) {
         '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' +
       '</div>' +
     '</div>' +
+    '<input type="text" id="lista-buscador" class="input-buscador" placeholder="Buscar…">' +
     '<div class="tabulator-wrap" id="tabulator-contenedor"></div>';
+
+  terminoBusquedaLista = '';
+  document.getElementById('lista-buscador').addEventListener('input', function () {
+    terminoBusquedaLista = this.value.trim().toLowerCase();
+    if (tablaListaTabulator) tablaListaTabulator.refreshFilter();
+  });
 
   document.getElementById('btn-agregar-fila').addEventListener('click', function () { agregarFilaLista(nombreTab); });
 
@@ -1342,11 +1378,17 @@ function montarTabulator(nombreTab, schema, datos) {
 
   tablaListaTabulator = new Tabulator('#tabulator-contenedor', {
     data: datos,
-    layout: 'fitColumns',
+    layout: 'fitDataFill',
     index: 'id',
     columns: columnas,
-    placeholder: 'Todavía no hay filas cargadas en esta lista.'
+    placeholder: 'Todavía no hay filas cargadas en esta lista.',
+    pagination: true,
+    paginationSize: 10,
+    paginationSizeSelector: [10, 20, 50],
+    paginationCounter: 'rows'
   });
+
+  tablaListaTabulator.setFilter(filtroBusquedaGlobal);
 
   // Tabulator 5.x: "cellEdited" es un EVENTO (se registra con .on()),
   // no una opción del constructor — puesto ahí no tira error, pero
