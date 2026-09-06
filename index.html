@@ -441,7 +441,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.08</div>
+    <div class="caja-version" id="version-label">v1.09</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -491,7 +491,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.08</div>
+    <div class="hdr-version" id="version-label-app">v1.09</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -567,7 +567,15 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.08.html — lógica
+// PreKOM — index_prekom_v1.09.html — lógica
+// v1.09 — botón "Actualizar" en el detalle de lista (pedido por Ale):
+// por si otro usuario cargó/modificó datos, o se agregó una opción
+// nueva a listaValores desde el backend, mientras la lista estaba
+// abierta. Refresca `listaValores` GLOBAL (todas las listas de
+// valores, no solo la abierta) + schema/datos de la lista puntual, y
+// reconstruye la grilla (destruye y remonta) para que los selects
+// reflejen opciones nuevas. Se extrajo la carga de schema/datos de
+// `abrirLista` a una función reutilizable `cargarYMontarLista`.
 // v1.08 — 6 ajustes pedidos por Ale tras probar v1.07:
 //  1) Encabezado de la grilla demasiado alto — padding vertical
 //     reducido de 12px a 5px (~40% del anterior).
@@ -674,7 +682,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.08';
+const APP_VERSION = 'v1.09';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1372,6 +1380,7 @@ async function abrirLista(nombreTab) {
         '<button id="btn-favorito-grande" class="btn-favorito-grande' + (esFav ? ' activo' : '') + '" onclick="toggleFavorito(\'' + nombreTab + '\')">' + (esFav ? '★' : '☆') + '</button>' +
       '</div>' +
       '<div class="lista-header-acciones hidden" id="lista-header-acciones">' +
+        '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
         '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
         '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' +
       '</div>' +
@@ -1388,7 +1397,17 @@ async function abrirLista(nombreTab) {
   });
 
   document.getElementById('btn-agregar-fila').addEventListener('click', function () { agregarFilaLista(nombreTab); });
+  document.getElementById('btn-actualizar-lista').addEventListener('click', function () { actualizarListaActual(); });
 
+  await cargarYMontarLista(nombreTab, true);
+}
+
+/**
+ * Carga (o recarga) el schema/datos de la lista abierta y monta la
+ * grilla. `esPrimeraCarga` controla el estado visual de "Cargando…"
+ * (solo se muestra la primera vez que se abre la lista).
+ */
+async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
   try {
     const [resSchema, resDatos] = await Promise.all([
       llamarBackend('leerListaSchema', { obraId: obraActual.obraId, nombreLista: nombreTab }),
@@ -1397,13 +1416,44 @@ async function abrirLista(nombreTab) {
     schemaListaAbierta = (resSchema.ok && resSchema.schema) ? resSchema.schema : [];
     const datos = (resDatos.ok && resDatos.datos) ? resDatos.datos : [];
     document.getElementById('contador-filas').textContent = datos.length + (datos.length === 1 ? ' fila' : ' filas');
-    document.getElementById('lista-cargando').classList.add('hidden');
-    document.getElementById('lista-header-acciones').classList.remove('hidden');
-    document.getElementById('lista-buscador').classList.remove('hidden');
+    if (esPrimeraCarga) {
+      document.getElementById('lista-cargando').classList.add('hidden');
+      document.getElementById('lista-header-acciones').classList.remove('hidden');
+      document.getElementById('lista-buscador').classList.remove('hidden');
+    }
+    destruirTablaSiExiste();
     montarTabulator(nombreTab, schemaListaAbierta, datos);
   } catch (err) {
-    document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
+    if (esPrimeraCarga) {
+      document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
+    } else {
+      alert('No se pudo actualizar la lista.');
+    }
   }
+}
+
+/**
+ * Botón "Actualizar" — por si otro usuario cargó/modificó datos, o
+ * agregó una opción nueva a listaValores desde el backend, mientras
+ * esta lista estaba abierta. Refresca listaValores (global, todas las
+ * listas de valores) además del schema/datos de esta lista puntual,
+ * y reconstruye la grilla — así los selects reflejan opciones nuevas.
+ */
+async function actualizarListaActual() {
+  if (!listaAbierta) return;
+  const btn = document.getElementById('btn-actualizar-lista');
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = 'Actualizando…';
+  try {
+    const resValores = await llamarBackend('leerListaValores', { obraId: obraActual.obraId });
+    valoresListas = (resValores.ok && resValores.valores) ? resValores.valores : valoresListas;
+    await cargarYMontarLista(listaAbierta, false);
+  } catch (err) {
+    alert('No se pudo actualizar.');
+  }
+  btn.disabled = false;
+  btn.textContent = textoOriginal;
 }
 
 function valoresParaTipo(tipoCampo) {
