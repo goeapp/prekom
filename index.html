@@ -360,13 +360,13 @@ input { font-family: inherit; }
 
 /* Tabulator — retema para calzar con los tokens del stack */
 .tabulator { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; box-shadow: var(--shadow); }
-.tabulator .tabulator-header { background: var(--accent2); border-bottom: none; }
-.tabulator .tabulator-col { background: var(--accent2); border-right: 1px solid rgba(255,255,255,.08); }
+.tabulator .tabulator-header { background: var(--accent2) !important; border-bottom: none; }
+.tabulator .tabulator-col { background: var(--accent2) !important; border-right: 1px solid rgba(255,255,255,.08); }
 .tabulator .tabulator-col-title,
 .tabulator .tabulator-col-title-holder,
-.tabulator .tabulator-col-content { color: #fff !important; }
+.tabulator .tabulator-col-content { color: #fff !important; background: transparent !important; }
 .tabulator .tabulator-col-title { font-weight: 600 !important; font-size: 12px; }
-.tabulator .tabulator-col.tabulator-sortable:hover { background: #1e293b; }
+.tabulator .tabulator-col.tabulator-sortable:hover { background: #1e293b !important; }
 .tabulator-row { background: var(--surface); border-bottom: 1px solid var(--border); }
 .tabulator-row.tabulator-row-even { background: #fafbfc; }
 .tabulator-row:hover { background: #fffbeb; }
@@ -418,7 +418,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.01</div>
+    <div class="caja-version" id="version-label">v1.03</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -468,7 +468,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.01</div>
+    <div class="hdr-version" id="version-label-app">v1.03</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol">Árbol</button>
@@ -544,10 +544,23 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.01.html — lógica
+// PreKOM — index_prekom_v1.03.html — lógica
+// v1.03 — CAUSA REAL encontrada del bug de v1.00-v1.02 (los cambios de
+// celda no llegaban al backend, sin ningún error visible): "cellEdited"
+// estaba puesto como opción del constructor de Tabulator, pero en
+// Tabulator 5.x ese es un EVENTO que se registra con tabla.on(...) —
+// puesto en el constructor no tira error, pero tampoco se dispara
+// nunca. Se cambió a tablaListaTabulator.on('cellEdited', ...).
+// v1.02 — el fix de v1.01 para el texto de encabezados quedó
+// incompleto: el color de texto sí se forzó con !important, pero el
+// FONDO oscuro del header no (perdía la pelea de especificidad contra
+// el tema por defecto de Tabulator), dejando texto blanco sobre el
+// fondo claro de la librería — invisible. Se suma !important también
+// al fondo de #tabulator-header y .tabulator-col.
 // v1.01 — 3 fixes reportados por Ale al probar v1.00:
 //  1) Texto de encabezados de Tabulator invisible (choque de CSS
-//     con el tema por defecto de la librería) — forzado con !important.
+//     con el tema por defecto de la librería) — forzado con !important
+//     (incompleto, ver arriba — completado en v1.02).
 //  2) "+ Agregar fila" insertaba arriba en vez de al final —
 //     addRow(fila, true) → addRow(fila, false).
 //  3) Los cambios de celda (editar Area/Estado/Observaciones) NO
@@ -568,7 +581,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.01';
+const APP_VERSION = 'v1.03';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1332,13 +1345,18 @@ function montarTabulator(nombreTab, schema, datos) {
     layout: 'fitColumns',
     index: 'id',
     columns: columnas,
-    placeholder: 'Todavía no hay filas cargadas en esta lista.',
-    cellEdited: function (cell) {
-      guardarCeldaEditada(nombreTab, cell).catch(function (err) {
-        alert('Error inesperado al guardar la celda: ' + (err && err.message ? err.message : err));
-        cell.restoreOldValue();
-      });
-    }
+    placeholder: 'Todavía no hay filas cargadas en esta lista.'
+  });
+
+  // Tabulator 5.x: "cellEdited" es un EVENTO (se registra con .on()),
+  // no una opción del constructor — puesto ahí no tira error, pero
+  // tampoco se dispara nunca. Esta fue la causa real de que las
+  // ediciones de celda nunca llegaran al backend en v1.00/v1.01/v1.02.
+  tablaListaTabulator.on('cellEdited', function (cell) {
+    guardarCeldaEditada(nombreTab, cell).catch(function (err) {
+      alert('Error inesperado al guardar la celda: ' + (err && err.message ? err.message : err));
+      cell.restoreOldValue();
+    });
   });
 }
 
