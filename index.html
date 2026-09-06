@@ -386,14 +386,14 @@ input { font-family: inherit; }
 .btn-borrar-fila { background: none; border: none; color: #dc2626; font-size: 15px; padding: 0 4px; }
 .btn-borrar-fila:hover { color: #991b1b; }
 .tabulator-wrap { margin-top: 4px; }
-.input-buscador {
-  width: 100%; max-width: 320px; padding: 8px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-  font-size: .82rem; margin-bottom: 12px; color: var(--text); transition: border-color .15s;
+.input-buscador-inline {
+  width: 200px; padding: 7px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: .8rem; color: var(--text); transition: border-color .15s;
 }
+.input-buscador-inline:focus { outline: none; border-color: var(--accent); }
 .contador-filas { font-size: .78rem; color: var(--muted); font-weight: 600; }
 .paginador-arriba { margin-bottom: 10px; }
 .paginador-arriba:empty { margin-bottom: 0; }
-.input-buscador:focus { outline: none; border-color: var(--accent); }
 .tabulator .tabulator-footer { background: var(--surface); border-top: 1px solid var(--border); }
 .paginador-arriba .tabulator-paginator, #paginador-arriba .tabulator-paginator,
 .paginador-arriba, #paginador-arriba {
@@ -447,7 +447,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.10</div>
+    <div class="caja-version" id="version-label">v1.11</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -497,7 +497,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.10</div>
+    <div class="hdr-version" id="version-label-app">v1.11</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -573,7 +573,19 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.10.html — lógica
+// PreKOM — index_prekom_v1.11.html — lógica
+// v1.11 — 2 correcciones sobre v1.10 (Ale aclaró que lo había pedido
+// al revés):
+//  1) Filtro por columna: sacado de los campos SIN lista de valores
+//     fija (numerico/fecha/texto_largo/texto_corto) — con texto largo
+//     el header filter con valuesLookup mostraba un desplegable
+//     enorme con el texto completo de cada fila, poco útil. Ahora
+//     el filtro por selección queda SOLO en las columnas
+//     listaValores_*, usando las mismas opciones fijas del editor de
+//     celda (no una búsqueda de valores existentes).
+//  2) Buscador movido a la misma fila que los botones (Actualizar/
+//     Comentarios/+Agregar fila), como primer elemento — antes
+//     ocupaba una fila propia completa, gastando altura de más.
 // v1.10 — 2 ajustes pedidos por Ale:
 //  1) Spinner (reutiliza la clase .spinner del login) en el estado de
 //     "Cargando datos de la obra…" y en el "Cargando…" del detalle de
@@ -697,7 +709,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.10';
+const APP_VERSION = 'v1.11';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1395,13 +1407,13 @@ async function abrirLista(nombreTab) {
         '<button id="btn-favorito-grande" class="btn-favorito-grande' + (esFav ? ' activo' : '') + '" onclick="toggleFavorito(\'' + nombreTab + '\')">' + (esFav ? '★' : '☆') + '</button>' +
       '</div>' +
       '<div class="lista-header-acciones hidden" id="lista-header-acciones">' +
+        '<input type="text" id="lista-buscador" class="input-buscador-inline" placeholder="Buscar…">' +
         '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
         '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
         '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' +
       '</div>' +
     '</div>' +
     '<div class="estado-vacio" id="lista-cargando"><div class="spinner"></div>Cargando…</div>' +
-    '<input type="text" id="lista-buscador" class="input-buscador hidden" placeholder="Buscar…">' +
     '<div id="paginador-arriba" class="paginador-arriba"></div>' +
     '<div class="tabulator-wrap" id="tabulator-contenedor"></div>';
 
@@ -1434,7 +1446,6 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').classList.add('hidden');
       document.getElementById('lista-header-acciones').classList.remove('hidden');
-      document.getElementById('lista-buscador').classList.remove('hidden');
     }
     destruirTablaSiExiste();
     montarTabulator(nombreTab, schemaListaAbierta, datos);
@@ -1496,18 +1507,11 @@ function columnaTabulator(col) {
   };
   if (esItem) { base.minWidth = 220; } else { base.width = 130; }
 
-  // Filtro de columna por selección — para campos SIN una lista de
-  // valores fija (numerico/fecha/texto_largo/texto_corto), el filtro
-  // se arma con los valores que ya existen en esa columna (no una
-  // lista predefinida). Las columnas listaValores_* no lo necesitan
-  // porque ya son de selección.
-  const conFiltro = { headerFilter: 'list', headerFilterParams: { valuesLookup: true, clearable: true } };
-
   if (col.tipoCampo === 'numerico') {
-    return Object.assign(base, conFiltro, { editor: 'number', hozAlign: 'right' });
+    return Object.assign(base, { editor: 'number', hozAlign: 'right' });
   }
   if (col.tipoCampo === 'fecha') {
-    return Object.assign(base, conFiltro, {
+    return Object.assign(base, {
       editor: 'date',
       formatter: function (cell) {
         const v = cell.getValue();
@@ -1519,15 +1523,20 @@ function columnaTabulator(col) {
   }
   if (col.tipoCampo === 'texto_largo') {
     if (!esItem) base.width = 220;
-    return Object.assign(base, conFiltro, { editor: 'textarea', formatter: 'textarea' });
+    return Object.assign(base, { editor: 'textarea', formatter: 'textarea' });
   }
   if (col.tipoCampo.indexOf('listaValores_') === 0) {
+    // Filtro de columna por selección — acá SÍ aplica, porque el
+    // campo ya tiene una lista de valores fija (las mismas opciones
+    // del editor de celda, no una búsqueda de valores existentes).
     const opciones = valoresParaTipo(col.tipoCampo);
     const valuesMap = {};
     opciones.forEach(function (o) { valuesMap[o.valor] = o.valor; });
     return Object.assign(base, {
       editor: 'list',
       editorParams: { values: valuesMap },
+      headerFilter: 'list',
+      headerFilterParams: { values: valuesMap, clearable: true },
       formatter: function (cell) {
         const v = cell.getValue();
         if (!v) return '';
@@ -1538,7 +1547,7 @@ function columnaTabulator(col) {
     });
   }
   // 'texto_corto' y cualquier otro tipo no contemplado → input simple
-  return Object.assign(base, conFiltro, { editor: 'input' });
+  return Object.assign(base, { editor: 'input' });
 }
 
 function montarTabulator(nombreTab, schema, datos) {
