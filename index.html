@@ -436,7 +436,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.06</div>
+    <div class="caja-version" id="version-label">v1.07</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -486,7 +486,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.06</div>
+    <div class="hdr-version" id="version-label-app">v1.07</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol">Árbol</button>
@@ -562,7 +562,22 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.06.html — lógica
+// PreKOM — index_prekom_v1.07.html — lógica
+// v1.07 — v1.06 rompió la grilla (columnas totalmente desalineadas
+// entre filas) y mostraba "0 filas" pese a tener datos. Dos causas:
+//  1) Se asignaba `minWidth: undefined` explícito en las columnas que
+//     no son 'item' — un valor undefined explícito (no la ausencia de
+//     la clave) corrompía el cálculo interno de anchos de Tabulator en
+//     modo fitColumns, produciendo anchos inconsistentes por fila.
+//     Se reemplazó por un if/else que solo agrega la clave cuando
+//     corresponde.
+//  2) `actualizarContadorFilas()` se llamaba inmediatamente después de
+//     `new Tabulator(...)`, antes de que terminara su montaje interno
+//     (asincrónico) — `getDataCount()` devolvía 0 en ese momento. Se
+//     sacó esa llamada prematura; el contador ya se setea de entrada
+//     con `datos.length` (fila 1353) y se vuelve a actualizar con
+//     `getDataCount()` solo tras alta/borrado, cuando la tabla ya está
+//     estable.
 // v1.06 — 4 ajustes pedidos por Ale tras probar v1.05:
 //  1) Espacio vacío a la derecha de la grilla: `fitDataFill` dejaba
 //     ese espacio como relleno inerte. Se cambió a `fitColumns` con
@@ -637,7 +652,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.06';
+const APP_VERSION = 'v1.07';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1374,10 +1389,9 @@ function columnaTabulator(col) {
   const esItem = col.campo === 'item';
   const base = {
     title: col.etiqueta || col.campo, field: col.campo, headerSort: true, editable: true,
-    widthGrow: esItem ? 5 : 0,
-    minWidth: esItem ? 220 : undefined
+    widthGrow: esItem ? 5 : 0
   };
-  if (!esItem) base.width = 130;
+  if (esItem) { base.minWidth = 220; } else { base.width = 130; }
 
   if (col.tipoCampo === 'numerico') {
     return Object.assign(base, { editor: 'number', hozAlign: 'right' });
@@ -1457,7 +1471,6 @@ function montarTabulator(nombreTab, schema, datos) {
   });
 
   tablaListaTabulator.setFilter(filtroBusquedaGlobal);
-  actualizarContadorFilas();
 
   // Tabulator 5.x: "cellEdited" es un EVENTO (se registra con .on()),
   // no una opción del constructor — puesto ahí no tira error, pero
