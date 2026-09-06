@@ -364,7 +364,7 @@ input { font-family: inherit; }
 .tabulator .tabulator-col { background: var(--accent2) !important; border-right: 1px solid rgba(255,255,255,.08); }
 .tabulator .tabulator-col-title,
 .tabulator .tabulator-col-title-holder,
-.tabulator .tabulator-col-content { color: #fff !important; background: transparent !important; }
+.tabulator .tabulator-col-content { color: #fff !important; background: transparent !important; padding: 12px 10px !important; }
 .tabulator .tabulator-col-title { font-weight: 600 !important; font-size: 12px; }
 .tabulator .tabulator-col.tabulator-sortable:hover { background: #1e293b !important; }
 .tabulator-row { background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -382,6 +382,9 @@ input { font-family: inherit; }
   width: 100%; max-width: 320px; padding: 8px 14px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   font-size: .82rem; margin-bottom: 12px; color: var(--text); transition: border-color .15s;
 }
+.contador-filas { font-size: .78rem; color: var(--muted); font-weight: 600; }
+.paginador-arriba { margin-bottom: 10px; }
+.paginador-arriba:empty { margin-bottom: 0; }
 .input-buscador:focus { outline: none; border-color: var(--accent); }
 .tabulator .tabulator-footer { background: var(--surface); border-top: 1px solid var(--border); }
 .tabulator .tabulator-page {
@@ -433,7 +436,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.05</div>
+    <div class="caja-version" id="version-label">v1.06</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -483,7 +486,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.05</div>
+    <div class="hdr-version" id="version-label-app">v1.06</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol">Árbol</button>
@@ -559,7 +562,20 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.05.html — lógica
+// PreKOM — index_prekom_v1.06.html — lógica
+// v1.06 — 4 ajustes pedidos por Ale tras probar v1.05:
+//  1) Espacio vacío a la derecha de la grilla: `fitDataFill` dejaba
+//     ese espacio como relleno inerte. Se cambió a `fitColumns` con
+//     `widthGrow` explícito: solo la columna con campo="item" (el
+//     campo técnico universal que identifica lo principal de
+//     cualquier lista) crece para absorber el espacio sobrante; el
+//     resto queda en un ancho fijo por tipo.
+//  2) Paginado movido arriba de la grilla — vía `paginationElement`
+//     apuntando a un contenedor propio (#paginador-arriba) en vez del
+//     footer por defecto de Tabulator.
+//  3) Encabezado más alto — más padding vertical en tabulator-col-content.
+//  4) Contador de filas junto al título ("N filas"), actualizado en
+//     alta/borrado de fila vía tabla.getDataCount().
 // v1.05 — 4 ajustes de UX pedidos por Ale tras probar paginado/buscador:
 //  1) Más ancho lateral: .view de max-width 1280px → 1680px.
 //  2) Etiquetas del paginado traducidas al español (locale 'es-ar' +
@@ -621,7 +637,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.05';
+const APP_VERSION = 'v1.06';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1307,6 +1323,7 @@ async function abrirLista(nombreTab) {
     '<div class="lista-header">' +
       '<div class="lista-header-titulo">' +
         '<h2>' + escaparHtml(meta.nombreVisible) + '</h2>' +
+        '<span class="contador-filas" id="contador-filas"></span>' +
         '<button id="btn-favorito-grande" class="btn-favorito-grande' + (esFav ? ' activo' : '') + '" onclick="toggleFavorito(\'' + nombreTab + '\')">' + (esFav ? '★' : '☆') + '</button>' +
       '</div>' +
       '<div class="lista-header-acciones">' +
@@ -1315,6 +1332,7 @@ async function abrirLista(nombreTab) {
       '</div>' +
     '</div>' +
     '<input type="text" id="lista-buscador" class="input-buscador" placeholder="Buscar…">' +
+    '<div id="paginador-arriba" class="paginador-arriba"></div>' +
     '<div class="tabulator-wrap" id="tabulator-contenedor"></div>';
 
   terminoBusquedaLista = '';
@@ -1332,6 +1350,7 @@ async function abrirLista(nombreTab) {
     ]);
     schemaListaAbierta = (resSchema.ok && resSchema.schema) ? resSchema.schema : [];
     const datos = (resDatos.ok && resDatos.datos) ? resDatos.datos : [];
+    document.getElementById('contador-filas').textContent = datos.length + (datos.length === 1 ? ' fila' : ' filas');
     montarTabulator(nombreTab, schemaListaAbierta, datos);
   } catch (err) {
     document.getElementById('tabulator-contenedor').innerHTML = '<div class="estado-vacio">No se pudo cargar la lista.</div>';
@@ -1345,10 +1364,20 @@ function valoresParaTipo(tipoCampo) {
 function columnaTabulator(col) {
   // Columna ID — visible pero nunca editable
   if (col.campo === 'id') {
-    return { title: col.etiqueta || 'ID', field: 'id', width: 70, editable: false, headerSort: true };
+    return { title: col.etiqueta || 'ID', field: 'id', width: 70, widthGrow: 0, editable: false, headerSort: true };
   }
 
-  const base = { title: col.etiqueta || col.campo, field: col.campo, headerSort: true, editable: true };
+  // 'item' es el campo técnico universal que identifica lo principal
+  // de cualquier lista (mismo campo que usará la vista Calendario) —
+  // es el único que crece para absorber el espacio sobrante; el resto
+  // queda en un ancho fijo y razonable según su tipo.
+  const esItem = col.campo === 'item';
+  const base = {
+    title: col.etiqueta || col.campo, field: col.campo, headerSort: true, editable: true,
+    widthGrow: esItem ? 5 : 0,
+    minWidth: esItem ? 220 : undefined
+  };
+  if (!esItem) base.width = 130;
 
   if (col.tipoCampo === 'numerico') {
     return Object.assign(base, { editor: 'number', hozAlign: 'right' });
@@ -1365,6 +1394,7 @@ function columnaTabulator(col) {
     });
   }
   if (col.tipoCampo === 'texto_largo') {
+    if (!esItem) base.width = 220;
     return Object.assign(base, { editor: 'textarea', formatter: 'textarea' });
   }
   if (col.tipoCampo.indexOf('listaValores_') === 0) {
@@ -1390,14 +1420,14 @@ function columnaTabulator(col) {
 function montarTabulator(nombreTab, schema, datos) {
   const columnas = schema.map(columnaTabulator);
   columnas.push({
-    title: '', field: '_acciones', width: 50, headerSort: false, hozAlign: 'center',
+    title: '', field: '_acciones', width: 50, widthGrow: 0, headerSort: false, hozAlign: 'center',
     formatter: function () { return '<button class="btn-borrar-fila" title="Borrar fila">🗑</button>'; },
     cellClick: function (e, cell) { confirmarBorrarFila(nombreTab, cell.getRow().getData()); }
   });
 
   tablaListaTabulator = new Tabulator('#tabulator-contenedor', {
     data: datos,
-    layout: 'fitDataFill',
+    layout: 'fitColumns',
     index: 'id',
     columns: columnas,
     placeholder: 'Todavía no hay filas cargadas en esta lista.',
@@ -1405,6 +1435,7 @@ function montarTabulator(nombreTab, schema, datos) {
     paginationSize: 10,
     paginationSizeSelector: [10, 20, 50],
     paginationCounter: 'rows',
+    paginationElement: document.getElementById('paginador-arriba'),
     locale: 'es-ar',
     langs: {
       'es-ar': {
@@ -1426,6 +1457,7 @@ function montarTabulator(nombreTab, schema, datos) {
   });
 
   tablaListaTabulator.setFilter(filtroBusquedaGlobal);
+  actualizarContadorFilas();
 
   // Tabulator 5.x: "cellEdited" es un EVENTO (se registra con .on()),
   // no una opción del constructor — puesto ahí no tira error, pero
@@ -1470,6 +1502,7 @@ async function agregarFilaLista(nombreTab) {
     const filaNueva = { id: res.id };
     schemaListaAbierta.forEach(function (col) { if (col.campo !== 'id' && !(col.campo in filaNueva)) filaNueva[col.campo] = ''; });
     await tablaListaTabulator.addRow(filaNueva, false);
+    actualizarContadorFilas();
   } catch (err) {
     alert('No se pudo conectar con el backend.');
   }
@@ -1487,9 +1520,17 @@ async function borrarFilaListaFrontend(nombreTab, filaId) {
     });
     if (!res.ok) { alert(res.error || 'No se pudo borrar la fila.'); return; }
     tablaListaTabulator.deleteRow(filaId);
+    actualizarContadorFilas();
   } catch (err) {
     alert('No se pudo conectar con el backend.');
   }
+}
+
+function actualizarContadorFilas() {
+  const el = document.getElementById('contador-filas');
+  if (!el || !tablaListaTabulator) return;
+  const n = tablaListaTabulator.getDataCount();
+  el.textContent = n + (n === 1 ? ' fila' : ' filas');
 }
 
 // ── PANEL LATERAL DE COMENTARIOS ──────────────────────────────
