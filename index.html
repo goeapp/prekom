@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PreKOM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<style>
+  /* ============================================================
+     DESIGN TOKENS — sistema de diseño del stack
+     ============================================================ */
+  :root{
+    --amber:#d97706;
+    --amber-dark:#92400e;
+    --amber-tint:#fef3e2;
+    --dark:#0f172a;
+    --dark-soft:#1e293b;
+    --surface:#f1f5f9;
+    --surface-card:#ffffff;
+    --border:#e2e8f0;
+    --text:#0f172a;
+    --text-muted:#64748b;
+    --text-faint:#94a3b8;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(15,23,42,.06), 0 4px 12px rgba(15,23,42,.05);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--surface);
+    color:var(--text);
+    font-family:'DM Sans',Arial,sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{
+    font-family:'Bebas Neue',Arial,sans-serif;
+    letter-spacing:.5px;
+    font-weight:400;
+  }
+  button{font-family:inherit;cursor:pointer;}
+  a{color:var(--amber-dark);}
+
+  /* ---------- Header ---------- */
+  .app-header{
+    background:var(--dark);
+    color:#fff;
+    padding:14px 20px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  .app-header .brand{
+    font-family:'Bebas Neue',Arial,sans-serif;
+    font-size:26px;
+    letter-spacing:1px;
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+  }
+  .app-header .brand small{
+    font-family:'DM Sans',Arial,sans-serif;
+    font-size:11px;
+    color:#94a3b8;
+    letter-spacing:.5px;
+  }
+  .app-header .obra-nombre{
+    font-size:13px;
+    color:#cbd5e1;
+    border-left:1px solid #334155;
+    padding-left:14px;
+    flex:1;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .header-btn{
+    background:transparent;
+    border:1px solid #334155;
+    color:#e2e8f0;
+    border-radius:8px;
+    padding:7px 12px;
+    font-size:13px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    white-space:nowrap;
+  }
+  .header-btn:hover{background:#1e293b;}
+
+  /* ---------- Layout ---------- */
+  .view{max-width:960px;margin:0 auto;padding:24px 20px 60px;}
+  .hidden{display:none !important;}
+
+  /* ---------- Breadcrumb ---------- */
+  .breadcrumb{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px;
+    margin-bottom:18px;
+    font-size:13px;
+    color:var(--text-muted);
+  }
+  .breadcrumb button{
+    background:none;border:none;color:var(--amber-dark);
+    font-size:13px;padding:2px 4px;
+  }
+  .breadcrumb button:hover{text-decoration:underline;}
+  .breadcrumb .sep{color:var(--text-faint);}
+
+  /* ---------- Home cards (14 puntos) ---------- */
+  .cards-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    gap:14px;
+  }
+  .card{
+    background:var(--surface-card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:18px;
+    box-shadow:var(--shadow);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    text-align:left;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .card:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(15,23,42,.09);}
+  .card .card-titulo{
+    font-family:'Bebas Neue',Arial,sans-serif;
+    font-size:19px;
+    color:var(--dark);
+    line-height:1.15;
+  }
+  .card .card-desc{
+    font-size:13px;
+    color:var(--text-muted);
+    flex:1;
+    min-height:32px;
+  }
+  .card .card-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:12px;
+    color:var(--text-faint);
+    border-top:1px solid var(--border);
+    padding-top:10px;
+    margin-top:2px;
+  }
+  .card .ver-mas{
+    background:none;border:none;color:var(--amber-dark);
+    font-size:13px;font-weight:700;padding:0;
+  }
+
+  /* ---------- Árbol (nivel 2 / 3) ---------- */
+  .arbol-lista{display:flex;flex-direction:column;gap:8px;}
+  .arbol-item{
+    background:var(--surface-card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    text-align:left;
+  }
+  .arbol-item:hover{border-color:var(--amber);}
+  .arbol-item .punto{
+    font-size:11px;color:var(--text-faint);
+    font-variant-numeric:tabular-nums;
+    min-width:44px;
+  }
+  .arbol-item .titulo{flex:1;font-size:14px;font-weight:500;}
+  .arbol-item .flecha{color:var(--amber-dark);font-size:15px;}
+
+  /* ---------- Nodo hoja (Resumen) ---------- */
+  .nodo-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    margin-bottom:14px;
+  }
+  .nodo-titulo{font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:var(--dark);}
+  .btn-editar{
+    background:var(--amber);
+    color:#fff;
+    border:none;
+    border-radius:8px;
+    padding:8px 16px;
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .btn-editar:hover{background:var(--amber-dark);}
+  .resumen-box{
+    background:var(--surface-card);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:20px;
+    box-shadow:var(--shadow);
+    min-height:80px;
+  }
+  .resumen-box.vacio{color:var(--text-faint);font-style:italic;}
+  .resumen-box p:first-child{margin-top:0;}
+  .resumen-box p:last-child{margin-bottom:0;}
+
+  /* ---------- Modales genéricos ---------- */
+  .modal-overlay{
+    position:fixed;inset:0;
+    background:rgba(15,23,42,.5);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;
+    z-index:100;
+  }
+  .modal-box{
+    background:#fff;
+    border-radius:14px;
+    width:100%;
+    max-width:420px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    overflow:hidden;
+  }
+  .modal-box.wide{max-width:640px;}
+  .modal-head{
+    background:var(--dark);
+    color:#fff;
+    padding:16px 20px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .modal-head h3{margin:0;font-size:18px;}
+  .modal-close{background:none;border:none;color:#94a3b8;font-size:20px;line-height:1;}
+  .modal-close:hover{color:#fff;}
+  .modal-body{padding:22px 20px;}
+  .modal-body p{margin:0 0 14px;font-size:14px;color:var(--text-muted);}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+
+  input[type=email],input[type=text]{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:15px;
+    font-family:inherit;
+  }
+  input:focus{outline:2px solid var(--amber);outline-offset:1px;}
+
+  .btn-primary{
+    background:var(--amber);color:#fff;border:none;border-radius:8px;
+    padding:10px 18px;font-size:14px;font-weight:700;
+  }
+  .btn-primary:hover{background:var(--amber-dark);}
+  .btn-primary:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-secondary{
+    background:none;border:1px solid var(--border);border-radius:8px;
+    color:var(--text-muted);padding:10px 16px;font-size:14px;
+  }
+  .btn-secondary:hover{background:var(--surface);}
+
+  .pin-input{
+    text-align:center;font-size:26px;letter-spacing:8px;
+    font-family:monospace;
+  }
+  .login-error{
+    background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;
+    border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px;
+  }
+  .login-spinner{
+    display:flex;flex-direction:column;align-items:center;gap:14px;
+    padding:20px 0;color:var(--text-muted);font-size:14px;
+  }
+  .spinner{
+    width:30px;height:30px;border-radius:50%;
+    border:3px solid var(--border);border-top-color:var(--amber);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ---------- Links modal ---------- */
+  .links-lista{display:flex;flex-direction:column;gap:8px;}
+  .links-lista a{
+    display:block;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px 14px;
+    font-size:14px;
+    color:var(--text);
+    text-decoration:none;
+  }
+  .links-lista a:hover{border-color:var(--amber);}
+
+  /* ---------- Quill override (tema del stack) ---------- */
+  .ql-toolbar.ql-snow{border-color:var(--border);border-radius:8px 8px 0 0;}
+  .ql-container.ql-snow{border-color:var(--border);border-radius:0 0 8px 8px;min-height:220px;font-size:14px;font-family:'DM Sans',Arial,sans-serif;}
+
+  .estado-vacio{
+    text-align:center;color:var(--text-faint);padding:60px 20px;font-size:14px;
+  }
+
+  @media (max-width:560px){
+    .app-header .obra-nombre{display:none;}
+    .cards-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">PreKOM <small id="version-label">v001</small></div>
+  <div class="obra-nombre" id="obra-nombre-label"></div>
+  <button class="header-btn hidden" id="btn-links" title="Links de la obra">🔗 Links</button>
+</header>
+
+<main class="view" id="main-view">
+  <div class="estado-vacio" id="estado-carga">Cargando PreKOM…</div>
+</main>
+
+<!-- ============================================================
+     MODAL — Login pwa_pin (5 estados internos)
+     ============================================================ -->
+<div class="modal-overlay hidden" id="modal-login">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>PreKOM</h3>
+    </div>
+    <div class="modal-body">
+
+      <!-- Paso: pedir email -->
+      <div id="paso-email">
+        <p>Ingresá tu email para acceder.</p>
+        <div id="login-error-email" class="login-error hidden"></div>
+        <input type="email" id="input-email" placeholder="nombre@empresa.com" autocomplete="email">
+        <div class="modal-actions">
+          <button class="btn-primary" id="btn-pedir-pin">Enviar código</button>
+        </div>
+      </div>
+
+      <!-- Paso: esperando código -->
+      <div id="paso-codigo" class="hidden">
+        <p>Te enviamos un código de 6 dígitos a <strong id="email-confirmado"></strong>.</p>
+        <div id="login-error-pin" class="login-error hidden"></div>
+        <input type="text" id="input-pin" class="pin-input" maxlength="6" inputmode="numeric" placeholder="······">
+        <div class="modal-actions" style="justify-content:space-between;">
+          <button class="btn-secondary" id="btn-reenviar-pin">Reenviar código</button>
+          <button class="btn-primary" id="btn-validar-pin">Ingresar</button>
+        </div>
+      </div>
+
+      <!-- Paso: validando sesión (revalidación al abrir) -->
+      <div id="paso-validando" class="hidden">
+        <div class="login-spinner">
+          <div class="spinner"></div>
+          <span>Validando usuario…</span>
+        </div>
+      </div>
+
+      <!-- Paso: sin conexión -->
+      <div id="paso-sin-conexion" class="hidden">
+        <p>No pudimos conectar con el servidor. Tus datos guardados siguen ahí — reintentá cuando tengas conexión.</p>
+        <div class="modal-actions">
+          <button class="btn-primary" id="btn-reintentar-conexion">Reintentar</button>
+        </div>
+      </div>
+
+      <!-- Paso: error de auth (usuario no encontrado / inactivo / bloqueado) -->
+      <div id="paso-error-auth" class="hidden">
+        <p id="texto-error-auth"></p>
+        <div class="modal-actions">
+          <button class="btn-primary" id="btn-volver-email">Volver</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL — Editar Resumen (Quill)
+     ============================================================ -->
+<div class="modal-overlay hidden" id="modal-editar">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h3 id="editar-titulo">Editar Resumen</h3>
+      <button class="modal-close" id="btn-cerrar-editar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="quill-editor"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btn-cancelar-editar">Cancelar</button>
+        <button class="btn-primary" id="btn-guardar-editar">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL — Links de la obra (header, tope 5)
+     ============================================================ -->
+<div class="modal-overlay hidden" id="modal-links">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Links de la obra</h3>
+      <button class="modal-close" id="btn-cerrar-links">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="links-lista" id="links-lista"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — PreKOM v001 (Módulo 1: Árbol documental)
+// ============================================================
+const APP_VERSION = 'v001';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
+const APP_KEY = 'prekom';
+const SESION_KEY = APP_KEY + '_sesion';
+
+// v001 es mono-obra en uso (una sola obra real, Pluspetrol), pero la
+// arquitectura de backend ya es multi-obra (config_obras). En vez de
+// hardcodear un ObraId, al loguearse se pide listarObras y se toma
+// la primera — hoy hay una sola, y esto no rompe si en el futuro hay
+// más (un selector de obra queda para una iteración posterior).
+let ESTADO = {
+  email: null,
+  nombreApellido: null,
+  esAdmin: false,
+  obraId: null,
+  nombreObra: null,
+  arbol: [],       // todos los nodos (Punto|Nivel|Titulo|Resumen)
+  links: [],
+  configObra: null,
+  camino: []       // pila de nodos actuales para navegación en árbol (breadcrumb)
+};
+
+let quill = null;
+
+// ---------------------------------------------------------------------------
+// Helper de llamadas al backend
+// ---------------------------------------------------------------------------
+async function api(action, params) {
+  const body = Object.assign({ action: action }, params || {});
+  const resp = await fetch(API_URL, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+  return resp.json();
+}
+
+// ---------------------------------------------------------------------------
+// Sesión (localStorage, 7 días — o sin vencimiento si noExpira)
+// ---------------------------------------------------------------------------
+function leerSesionGuardada() {
+  try {
+    const raw = localStorage.getItem(SESION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+function guardarSesion(email, nombreApellido, noExpira) {
+  const vencimiento = noExpira ? null : (Date.now() + 7 * 24 * 60 * 60 * 1000);
+  localStorage.setItem(SESION_KEY, JSON.stringify({
+    email: email,
+    nombreApellido: nombreApellido || '',
+    noExpira: !!noExpira,
+    vence: vencimiento
+  }));
+}
+
+function borrarSesion() {
+  localStorage.removeItem(SESION_KEY);
+}
+
+function sesionVencida(sesion) {
+  if (sesion.noExpira) return false;
+  if (!sesion.vence) return true;
+  return Date.now() > sesion.vence;
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+window.addEventListener('DOMContentLoaded', boot);
+
+async function boot() {
+  const sesion = leerSesionGuardada();
+  if (!sesion || sesionVencida(sesion)) {
+    borrarSesion();
+    mostrarModalLogin();
+    mostrarPasoLogin('email');
+    return;
+  }
+
+  mostrarModalLogin();
+  mostrarPasoLogin('validando');
+
+  let resultado;
+  try {
+    resultado = await api('validarSesion', { email: sesion.email });
+  } catch (err) {
+    mostrarPasoLogin('sin-conexion');
+    return;
+  }
+
+  if (!resultado.ok) {
+    borrarSesion();
+    mostrarTextoErrorAuth(resultado.motivo);
+    mostrarPasoLogin('error-auth');
+    return;
+  }
+
+  await onLoginOk(sesion.email, resultado.nombreApellido);
+}
+
+async function onLoginOk(email, nombreApellido) {
+  ESTADO.email = email;
+  ESTADO.nombreApellido = nombreApellido || '';
+
+  ocultarModalLogin();
+  document.getElementById('estado-carga').textContent = 'Cargando datos de la obra…';
+
+  try {
+    const [resAdmin, resObras] = await Promise.all([
+      api('verificarAdmin', { email: email }),
+      api('listarObras', {})
+    ]);
+
+    ESTADO.esAdmin = !!(resAdmin && resAdmin.esAdmin);
+
+    if (!resObras.ok || !resObras.obras || !resObras.obras.length) {
+      renderEstadoVacioGlobal('Todavía no hay ninguna obra creada en el Maestro. Creála desde el menú "PreKOM Admin → Crear nueva obra" en el Sheet.');
+      return;
+    }
+
+    // Mono-obra en uso: se toma la primera obra registrada.
+    const obra = resObras.obras[0];
+    ESTADO.obraId = obra.obraId;
+    ESTADO.nombreObra = obra.nombreObra;
+
+    const [resArbol, resLinks, resConfig] = await Promise.all([
+      api('leerArbolContenido', { obraId: ESTADO.obraId }),
+      api('leerLinks', { obraId: ESTADO.obraId }),
+      api('leerConfigObra', { obraId: ESTADO.obraId })
+    ]);
+
+    ESTADO.arbol = (resArbol.ok && resArbol.arbol) ? resArbol.arbol : [];
+    ESTADO.links = (resLinks.ok && resLinks.links) ? resLinks.links : [];
+    ESTADO.configObra = (resConfig.ok && resConfig.config) ? resConfig.config : null;
+
+    document.getElementById('obra-nombre-label').textContent =
+      (ESTADO.configObra && ESTADO.configObra.nombre) ? ESTADO.configObra.nombre : ESTADO.nombreObra;
+
+    if (ESTADO.links.length > 0) {
+      document.getElementById('btn-links').classList.remove('hidden');
+    }
+
+    renderHome();
+  } catch (err) {
+    renderEstadoVacioGlobal('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.');
+  }
+}
+
+function renderEstadoVacioGlobal(mensaje) {
+  document.getElementById('main-view').innerHTML =
+    '<div class="estado-vacio">' + escaparHtml(mensaje) + '</div>';
+}
+
+// ---------------------------------------------------------------------------
+// Modal de login — control de pasos
+// ---------------------------------------------------------------------------
+function mostrarModalLogin() { document.getElementById('modal-login').classList.remove('hidden'); }
+function ocultarModalLogin() { document.getElementById('modal-login').classList.add('hidden'); }
+
+function mostrarPasoLogin(paso) {
+  ['email', 'codigo', 'validando', 'sin-conexion', 'error-auth'].forEach(function (p) {
+    document.getElementById('paso-' + p).classList.toggle('hidden', p !== paso);
+  });
+}
+
+const MOTIVOS_AUTH = {
+  no_encontrado: 'Ese email no está habilitado para PreKOM. Consultá con el administrador.',
+  inactivo: 'Tu usuario está inactivo. Consultá con el administrador.',
+  bloqueado: 'Tu usuario quedó bloqueado por intentos fallidos. Consultá con el administrador.'
+};
+
+function mostrarTextoErrorAuth(motivo) {
+  document.getElementById('texto-error-auth').textContent =
+    MOTIVOS_AUTH[motivo] || 'No pudimos validar tu sesión. Iniciá sesión de nuevo.';
+}
+
+document.getElementById('btn-pedir-pin').addEventListener('click', async function () {
+  const email = document.getElementById('input-email').value.trim();
+  const errBox = document.getElementById('login-error-email');
+  errBox.classList.add('hidden');
+
+  if (!email) return;
+
+  this.disabled = true;
+  try {
+    const res = await api('solicitarPIN', { email: email });
+    if (!res.ok) {
+      errBox.textContent = textoErrorSolicitarPin(res.motivo, res.restanteSegundos);
+      errBox.classList.remove('hidden');
+      this.disabled = false;
+      return;
+    }
+    document.getElementById('email-confirmado').textContent = email;
+    document.getElementById('input-email').dataset.pendiente = email;
+    mostrarPasoLogin('codigo');
+  } catch (err) {
+    mostrarPasoLogin('sin-conexion');
+  }
+  this.disabled = false;
+});
+
+function textoErrorSolicitarPin(motivo, restanteSegundos) {
+  if (motivo === 'cooldown') return 'Esperá ' + restanteSegundos + ' segundos antes de pedir otro código.';
+  if (motivo === 'no_encontrado') return 'Ese email no está habilitado para PreKOM.';
+  if (motivo === 'inactivo') return 'Tu usuario está inactivo.';
+  if (motivo === 'bloqueado') return 'Tu usuario está bloqueado por intentos fallidos.';
+  return 'No se pudo enviar el código. Probá de nuevo.';
+}
+
+document.getElementById('btn-reenviar-pin').addEventListener('click', function () {
+  document.getElementById('input-email').value = document.getElementById('input-email').dataset.pendiente || '';
+  mostrarPasoLogin('email');
+});
+
+document.getElementById('btn-validar-pin').addEventListener('click', async function () {
+  const email = document.getElementById('input-email').dataset.pendiente;
+  const pin = document.getElementById('input-pin').value.trim();
+  const errBox = document.getElementById('login-error-pin');
+  errBox.classList.add('hidden');
+
+  if (!pin) return;
+
+  this.disabled = true;
+  try {
+    const res = await api('validarPIN', { email: email, pin: pin });
+    if (!res.ok) {
+      errBox.textContent = textoErrorValidarPin(res.motivo, res.restantes);
+      errBox.classList.remove('hidden');
+      this.disabled = false;
+      return;
+    }
+    guardarSesion(email, res.nombreApellido, res.noExpira);
+    await onLoginOk(email, res.nombreApellido);
+  } catch (err) {
+    mostrarPasoLogin('sin-conexion');
+  }
+  this.disabled = false;
+});
+
+function textoErrorValidarPin(motivo, restantes) {
+  if (motivo === 'pin_incorrecto') return 'Código incorrecto. Te quedan ' + restantes + ' intentos.';
+  if (motivo === 'bloqueado_ahora') return 'Demasiados intentos fallidos — tu usuario quedó bloqueado.';
+  if (motivo === 'pin_vencido') return 'El código venció. Pedí uno nuevo.';
+  if (motivo === 'sin_pin_generado') return 'Todavía no pediste un código para este email.';
+  return 'No se pudo validar el código.';
+}
+
+document.getElementById('btn-reintentar-conexion').addEventListener('click', boot);
+document.getElementById('btn-volver-email').addEventListener('click', function () {
+  mostrarPasoLogin('email');
+});
+
+// ---------------------------------------------------------------------------
+// Utilidades de árbol
+// ---------------------------------------------------------------------------
+// El campo Nivel del Sheet ya garantiza la profundidad — alcanza con
+// pedir ese Nivel exacto y que el Punto empiece con el prefijo del padre.
+function nodosNivel(nivel, prefijoPadre) {
+  return ESTADO.arbol
+    .filter(function (n) {
+      if (n.nivel !== nivel) return false;
+      if (!prefijoPadre) return true;
+      return n.punto.indexOf(prefijoPadre + '.') === 0;
+    })
+    .sort(comparePorPunto);
+}
+
+function contarSubpuntos(punto) {
+  return ESTADO.arbol.filter(function (n) {
+    return n.punto !== punto && n.punto.indexOf(punto + '.') === 0;
+  }).length;
+}
+
+function comparePorPunto(a, b) {
+  const pa = a.punto.split('.').map(Number);
+  const pb = b.punto.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const va = pa[i] || 0, vb = pb[i] || 0;
+    if (va !== vb) return va - vb;
+  }
+  return 0;
+}
+
+function primerosCaracteres(html, n) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  const texto = (tmp.textContent || '').trim();
+  return texto.length > n ? texto.slice(0, n) + '…' : texto;
+}
+
+function escaparHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ---------------------------------------------------------------------------
+// Render — Home (14 cards, nivel 1)
+// ---------------------------------------------------------------------------
+function renderHome() {
+  ESTADO.camino = [];
+  const nodos = nodosNivel(1, null);
+
+  if (!nodos.length) {
+    renderEstadoVacioGlobal('Todavía no hay contenido cargado en ArbolContenido para esta obra.');
+    return;
+  }
+
+  const html = '<div class="cards-grid">' + nodos.map(function (n) {
+    const sub = contarSubpuntos(n.punto);
+    return '' +
+      '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
+        '<div class="card-titulo">' + escaparHtml(n.titulo) + '</div>' +
+        '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, 30)) + '</div>' +
+        '<div class="card-footer">' +
+          '<span>' + sub + (sub === 1 ? ' subpunto' : ' subpuntos') + '</span>' +
+          '<span class="ver-mas">Ver más →</span>' +
+        '</div>' +
+      '</button>';
+  }).join('') + '</div>';
+
+  document.getElementById('main-view').innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// Render — navegación en árbol (nivel 2 / 3) y nodo hoja
+// ---------------------------------------------------------------------------
+function abrirNodo(punto) {
+  const nodo = ESTADO.arbol.find(function (n) { return n.punto === punto; });
+  if (!nodo) return;
+
+  ESTADO.camino = caminoHasta(punto);
+
+  const hijos = nodosNivel(nodo.nivel + 1, punto);
+  if (hijos.length > 0 && nodo.nivel < 3) {
+    renderListaHijos(nodo, hijos);
+  } else {
+    renderNodoHoja(nodo);
+  }
+}
+
+function caminoHasta(punto) {
+  const partes = punto.split('.');
+  const camino = [];
+  for (let i = 1; i <= partes.length; i++) {
+    const p = partes.slice(0, i).join('.');
+    const n = ESTADO.arbol.find(function (x) { return x.punto === p; });
+    if (n) camino.push(n);
+  }
+  return camino;
+}
+
+function renderBreadcrumb() {
+  let html = '<button onclick="renderHome()">Inicio</button>';
+  ESTADO.camino.forEach(function (n, i) {
+    html += '<span class="sep">/</span>';
+    if (i === ESTADO.camino.length - 1) {
+      html += '<span>' + escaparHtml(n.titulo) + '</span>';
+    } else {
+      html += '<button onclick="abrirNodo(\'' + n.punto + '\')">' + escaparHtml(n.titulo) + '</button>';
+    }
+  });
+  return '<div class="breadcrumb">' + html + '</div>';
+}
+
+function renderListaHijos(nodo, hijos) {
+  const filas = hijos.map(function (n) {
+    return '' +
+      '<button class="arbol-item" onclick="abrirNodo(\'' + n.punto + '\')">' +
+        '<span class="punto">' + escaparHtml(n.punto) + '</span>' +
+        '<span class="titulo">' + escaparHtml(n.titulo) + '</span>' +
+        '<span class="flecha">→</span>' +
+      '</button>';
+  }).join('');
+
+  document.getElementById('main-view').innerHTML =
+    renderBreadcrumb() +
+    '<div class="arbol-lista">' + filas + '</div>';
+}
+
+function renderNodoHoja(nodo) {
+  const resumenLimpio = nodo.resumen ? DOMPurify.sanitize(nodo.resumen) : '';
+  const btnEditar = ESTADO.esAdmin
+    ? '<button class="btn-editar" onclick="abrirEditor(\'' + nodo.punto + '\')">Editar</button>'
+    : '';
+
+  document.getElementById('main-view').innerHTML =
+    renderBreadcrumb() +
+    '<div class="nodo-header">' +
+      '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
+      btnEditar +
+    '</div>' +
+    '<div class="resumen-box' + (resumenLimpio ? '' : ' vacio') + '">' +
+      (resumenLimpio || 'Todavía no hay Resumen cargado para este punto.') +
+    '</div>';
+}
+
+// ---------------------------------------------------------------------------
+// Modal — Editar Resumen (Quill)
+// ---------------------------------------------------------------------------
+let puntoEnEdicion = null;
+
+function abrirEditor(punto) {
+  const nodo = ESTADO.arbol.find(function (n) { return n.punto === punto; });
+  if (!nodo) return;
+  puntoEnEdicion = punto;
+
+  document.getElementById('editar-titulo').textContent = 'Editar — ' + nodo.titulo;
+  document.getElementById('modal-editar').classList.remove('hidden');
+
+  if (!quill) {
+    quill = new Quill('#quill-editor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          ['bold', 'italic', 'underline'],
+          [{ list: 'ordered' }, { list: 'bullet' }],
+          [{ size: ['small', false, 'large'] }],
+          [{ color: [] }, { background: [] }],
+          ['clean']
+        ]
+      }
+    });
+  }
+  quill.setContents([]);
+  if (nodo.resumen) {
+    quill.clipboard.dangerouslyPasteHTML(DOMPurify.sanitize(nodo.resumen));
+  }
+}
+
+function cerrarEditor() {
+  document.getElementById('modal-editar').classList.add('hidden');
+  puntoEnEdicion = null;
+}
+
+document.getElementById('btn-cerrar-editar').addEventListener('click', cerrarEditor);
+document.getElementById('btn-cancelar-editar').addEventListener('click', cerrarEditor);
+
+document.getElementById('btn-guardar-editar').addEventListener('click', async function () {
+  if (!puntoEnEdicion) return;
+  const html = quill.root.innerHTML;
+
+  this.disabled = true;
+  try {
+    const res = await api('guardarResumen', {
+      obraId: ESTADO.obraId,
+      punto: puntoEnEdicion,
+      resumen: html,
+      email: ESTADO.email
+    });
+    if (!res.ok) {
+      alert(res.error || 'No se pudo guardar.');
+      this.disabled = false;
+      return;
+    }
+    const nodo = ESTADO.arbol.find(function (n) { return n.punto === puntoEnEdicion; });
+    if (nodo) nodo.resumen = html;
+
+    cerrarEditor();
+    renderNodoHoja(nodo);
+  } catch (err) {
+    alert('No se pudo conectar con el backend.');
+  }
+  this.disabled = false;
+});
+
+// ---------------------------------------------------------------------------
+// Modal — Links de la obra
+// ---------------------------------------------------------------------------
+document.getElementById('btn-links').addEventListener('click', function () {
+  const html = ESTADO.links.map(function (l) {
+    return '<a href="' + escaparHtml(l.url) + '" target="_blank" rel="noopener">' + escaparHtml(l.nombre) + '</a>';
+  }).join('');
+  document.getElementById('links-lista').innerHTML = html;
+  document.getElementById('modal-links').classList.remove('hidden');
+});
+document.getElementById('btn-cerrar-links').addEventListener('click', function () {
+  document.getElementById('modal-links').classList.add('hidden');
+});
+</script>
+</body>
+</html>
