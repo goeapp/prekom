@@ -267,18 +267,8 @@ input { font-family: inherit; }
 }
 .card .ver-mas { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 700; padding: 0; }
 
-/* Árbol — lista de hijos (nivel 2/3) */
-.arbol-lista { display: flex; flex-direction: column; gap: 8px; margin-top: 18px; }
-.arbol-item {
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; text-align: left; width: 100%;
-}
-.arbol-item:hover { border-color: var(--accent); }
-.arbol-item .punto { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 44px; }
-.arbol-item .titulo { flex: 1; font-size: 14px; font-weight: 500; }
-.arbol-item .flecha { color: var(--accent); font-size: 15px; }
-.arbol-subtitulo { font-size: .78rem; color: var(--muted); font-weight: 600; margin: 4px 0 -4px; text-transform: uppercase; letter-spacing: .03em; }
+/* Subpuntos dentro de un nodo — misma grilla de cards que el Home */
+.arbol-subtitulo { font-size: .78rem; color: var(--muted); font-weight: 600; margin: 24px 0 12px; text-transform: uppercase; letter-spacing: .03em; }
 
 /* Nodo — Resumen */
 .nodo-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
@@ -326,7 +316,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v003</div>
+    <div class="caja-version" id="version-label">v004</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -376,7 +366,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v003</div>
+    <div class="hdr-version" id="version-label-app">v004</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
     <button class="hdr-btn-cambiar-obra hidden" id="btn-links">Links</button>
@@ -432,7 +422,15 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v003.html — lógica
+// PreKOM — index_prekom_v004.html — lógica
+// v004: Ale marcó que los subpuntos de nivel 2/3 usaban una lista
+// compacta distinta a las cards del Home — no era lo pedido ("todas
+// las tarjetas, de todos los niveles, igual a la de nivel 1"). Se
+// unificó: renderCardsGrid() es ahora la única función que arma
+// cards, reutilizada tanto por el Home como por la sección
+// "Subpuntos" de cualquier nodo. El punto 2 de la ronda anterior
+// (barra de navegación corriéndose) se confirmó resuelto — el fix
+// de #main-view (width:100%) ya alineó los 3 niveles correctamente.
 // v003: Ale probó v002 (OK en colores/tipografías/tamaños) y pidió 4
 // ajustes puntuales: (1) grilla de cards a 4 columnas fijas con
 // breakpoints, en vez de auto-fill por ancho mínimo (dejaba 1 sola
@@ -448,7 +446,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v003';
+const APP_VERSION = 'v004';
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -811,17 +809,12 @@ function escaparHtml(s) {
   return d.innerHTML;
 }
 
-// ── RENDER — Home (14 cards, nivel 1) ────────────────────────
-function renderHome() {
-  caminoActual = [];
-  const nodos = nodosNivel(1, null);
-
-  if (!nodos.length) {
-    document.getElementById('main-view').innerHTML = '<div class="estado-vacio">Todavía no hay contenido cargado en ArbolContenido para esta obra.</div>';
-    return;
-  }
-
-  const html = '<div class="cards-grid">' + nodos.map(function (n) {
+// ── RENDER — grilla de cards, reutilizada por Home y por los
+// subpuntos de cualquier nivel (v004: antes los subpuntos de nivel
+// 2/3 usaban una lista compacta distinta a las cards del Home —
+// no era lo pedido; ahora es la misma card en todos los niveles) ──
+function renderCardsGrid(nodos) {
+  return '<div class="cards-grid">' + nodos.map(function (n) {
     const sub = contarSubpuntos(n.punto);
     return '' +
       '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
@@ -834,8 +827,19 @@ function renderHome() {
         '</div>' +
       '</button>';
   }).join('') + '</div>';
+}
 
-  document.getElementById('main-view').innerHTML = html;
+// ── RENDER — Home (14 cards, nivel 1) ────────────────────────
+function renderHome() {
+  caminoActual = [];
+  const nodos = nodosNivel(1, null);
+
+  if (!nodos.length) {
+    document.getElementById('main-view').innerHTML = '<div class="estado-vacio">Todavía no hay contenido cargado en ArbolContenido para esta obra.</div>';
+    return;
+  }
+
+  document.getElementById('main-view').innerHTML = renderCardsGrid(nodos);
 }
 
 // ── RENDER — navegación en árbol + nodo ──────────────────────
@@ -890,15 +894,7 @@ function renderNodo(nodo) {
   if (nodo.nivel < 3) {
     const hijos = nodosNivel(nodo.nivel + 1, nodo.punto);
     if (hijos.length > 0) {
-      html += '<div class="arbol-subtitulo">Subpuntos</div>' +
-        '<div class="arbol-lista">' + hijos.map(function (n) {
-          return '' +
-            '<button class="arbol-item" onclick="abrirNodo(\'' + n.punto + '\')">' +
-              '<span class="punto">' + escaparHtml(n.punto) + '</span>' +
-              '<span class="titulo">' + escaparHtml(n.titulo) + '</span>' +
-              '<span class="flecha">›</span>' +
-            '</button>';
-        }).join('') + '</div>';
+      html += '<div class="arbol-subtitulo">Subpuntos</div>' + renderCardsGrid(hijos);
     }
   }
 
