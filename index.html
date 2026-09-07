@@ -645,7 +645,16 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v2.02.html — lógica
+// PreKOM — index_prekom_v2.03.html — lógica
+// v2.03 — fix de bug reportado por Ale: el diálogo "Sesión actual"
+// (Ctrl+Alt+U) mostraba "Invalid Date" en Vence. Causa: localStorage
+// es del mismo origen (goeapp.github.io/prekom/) y sobrevive a los
+// redeploys — una sesión guardada por una versión anterior con un
+// shape de sesión distinto (sin `exp` numérico) quedaba en el
+// navegador y rompía `new Date(sesion.exp)`. Se valida la forma en
+// leerSesion() — ver el comentario ahí. "PREKOM"→"preKOM" (pedido
+// de Ale) queda pendiente de precisar dónde, no se tocó nada todavía.
+//
 // v2.02 — consume el modelo de permisos por obra de gas_prekom_v2.01.gs
 // (usuarios_obras): el flag global `esAdmin` (fijado una sola vez al
 // login) se reemplaza por `puedeEditarContenido`/`puedeEditarListas`,
@@ -836,7 +845,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v2.02';
+const APP_VERSION = 'v2.03';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -921,7 +930,19 @@ async function llamarBackend(action, params) {
 function leerSesion() {
   try {
     const raw = localStorage.getItem(SESION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const sesion = JSON.parse(raw);
+    // v2.03 — fix "Invalid Date" en el diálogo de sesión (Ctrl+Alt+U):
+    // localStorage sobrevive a los redeploys de goeapp.github.io/prekom/
+    // (mismo origen); una sesión guardada por una versión anterior con
+    // otro shape (sin `exp` numérico) rompía abrirSessionDialog() al
+    // hacer new Date(undefined). Se valida la forma acá — si no es
+    // válida, se descarta como si no hubiera sesión (fuerza login
+    // nuevo, que sí guarda el shape correcto).
+    if (!sesion || typeof sesion.email !== 'string' || (!sesion.noExpira && typeof sesion.exp !== 'number')) {
+      return null;
+    }
+    return sesion;
   } catch (err) { return null; }
 }
 function guardarSesion(email, nombreApellido, noExpira) {
