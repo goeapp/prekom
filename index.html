@@ -74,7 +74,14 @@ input { font-family: inherit; }
   text-align   : center;
   box-shadow   : var(--shadow-md);
 }
-.caja-logo    { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; color: var(--accent); letter-spacing: 3px; margin-bottom: 4px; }
+/* v2.04 — fix "PREKOM" en vez de "preKOM": Bebas Neue es una
+   tipografía todo-mayúsculas (no tiene formas de minúscula real), el
+   texto "PreKOM" del HTML se renderizaba visualmente en mayúsculas.
+   El logo (acá y .hdr-logo) pasa a DM Sans en bold, que sí respeta
+   el casing real del texto. El resto del sistema de diseño (títulos
+   de cards, nodo-titulo, etc.) sigue en Bebas Neue sin cambios — el
+   problema era específico del logo. */
+.caja-logo    { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 1.6rem; color: var(--accent); letter-spacing: .5px; margin-bottom: 4px; }
 .caja-version { font-size: .62rem; color: var(--muted); letter-spacing: .03em; margin-bottom: 4px; }
 .caja-sub     { font-size: .78rem; color: var(--muted); margin-bottom: 28px; }
 .caja-title   { font-size: 1rem; font-weight: 600; margin-bottom: 6px; }
@@ -186,7 +193,7 @@ input { font-family: inherit; }
   top          : 0;
   z-index      : 20;
 }
-.hdr-logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.4rem; color: var(--accent); letter-spacing: 2px; white-space: nowrap; }
+.hdr-logo { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 1.15rem; color: var(--accent); letter-spacing: .3px; white-space: nowrap; }
 .hdr-version { font-size: .62rem; color: rgba(255,255,255,.4); white-space: nowrap; }
 .hdr-obra-nombre {
   font-size    : .8rem;
@@ -645,7 +652,13 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v2.03.html — lógica
+// PreKOM — index_prekom_v2.04.html — lógica
+// v2.04 — fix chico: "PREKOM" se veía todo en mayúsculas en el logo
+// (login y header) porque Bebas Neue es una tipografía todo-mayúsculas
+// (sin formas de minúscula real) — el texto real ya decía "PreKOM"
+// bien casado. El logo pasa a DM Sans bold, ver el comentario en el
+// CSS de .caja-logo. Sin cambios de lógica.
+//
 // v2.03 — fix de bug reportado por Ale: el diálogo "Sesión actual"
 // (Ctrl+Alt+U) mostraba "Invalid Date" en Vence. Causa: localStorage
 // es del mismo origen (goeapp.github.io/prekom/) y sobrevive a los
@@ -845,7 +858,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v2.03';
+const APP_VERSION = 'v2.04';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
