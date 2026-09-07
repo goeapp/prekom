@@ -645,7 +645,12 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v2.00.html — lógica
+// PreKOM — index_prekom_v2.01.html — lógica
+// v2.01 — ajuste chico sobre v2.00, pedido por Ale tras probar el
+// marco de color: la regla de columnas de Subpuntos y el truncado
+// de descripción, ver columnasAdaptativas_ / renderCardsGrid más
+// abajo para el detalle. Sin cambios en el resto de v2.00.
+//
 // v2.00 — primer incremento de la mejora de visualización de
 // Módulo 1 (Contenido) acordada con Ale (reemplaza en su rol
 // histórico a un PPTX, aprovechando mejor el área de pantalla),
@@ -818,7 +823,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v2.00';
+const APP_VERSION = 'v2.01';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1264,22 +1269,34 @@ function escaparHtml(s) {
 // 2/3 usaban una lista compacta distinta a las cards del Home —
 // no era lo pedido; ahora es la misma card en todos los niveles) ──
 // v2.00 — 2° argumento opcional { maxCols } SOLO para la sección de
-// Subpuntos de un nodo (ver renderNodo): columnas = mínimo(N, maxCols),
-// fijado inline. Sin ese argumento (Home de 14 cards, Home de Listas
-// de Módulo 2) se comporta exactamente igual que antes, con la grilla
-// fija de 4/3/2/1 de .cards-grid.
+// Subpuntos de un nodo (ver renderNodo). Sin ese argumento (Home de
+// 14 cards, Home de Listas de Módulo 2) se comporta exactamente
+// igual que antes: grilla fija de 4/3/2/1 de .cards-grid, 60
+// caracteres de descripción.
+// v2.01 — ajuste de la regla de columnas de Subpuntos, pedido por
+// Ale tras ver 4 subpuntos en 3+1 (2 filas) cuando entraban bien en
+// una sola fila: pasa de "mínimo(N,3)" a "N≤4 → N columnas (una
+// sola fila), N≥5 → 3 columnas" (columnasAdaptativas_). También se
+// descartó estirar la altura por JS (alternativa más simple: subir
+// el truncado de la descripción de 60 a 200 caracteres SOLO en
+// Subpuntos, así las cards se ven más altas de forma natural, con
+// más contenido real en vez de espacio vacío).
+function columnasAdaptativas_(n) {
+  return n <= 4 ? n : 3;
+}
 function renderCardsGrid(nodos, opts) {
   opts = opts || {};
   const clase = opts.maxCols ? 'cards-grid cards-grid-subpuntos' : 'cards-grid';
-  const cols = opts.maxCols ? Math.min(nodos.length, opts.maxCols) : null;
+  const cols = opts.maxCols ? columnasAdaptativas_(nodos.length) : null;
   const style = cols ? ' style="grid-template-columns: repeat(' + cols + ', 1fr);"' : '';
+  const truncado = opts.maxCols ? 200 : 60;
   return '<div class="' + clase + '"' + style + '>' + nodos.map(function (n) {
     const sub = contarSubpuntos(n.punto);
     return '' +
       '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
         '<div class="card-punto">' + escaparHtml(n.punto) + '</div>' +
         '<div class="card-titulo">' + escaparHtml(n.titulo) + '</div>' +
-        '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, 60)) + '</div>' +
+        '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, truncado)) + '</div>' +
         '<div class="card-footer">' +
           '<span>' + sub + (sub === 1 ? ' subpunto' : ' subpuntos') + '</span>' +
           '<span class="ver-mas">Ver más →</span>' +
