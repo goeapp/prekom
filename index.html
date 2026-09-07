@@ -645,7 +645,20 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v2.01.html — lógica
+// PreKOM — index_prekom_v2.02.html — lógica
+// v2.02 — consume el modelo de permisos por obra de gas_prekom_v2.01.gs
+// (usuarios_obras): el flag global `esAdmin` (fijado una sola vez al
+// login) se reemplaza por `puedeEditarContenido`/`puedeEditarListas`,
+// recalculados cada vez que se entra a una obra (mostrarApp, ver la
+// nueva llamada a 'verificarPermisosObra' junto al resto de la carga
+// inicial) — porque ahora el permiso es POR obra, no global. La
+// action 'listarObras' ahora manda `email`, ya que el backend filtra
+// qué obras ve cada usuario (antes devolvía todas). El botón Editar
+// y el swatch de color usan `puedeEditarContenido`; en Listas,
+// `puedeEditarListas` gatea la edición de celda, "+ Agregar fila" y
+// el botón de borrar fila (todo oculto/no-editable si es false — el
+// gate real y definitivo está en el backend, esto es solo UX).
+//
 // v2.01 — ajuste chico sobre v2.00, pedido por Ale tras probar el
 // marco de color: la regla de columnas de Subpuntos y el truncado
 // de descripción, ver columnasAdaptativas_ / renderCardsGrid más
@@ -823,7 +836,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v2.01';
+const APP_VERSION = 'v2.02';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -856,7 +869,8 @@ window.addEventListener('unhandledrejection', function (e) {
 
 // ── ESTADO EN MEMORIA ───────────────────────────────────────
 let emailActual = '';
-let esAdmin = false;
+let puedeEditarContenido = false;   // v2.02 — por obra, recalculado en mostrarApp()
+let puedeEditarListas = false;      // v2.02 — ídem
 let obraActual = null;      // { obraId, nombreObra }
 let arbol = [];             // ArbolContenido completo de la obra
 let links = [];
@@ -981,13 +995,6 @@ async function revalidarSesion(email) {
 
 async function onLoginOk(email, nombreApellido) {
   emailActual = email;
-
-  try {
-    const resAdmin = await llamarBackend('verificarAdmin', { email: email });
-    esAdmin = !!(resAdmin && resAdmin.esAdmin);
-  } catch (err) {
-    esAdmin = false;
-  }
 
   const obraGuardada = leerObraGuardada();
   if (obraGuardada) {
@@ -1129,13 +1136,13 @@ async function cargarObras() {
   document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Cargando obras…</div>';
 
   try {
-    const r = await llamarBackend('listarObras', {});
+    const r = await llamarBackend('listarObras', { email: emailActual });
     if (!r.ok) {
       document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">No pudimos cargar las obras.</div>';
       return;
     }
     if (!r.obras || r.obras.length === 0) {
-      document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Todavía no hay obras creadas.<br>Creá una desde el menú "PreKOM Admin" del Sheet.</div>';
+      document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Todavía no ves ninguna obra asignada.<br>Pedile a un administrador que te agregue en "usuarios_obras".</div>';
       return;
     }
     // Si hay una sola obra, se entra directo (sin pantalla intermedia)
@@ -1196,13 +1203,14 @@ async function mostrarApp() {
   document.getElementById('btn-nav-listas').disabled = true;
 
   try {
-    const [resArbol, resLinks, resConfig, resListas, resValores, resFavoritos] = await Promise.all([
+    const [resArbol, resLinks, resConfig, resListas, resValores, resFavoritos, resPermisos] = await Promise.all([
       llamarBackend('leerArbolContenido', { obraId: obraActual.obraId }),
       llamarBackend('leerLinks', { obraId: obraActual.obraId }),
       llamarBackend('leerConfigObra', { obraId: obraActual.obraId }),
       llamarBackend('listarListas', { obraId: obraActual.obraId }),
       llamarBackend('leerListaValores', { obraId: obraActual.obraId }),
-      llamarBackend('leerFavoritos', { obraId: obraActual.obraId, email: emailActual })
+      llamarBackend('leerFavoritos', { obraId: obraActual.obraId, email: emailActual }),
+      llamarBackend('verificarPermisosObra', { obraId: obraActual.obraId, email: emailActual })
     ]);
 
     arbol = (resArbol.ok && resArbol.arbol) ? resArbol.arbol : [];
@@ -1211,6 +1219,9 @@ async function mostrarApp() {
     listasIndex = (resListas.ok && resListas.listas) ? resListas.listas : [];
     valoresListas = (resValores.ok && resValores.valores) ? resValores.valores : [];
     favoritosActuales = (resFavoritos.ok && resFavoritos.favoritos) ? resFavoritos.favoritos : [];
+    // v2.02 — permisos de ESTA obra puntual, no un flag global
+    puedeEditarContenido = !!(resPermisos.ok && resPermisos.permisos && resPermisos.permisos.puedeEditarContenido);
+    puedeEditarListas = !!(resPermisos.ok && resPermisos.permisos && resPermisos.permisos.puedeEditarListas);
 
     document.getElementById('hdr-obra-nombre').textContent =
       (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
@@ -1354,12 +1365,12 @@ function renderBreadcrumb() {
 // — antes era resumen O lista de hijos, nunca los dos juntos.
 function renderNodo(nodo) {
   const resumenLimpio = nodo.resumen ? DOMPurify.sanitize(nodo.resumen) : '';
-  const btnEditar = esAdmin
+  const btnEditar = puedeEditarContenido
     ? '<button class="btn-editar" onclick="abrirEditor(\'' + nodo.punto + '\')">Editar</button>'
     : '';
-  // v2.00: swatch de color solo para admin, junto al botón Editar
+  // v2.00: swatch de color solo con permiso de Contenido, junto al botón Editar
   const colorActual = nodo.colorFondo || COLOR_FONDO_DEFAULT;
-  const btnColor = esAdmin
+  const btnColor = puedeEditarContenido
     ? '<button class="btn-color-swatch" style="background:' + colorActual + '" title="Cambiar color" onclick="abrirSelectorColor(\'' + nodo.punto + '\')"></button>'
     : '';
 
@@ -1613,7 +1624,7 @@ async function abrirLista(nombreTab) {
         '</div>' +
         '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
         '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
-        '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' +
+        (puedeEditarListas ? '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' : '') +
       '</div>' +
     '</div>' +
     '<div class="estado-vacio" id="lista-cargando"><div class="spinner"></div>Cargando…</div>' +
@@ -1636,7 +1647,10 @@ async function abrirLista(nombreTab) {
     if (tablaListaTabulator) tablaListaTabulator.refreshFilter();
   });
 
-  document.getElementById('btn-agregar-fila').addEventListener('click', function () { agregarFilaLista(nombreTab); });
+  const btnAgregarFila = document.getElementById('btn-agregar-fila');
+  if (btnAgregarFila) {
+    btnAgregarFila.addEventListener('click', function () { agregarFilaLista(nombreTab); });
+  }
   document.getElementById('btn-actualizar-lista').addEventListener('click', function () { actualizarListaActual(); });
 
   await cargarYMontarLista(nombreTab, true);
@@ -1714,7 +1728,7 @@ function columnaTabulator(col) {
   // congelada (frozen), junto con ID, para scroll horizontal.
   const esItem = col.campo === 'item';
   const base = {
-    title: col.etiqueta || col.campo, field: col.campo, headerSort: true, editable: true,
+    title: col.etiqueta || col.campo, field: col.campo, headerSort: true, editable: puedeEditarListas,
     widthGrow: esItem ? 5 : 0,
     frozen: esItem
   };
@@ -1765,11 +1779,14 @@ function columnaTabulator(col) {
 
 function montarTabulator(nombreTab, schema, datos) {
   const columnas = schema.map(columnaTabulator);
-  columnas.push({
-    title: '', field: '_acciones', width: 50, widthGrow: 0, headerSort: false, hozAlign: 'center',
-    formatter: function () { return '<button class="btn-borrar-fila" title="Borrar fila">🗑</button>'; },
-    cellClick: function (e, cell) { confirmarBorrarFila(nombreTab, cell.getRow().getData()); }
-  });
+  // v2.02 — columna de borrado solo si hay permiso de editar Listas
+  if (puedeEditarListas) {
+    columnas.push({
+      title: '', field: '_acciones', width: 50, widthGrow: 0, headerSort: false, hozAlign: 'center',
+      formatter: function () { return '<button class="btn-borrar-fila" title="Borrar fila">🗑</button>'; },
+      cellClick: function (e, cell) { confirmarBorrarFila(nombreTab, cell.getRow().getData()); }
+    });
+  }
 
   tablaListaTabulator = new Tabulator('#tabulator-contenedor', {
     data: datos,
