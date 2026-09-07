@@ -254,6 +254,15 @@ input { font-family: inherit; }
 @media (max-width: 1100px) { .cards-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 820px)  { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px)  { .cards-grid { grid-template-columns: 1fr; } }
+
+/* Grilla de Subpuntos (v2.00) — columnas = mínimo(N,3), fijado inline
+   por JS; estos breakpoints la colapsan en pantallas chicas igual
+   que .cards-grid, con !important porque el inline style pesa más
+   que una regla de clase normal. No toca .cards-grid a secas (Home
+   de 14 cards y Home de Listas de Módulo 2 siguen con la grilla fija
+   de 4/3/2/1 de arriba). */
+@media (max-width: 820px) { .cards-grid-subpuntos { grid-template-columns: repeat(2, 1fr) !important; } }
+@media (max-width: 560px) { .cards-grid-subpuntos { grid-template-columns: 1fr !important; } }
 .card {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 8px;
@@ -271,6 +280,28 @@ input { font-family: inherit; }
 
 /* Subpuntos dentro de un nodo — misma grilla de cards que el Home */
 .arbol-subtitulo { font-size: .78rem; color: var(--muted); font-weight: 600; margin: 24px 0 12px; text-transform: uppercase; letter-spacing: .03em; }
+
+/* Nodo — marco de color (v2.00) — envuelve header + Resumen +
+   Subpuntos de un nodo (la breadcrumb queda afuera, ver renderNodo).
+   Fondo editable por admin, ver modal-color. */
+.nodo-marco { border-radius: 20px; padding: 22px 24px 24px; transition: background-color .15s ease; }
+.btn-color-swatch {
+  width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(15,23,42,.15);
+  cursor: pointer; flex-shrink: 0; box-shadow: var(--shadow);
+}
+.btn-color-swatch:hover { border-color: rgba(15,23,42,.35); }
+.paleta-colores { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.paleta-swatch {
+  width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid transparent;
+  cursor: pointer; transition: transform .1s ease, border-color .1s ease;
+}
+.paleta-swatch:hover { transform: scale(1.06); }
+.paleta-swatch.seleccionado { border-color: var(--accent2); }
+.btn-sin-color {
+  width: 100%; margin-top: 12px; padding: 9px; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+  background: none; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-sin-color:hover { border-color: var(--accent); color: var(--accent); }
 
 /* Nodo — Resumen */
 .nodo-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
@@ -303,6 +334,26 @@ input { font-family: inherit; }
 
 .ql-toolbar.ql-snow { border-color: var(--border); border-radius: 8px 8px 0 0; }
 .ql-container.ql-snow { border-color: var(--border); border-radius: 0 0 8px 8px; min-height: 220px; font-size: 14px; font-family: 'DM Sans', sans-serif; }
+
+/* Fix v2.00: .ql-container.ql-snow (arriba) fija font-size:14px con
+   la misma especificidad que las reglas .ql-editor .ql-size-* de
+   quill.snow.css y se declara después en el documento — en la
+   práctica el cambio de tamaño no se notaba. Se blinda acá con
+   !important, acotado al editor. */
+#quill-editor .ql-size-small { font-size: .75em !important; }
+#quill-editor .ql-size-large { font-size: 1.5em !important; }
+#quill-editor .ql-size-huge  { font-size: 2.5em !important; }
+
+/* Estas mismas clases (tamaño y alineación) no tenían NINGÚN CSS
+   fuera de .ql-editor — el Resumen ya guardado se mostraba siempre
+   en tamaño/alineación normal aunque se hubiera guardado distinto.
+   Se replican acá para .resumen-box (vista de lectura). */
+.resumen-box .ql-size-small { font-size: .75em; }
+.resumen-box .ql-size-large { font-size: 1.5em; }
+.resumen-box .ql-size-huge  { font-size: 2.5em; }
+.resumen-box .ql-align-center { text-align: center; }
+.resumen-box .ql-align-right  { text-align: right; }
+.resumen-box .ql-align-justify { text-align: justify; }
 
 .estado-vacio { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 14px; }
 
@@ -386,11 +437,18 @@ input { font-family: inherit; }
 .btn-borrar-fila { background: none; border: none; color: #dc2626; font-size: 15px; padding: 0 4px; }
 .btn-borrar-fila:hover { color: #991b1b; }
 .tabulator-wrap { margin-top: 4px; }
+.buscador-wrap { position: relative; display: inline-block; }
 .input-buscador-inline {
-  width: 200px; padding: 7px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  width: 200px; padding: 7px 26px 7px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   font-size: .8rem; color: var(--text); transition: border-color .15s;
 }
 .input-buscador-inline:focus { outline: none; border-color: var(--accent); }
+.btn-limpiar-buscador {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--muted); font-size: 15px; line-height: 1; padding: 2px 4px; cursor: pointer;
+}
+.btn-limpiar-buscador:hover { color: var(--text); }
+.btn-limpiar-buscador.hidden { display: none; }
 .contador-filas { font-size: .78rem; color: var(--muted); font-weight: 600; }
 .paginador-arriba { margin-bottom: 10px; }
 .paginador-arriba:empty { margin-bottom: 0; }
@@ -542,6 +600,20 @@ input { font-family: inherit; }
   </div>
 </div>
 
+<!-- ═══════════════ MODAL — Color de fondo del nodo (v2.00) ═══════════════ -->
+<div class="modal-overlay hidden" id="modal-color">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>Color del panel</h3>
+      <button class="modal-close" id="btn-cerrar-color">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="paleta-colores" id="paleta-colores"></div>
+      <button class="btn-sin-color" id="btn-sin-color">Sin color (usar el default)</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ MODAL — Links de la obra ═══════════════ -->
 <div class="modal-overlay hidden" id="modal-links">
   <div class="modal-box">
@@ -573,7 +645,44 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v1.11.html — lógica
+// PreKOM — index_prekom_v2.00.html — lógica
+// v2.00 — primer incremento de la mejora de visualización de
+// Módulo 1 (Contenido) acordada con Ale (reemplaza en su rol
+// histórico a un PPTX, aprovechando mejor el área de pantalla),
+// + 1 pendiente anotado de Módulo 2:
+//  1) Grilla de Subpuntos adaptativa: columnas = mínimo(N, 3) — ya
+//     no la grilla fija de 4 (esa se mantiene sin cambios para el
+//     Home de 14 cards y para el Home de Listas de Módulo 2, que
+//     siguen usando renderCardsGrid(nodos) sin el 2° argumento).
+//     Nueva clase .cards-grid-subpuntos con su propio breakpoint
+//     responsive (no toca .cards-grid a secas).
+//  2) Marco de color por nodo: todo el panel de un nodo (header +
+//     Resumen + "Subpuntos" + grilla — la breadcrumb queda afuera)
+//     va dentro de un nuevo contenedor .nodo-marco, bordes
+//     redondeados, fondo = nodo.colorFondo o el primero de
+//     PALETA_COLORES_FONDO si viene vacío. Solo admin ve el swatch
+//     "Cambiar color" (junto al botón Editar) que abre un selector
+//     con las 16 opciones + "Sin color"; guarda vía la nueva action
+//     guardarColorFondo (backend v2.00). Las cards de Subpuntos
+//     siguen blancas siempre (fondo propio de .card, sin cambios).
+//  3) Fix del editor Quill — diagnóstico: quill.snow.css sí trae
+//     `.ql-editor .ql-size-large{font-size:1.5em}` de fábrica, pero
+//     `.ql-container.ql-snow{font-size:14px}` (CSS propio del stack,
+//     ya existía) tiene la MISMA especificidad y se declara después
+//     en el documento — al heredarse ese 14px como base, el cambio
+//     de tamaño quedaba invisible en la práctica. Se agregan reglas
+//     con !important acotadas a #quill-editor para blindar el
+//     tamaño dentro del editor, y las mismas clases (ql-size-*,
+//     ql-align-*) también en .resumen-box — antes esas clases NO
+//     tenían ningún CSS fuera de .ql-editor, así que aunque el
+//     tamaño/centrado se guardaran bien, no se veían al mostrar el
+//     Resumen ya guardado. Se suma { align: [] } a la toolbar de
+//     Quill (botón de alineación, incluye centrado) — aplica a
+//     cualquier Resumen editable, no solo al nodo hoja.
+//  4) Pendiente de Módulo 2 (sin urgencia, sumado a esta entrega):
+//     "x" para borrar el término del buscador del detalle de lista
+//     con un click, en vez de borrar el texto a mano.
+//
 // v1.11 — 2 correcciones sobre v1.10 (Ale aclaró que lo había pedido
 // al revés):
 //  1) Filtro por columna: sacado de los campos SIN lista de valores
@@ -709,7 +818,18 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v1.11';
+const APP_VERSION = 'v2.00';
+
+// Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
+// — el frontend no inventa colores propios, usa exactamente estos 16 hex.
+const PALETA_COLORES_FONDO = [
+  '#FECACA', '#FED7AA', '#FDE68A', '#FEF08A',
+  '#D9F99D', '#BBF7D0', '#A7F3D0', '#99F6E4',
+  '#A5F3FC', '#BAE6FD', '#BFDBFE', '#C7D2FE',
+  '#DDD6FE', '#E9D5FF', '#F5D0FE', '#FBCFE8'
+];
+const COLOR_FONDO_DEFAULT = PALETA_COLORES_FONDO[0];
+let puntoEnEdicionColor = null;
 const API_URL = 'https://script.google.com/macros/s/AKfycbzvycthxE1JZ7K1QkeMRrMiRlc2PuO7hZghEdlm8mY58NgnYkC2P_Iznctqd8tPLK1R/exec';
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
@@ -1143,8 +1263,17 @@ function escaparHtml(s) {
 // subpuntos de cualquier nivel (v004: antes los subpuntos de nivel
 // 2/3 usaban una lista compacta distinta a las cards del Home —
 // no era lo pedido; ahora es la misma card en todos los niveles) ──
-function renderCardsGrid(nodos) {
-  return '<div class="cards-grid">' + nodos.map(function (n) {
+// v2.00 — 2° argumento opcional { maxCols } SOLO para la sección de
+// Subpuntos de un nodo (ver renderNodo): columnas = mínimo(N, maxCols),
+// fijado inline. Sin ese argumento (Home de 14 cards, Home de Listas
+// de Módulo 2) se comporta exactamente igual que antes, con la grilla
+// fija de 4/3/2/1 de .cards-grid.
+function renderCardsGrid(nodos, opts) {
+  opts = opts || {};
+  const clase = opts.maxCols ? 'cards-grid cards-grid-subpuntos' : 'cards-grid';
+  const cols = opts.maxCols ? Math.min(nodos.length, opts.maxCols) : null;
+  const style = cols ? ' style="grid-template-columns: repeat(' + cols + ', 1fr);"' : '';
+  return '<div class="' + clase + '"' + style + '>' + nodos.map(function (n) {
     const sub = contarSubpuntos(n.punto);
     return '' +
       '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
@@ -1211,27 +1340,80 @@ function renderNodo(nodo) {
   const btnEditar = esAdmin
     ? '<button class="btn-editar" onclick="abrirEditor(\'' + nodo.punto + '\')">Editar</button>'
     : '';
+  // v2.00: swatch de color solo para admin, junto al botón Editar
+  const colorActual = nodo.colorFondo || COLOR_FONDO_DEFAULT;
+  const btnColor = esAdmin
+    ? '<button class="btn-color-swatch" style="background:' + colorActual + '" title="Cambiar color" onclick="abrirSelectorColor(\'' + nodo.punto + '\')"></button>'
+    : '';
 
+  // El marco de color envuelve header + Resumen + Subpuntos — la
+  // breadcrumb queda afuera, a propósito (ver diseño acordado)
   let html = renderBreadcrumb() +
-    '<div class="nodo-header">' +
-      '<div>' +
-        '<div class="nodo-punto">' + escaparHtml(nodo.punto) + '</div>' +
-        '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
+    '<div class="nodo-marco" id="nodo-marco" style="background:' + colorActual + '">' +
+      '<div class="nodo-header">' +
+        '<div>' +
+          '<div class="nodo-punto">' + escaparHtml(nodo.punto) + '</div>' +
+          '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:10px;align-items:flex-start">' + btnColor + btnEditar + '</div>' +
       '</div>' +
-      btnEditar +
-    '</div>' +
-    '<div class="resumen-box' + (resumenLimpio ? '' : ' vacio') + '">' +
-      (resumenLimpio || 'Todavía no hay Resumen cargado para este punto.') +
-    '</div>';
+      '<div class="resumen-box' + (resumenLimpio ? '' : ' vacio') + '">' +
+        (resumenLimpio || 'Todavía no hay Resumen cargado para este punto.') +
+      '</div>';
 
   if (nodo.nivel < 3) {
     const hijos = nodosNivel(nodo.nivel + 1, nodo.punto);
     if (hijos.length > 0) {
-      html += '<div class="arbol-subtitulo">Subpuntos</div>' + renderCardsGrid(hijos);
+      html += '<div class="arbol-subtitulo">Subpuntos</div>' + renderCardsGrid(hijos, { maxCols: 3 });
     }
   }
 
+  html += '</div>'; // cierre .nodo-marco
+
   document.getElementById('main-view').innerHTML = html;
+}
+
+// ── MODAL — Selector de color de fondo del nodo (v2.00) ──────
+function abrirSelectorColor(punto) {
+  puntoEnEdicionColor = punto;
+  const nodo = arbol.find(function (n) { return n.punto === punto; });
+  const colorActual = nodo ? nodo.colorFondo : '';
+
+  document.getElementById('paleta-colores').innerHTML = PALETA_COLORES_FONDO.map(function (hex) {
+    const sel = hex === colorActual ? ' seleccionado' : '';
+    return '<button class="paleta-swatch' + sel + '" style="background:' + hex + '" onclick="elegirColorFondo(\'' + hex + '\')" title="' + hex + '"></button>';
+  }).join('');
+
+  document.getElementById('modal-color').classList.remove('hidden');
+}
+function cerrarSelectorColor() {
+  document.getElementById('modal-color').classList.add('hidden');
+  puntoEnEdicionColor = null;
+}
+document.getElementById('btn-cerrar-color').addEventListener('click', cerrarSelectorColor);
+document.getElementById('btn-sin-color').addEventListener('click', function () { elegirColorFondo(''); });
+
+async function elegirColorFondo(hex) {
+  if (!puntoEnEdicionColor) return;
+  const punto = puntoEnEdicionColor;
+  try {
+    const res = await llamarBackend('guardarColorFondo', {
+      obraId: obraActual.obraId,
+      punto: punto,
+      color: hex,
+      email: emailActual
+    });
+    if (!res.ok) {
+      alert(res.error || 'No se pudo guardar el color.');
+      return;
+    }
+    const nodo = arbol.find(function (n) { return n.punto === punto; });
+    if (nodo) nodo.colorFondo = hex;
+    cerrarSelectorColor();
+    if (nodo) renderNodo(nodo);
+  } catch (err) {
+    alert('No se pudo conectar con el backend.');
+  }
 }
 
 // ── MODAL — Editar Resumen (Quill) ───────────────────────────
@@ -1251,6 +1433,7 @@ function abrirEditor(punto) {
           ['bold', 'italic', 'underline'],
           [{ list: 'ordered' }, { list: 'bullet' }],
           [{ size: ['small', false, 'large'] }],
+          [{ align: [] }],
           [{ color: [] }, { background: [] }],
           ['clean']
         ]
@@ -1407,7 +1590,10 @@ async function abrirLista(nombreTab) {
         '<button id="btn-favorito-grande" class="btn-favorito-grande' + (esFav ? ' activo' : '') + '" onclick="toggleFavorito(\'' + nombreTab + '\')">' + (esFav ? '★' : '☆') + '</button>' +
       '</div>' +
       '<div class="lista-header-acciones hidden" id="lista-header-acciones">' +
-        '<input type="text" id="lista-buscador" class="input-buscador-inline" placeholder="Buscar…">' +
+        '<div class="buscador-wrap">' +
+          '<input type="text" id="lista-buscador" class="input-buscador-inline" placeholder="Buscar…">' +
+          '<button class="btn-limpiar-buscador hidden" id="btn-limpiar-buscador" title="Borrar búsqueda">&times;</button>' +
+        '</div>' +
         '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
         '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
         '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' +
@@ -1418,8 +1604,18 @@ async function abrirLista(nombreTab) {
     '<div class="tabulator-wrap" id="tabulator-contenedor"></div>';
 
   terminoBusquedaLista = '';
-  document.getElementById('lista-buscador').addEventListener('input', function () {
+  const inputBuscador = document.getElementById('lista-buscador');
+  const btnLimpiarBuscador = document.getElementById('btn-limpiar-buscador');
+  inputBuscador.addEventListener('input', function () {
     terminoBusquedaLista = this.value.trim().toLowerCase();
+    btnLimpiarBuscador.classList.toggle('hidden', this.value === '');
+    if (tablaListaTabulator) tablaListaTabulator.refreshFilter();
+  });
+  btnLimpiarBuscador.addEventListener('click', function () {
+    inputBuscador.value = '';
+    terminoBusquedaLista = '';
+    btnLimpiarBuscador.classList.add('hidden');
+    inputBuscador.focus();
     if (tablaListaTabulator) tablaListaTabulator.refreshFilter();
   });
 
