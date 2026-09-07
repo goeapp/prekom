@@ -464,6 +464,10 @@ input { font-family: inherit; }
 .sortable-chosen { box-shadow: 0 0 0 2px var(--accent-border); }
 .favorito-chip[draggable] { cursor: grab; }
 .favorito-chip[draggable]:active { cursor: grabbing; }
+.grupo-vacio {
+  grid-column: 1 / -1; border: 1.5px dashed var(--border); border-radius: var(--radius); min-height: 64px;
+  display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: .8rem; text-align: center; padding: 10px;
+}
 .card-categoria-chip {
   display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
   color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 99px; padding: 2px 9px; align-self: flex-start;
@@ -954,7 +958,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v3.1.0';
+const APP_VERSION = 'v3.1.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1748,23 +1752,27 @@ function renderListasHub() {
     html += '<div class="favoritos-vacio" id="favoritos-strip">Todavía no marcaste ninguna lista como favorita.</div>';
   }
 
-  // Grupos vistos en _ListasIndex (valor crudo de Categoria = GrupoId
-  // desde v3.1.0). Orden: primero los que están en el catálogo
-  // _ListasGrupos (por su Orden), después los que no matchean ningún
-  // GrupoId cargado (en el orden en que aparecen, igual que antes).
+  // Grupos: SIEMPRE se pintan todos los del catálogo _ListasGrupos —
+  // aunque tengan 0 listas en este momento — para que el contenedor
+  // (y su drop-zone de drag&drop) no desaparezca al vaciarse un grupo
+  // (bug reportado por Ale 07-sep-2026: al mover la única lista de un
+  // grupo, ese grupo dejaba de existir en el DOM y ya no se podía
+  // volver a soltar nada ahí desde la PWA). Van en el orden del
+  // catálogo (Orden), y DESPUÉS los grupos "sin catalogar" (texto
+  // libre en Categoria que no matchea ningún GrupoId) que sí tengan
+  // alguna lista — mismo comportamiento de siempre para obras que
+  // todavía no migraron a _ListasGrupos.
+  const catalogadosIds = gruposIndex.map(function (g) { return g.grupoId; });
   const gruposVistos = [];
   listasIndex.forEach(function (l) {
     const gid = l.categoria || '';
     if (gruposVistos.indexOf(gid) === -1) gruposVistos.push(gid);
   });
-  const catalogados = gruposVistos.filter(function (gid) { return gruposIndex.some(function (g) { return g.grupoId === gid; }); });
-  const sinCatalogar = gruposVistos.filter(function (gid) { return catalogados.indexOf(gid) === -1; });
-  catalogados.sort(function (a, b) {
-    const ga = gruposIndex.find(function (g) { return g.grupoId === a; });
-    const gb = gruposIndex.find(function (g) { return g.grupoId === b; });
-    return ga.orden - gb.orden;
-  });
-  const gruposOrdenados = catalogados.concat(sinCatalogar);
+  const sinCatalogar = gruposVistos.filter(function (gid) { return catalogadosIds.indexOf(gid) === -1; });
+  const catalogadosOrdenados = gruposIndex.slice()
+    .sort(function (a, b) { return a.orden - b.orden; })
+    .map(function (g) { return g.grupoId; });
+  const gruposOrdenados = catalogadosOrdenados.concat(sinCatalogar);
 
   gruposOrdenados.forEach(function (gid) {
     const catalogo = gruposIndex.find(function (g) { return g.grupoId === gid; });
@@ -1774,16 +1782,20 @@ function renderListasHub() {
       .sort(function (a, b) { return (a.orden || 999999) - (b.orden || 999999); });
 
     html += '<div class="arbol-subtitulo">' + escaparHtml(nombreMostrado) + '</div>';
-    html += '<div class="cards-grid" data-grupo-id="' + escaparHtml(gid) + '">' + deEsteGrupo.map(function (l) {
-      const esFav = favoritosActuales.indexOf(l.nombreTab) !== -1;
-      return '' +
-        '<button class="card card-lista' + (puedeEditarListas ? ' con-drag' : '') + '" data-nombretab="' + l.nombreTab + '" onclick="abrirLista(\'' + l.nombreTab + '\')">' +
-          (puedeEditarListas ? '<span class="drag-handle" title="Arrastrar para mover de grupo o reordenar" onclick="event.stopPropagation()">⠿</span>' : '') +
-          '<span class="btn-favorito' + (esFav ? ' activo' : '') + '" onclick="event.stopPropagation(); toggleFavorito(\'' + l.nombreTab + '\')">' + (esFav ? '★' : '☆') + '</span>' +
-          '<span class="card-categoria-chip">' + escaparHtml(nombreMostrado) + '</span>' +
-          '<div class="card-titulo">' + escaparHtml(l.nombreVisible) + '</div>' +
-        '</button>';
-    }).join('') + '</div>';
+    html += '<div class="cards-grid" data-grupo-id="' + escaparHtml(gid) + '">';
+    html += deEsteGrupo.length
+      ? deEsteGrupo.map(function (l) {
+          const esFav = favoritosActuales.indexOf(l.nombreTab) !== -1;
+          return '' +
+            '<button class="card card-lista' + (puedeEditarListas ? ' con-drag' : '') + '" data-nombretab="' + l.nombreTab + '" onclick="abrirLista(\'' + l.nombreTab + '\')">' +
+              (puedeEditarListas ? '<span class="drag-handle" title="Arrastrar para mover de grupo o reordenar" onclick="event.stopPropagation()">⠿</span>' : '') +
+              '<span class="btn-favorito' + (esFav ? ' activo' : '') + '" onclick="event.stopPropagation(); toggleFavorito(\'' + l.nombreTab + '\')">' + (esFav ? '★' : '☆') + '</span>' +
+              '<span class="card-categoria-chip">' + escaparHtml(nombreMostrado) + '</span>' +
+              '<div class="card-titulo">' + escaparHtml(l.nombreVisible) + '</div>' +
+            '</button>';
+        }).join('')
+      : '<div class="grupo-vacio">Sin listas en este grupo' + (puedeEditarListas ? ' — arrastrá una acá' : '') + '.</div>';
+    html += '</div>';
   });
 
   document.getElementById('main-view').innerHTML = html;
@@ -1807,12 +1819,17 @@ function inicializarDragDropListasHub_() {
   }
 
   // Grupos — mover entre grupos existentes + reordenar dentro de uno,
-  // solo si el usuario tiene permiso de editar Listas en esta obra
+  // solo si el usuario tiene permiso de editar Listas en esta obra.
+  // draggable:'.card-lista' excluye el placeholder ".grupo-vacio" de
+  // los grupos sin listas — no es un ítem arrastrable ni cuenta para
+  // el orden, solo ocupa la zona de drop hasta que caiga algo (fix
+  // v3.1.1).
   if (puedeEditarListas) {
     Array.prototype.forEach.call(document.querySelectorAll('.cards-grid[data-grupo-id]'), function (grid) {
       sortablesListasHub.push(new Sortable(grid, {
         group: 'listas-grupos', // mismo nombre en todos los grids → habilita arrastrar entre grupos
         handle: '.drag-handle',
+        draggable: '.card-lista',
         animation: 150,
         onEnd: onDragEndListaGrupo_
       }));
@@ -1845,8 +1862,12 @@ async function onDragEndListaGrupo_(evt) {
     ? Array.prototype.map.call(evt.from.querySelectorAll('[data-nombretab]'), function (el) { return el.getAttribute('data-nombretab'); })
     : null;
 
-  // Actualiza el modelo local en memoria (optimista, evita esperar un
-  // round-trip para que la UI ya se vea consistente con el drop)
+  // Actualiza el modelo local en memoria y repinta YA (fix v3.1.1):
+  // antes se esperaba a un re-render disparado por otra acción (F5,
+  // tocar un favorito) para que el chip mostrara el grupo correcto —
+  // ahora, como SortableJS ya movió la card en el DOM, un
+  // renderListasHub() inmediato deja todo consistente sin esperar
+  // la ida y vuelta al backend.
   const item = listasIndex.find(function (l) { return l.nombreTab === nombreTab; });
   if (item && cambioDeGrupo) item.categoria = grupoDestinoId;
   ordenDestino.forEach(function (nt, i) {
@@ -1859,6 +1880,7 @@ async function onDragEndListaGrupo_(evt) {
       if (l) l.orden = i + 1;
     });
   }
+  renderListasHub();
 
   try {
     if (cambioDeGrupo) {
