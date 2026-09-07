@@ -481,11 +481,13 @@ input { font-family: inherit; }
 /* Tabulator — retema para calzar con los tokens del stack */
 .tabulator { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; box-shadow: var(--shadow); }
 .tabulator .tabulator-header { background: transparent !important; border-bottom: none; }
-/* v3.0.0 — header de la grilla fijo (sticky) en el scroll vertical de
-   la página, debajo del header oscuro de la app (#app-header, sticky
-   top:0). Cada .tabulator-col ya trae su propio fondo oscuro, así que
-   el header entero queda opaco al pegarse arriba. */
-.tabulator .tabulator-header { position: sticky; top: var(--header-h); z-index: 5; }
+/* v3.0.1 — el header sticky vía CSS (v3.0.0) chocaba con el cálculo
+   interno de posiciones de Tabulator y rompía la grilla (fila 1
+   tapada). Revertido: el header sticky ahora se logra 100% nativo,
+   dándole altura fija a la tabla (ver montarTabulator) — Tabulator
+   ya resuelve el fijado de header + scroll interno del body solo con
+   eso, sin ningún truco de CSS. */
+.tabulator .tabulator-header { background: transparent !important; border-bottom: none; }
 .tabulator .tabulator-col { background: var(--accent2) !important; border-right: 1px solid rgba(255,255,255,.08); }
 .tabulator .tabulator-col-title,
 .tabulator .tabulator-col-title-holder,
@@ -577,7 +579,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo">preKOM</div>
-    <div class="caja-version" id="version-label">v3.0.0</div>
+    <div class="caja-version" id="version-label">v3.0.1</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -627,7 +629,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo">preKOM</div>
-    <div class="hdr-version" id="version-label-app">v3.0.0</div>
+    <div class="hdr-version" id="version-label-app">v3.0.1</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -938,7 +940,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v3.0.0';
+const APP_VERSION = 'v3.0.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1973,6 +1975,10 @@ function montarTabulator(nombreTab, schema, datos) {
   tablaListaTabulator = new Tabulator('#tabulator-contenedor', {
     data: datos,
     layout: 'fitColumns',
+    // v3.0.1 — altura fija: forma nativa de Tabulator para header
+    // fijo + scroll interno del body (reemplaza el hack de sticky
+    // CSS de v3.0.0, que rompía el posicionamiento de filas).
+    height: 'calc(100vh - 260px)',
     index: 'id',
     columns: columnas,
     placeholder: 'Todavía no hay filas cargadas en esta lista.',
