@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>PreKOM</title>
+<title>preKOM</title>
+<!-- v3.0.0 — ícono cohete (favicon), paleta del stack -->
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
@@ -33,6 +37,7 @@
   --shadow   : 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,.10);
   --header-h : 52px;
+  --danger   : #dc2626;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -327,7 +332,62 @@ input { font-family: inherit; }
 /* Modales de edición y links (propios de PreKOM) */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
 .modal-box { background: var(--surface); border-radius: 14px; width: 100%; max-width: 420px; box-shadow: var(--shadow-md); overflow: hidden; }
-.modal-box.wide { max-width: 640px; }
+.modal-box.wide { max-width: min(1100px, 92vw); }
+
+/* v3.0.0 — modal genérico (mostrarConfirm/mostrarAviso) y toast
+   (mostrarToast), portados tal cual de index_bdc_v6_0_0.html —
+   reemplazan los alert()/confirm() nativos del navegador en todo
+   PreKOM. */
+#dialogo-overlay {
+  display        : none;
+  position       : fixed;
+  inset          : 0;
+  background     : rgba(15,23,42,.4);
+  z-index        : 260;
+  align-items    : center;
+  justify-content: center;
+}
+#dialogo-overlay.visible { display: flex; }
+.dialogo-caja {
+  background   : var(--surface);
+  border-radius: var(--radius);
+  box-shadow   : var(--shadow-md);
+  padding      : 22px;
+  max-width    : 320px;
+  width        : 100%;
+}
+.dialogo-cabecera { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dialogo-icono { font-size: 1.05rem; line-height: 1; }
+.dialogo-title { font-size: .9rem; font-weight: 700; color: var(--text); }
+.dialogo-desc { font-size: .8rem; color: var(--text); line-height: 1.6; margin-bottom: 18px; }
+.dialogo-botones { display: flex; gap: 10px; }
+.dialogo-botones button { flex: 1; padding: 9px; border-radius: var(--radius-sm); font-size: .8rem; font-weight: 600; border: 1px solid var(--border); cursor: pointer; }
+.btn-dialogo-cancelar { background: var(--surface); color: var(--text); }
+.btn-dialogo-cancelar:hover { background: var(--bg); }
+.btn-dialogo-aceptar { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-dialogo-aceptar:hover { background: #b45309; }
+.btn-dialogo-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+.btn-dialogo-danger:hover { background: #b91c1c; }
+
+.toast {
+  position       : fixed;
+  left           : 50%;
+  bottom         : 28px;
+  transform      : translateX(-50%) translateY(12px);
+  background     : var(--accent2);
+  color          : #fff;
+  font-size      : .78rem;
+  font-weight    : 600;
+  padding        : 10px 18px;
+  border-radius  : 99px;
+  box-shadow     : var(--shadow-md);
+  opacity        : 0;
+  pointer-events : none;
+  transition     : opacity .2s ease, transform .2s ease;
+  z-index        : 300;
+  white-space    : nowrap;
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
 .modal-head { background: var(--accent2); color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
 .modal-head h3 { margin: 0; font-size: 18px; font-weight: 600; }
 .modal-close { background: none; border: none; color: rgba(255,255,255,.5); font-size: 20px; line-height: 1; }
@@ -421,6 +481,11 @@ input { font-family: inherit; }
 /* Tabulator — retema para calzar con los tokens del stack */
 .tabulator { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; box-shadow: var(--shadow); }
 .tabulator .tabulator-header { background: transparent !important; border-bottom: none; }
+/* v3.0.0 — header de la grilla fijo (sticky) en el scroll vertical de
+   la página, debajo del header oscuro de la app (#app-header, sticky
+   top:0). Cada .tabulator-col ya trae su propio fondo oscuro, así que
+   el header entero queda opaco al pegarse arriba. */
+.tabulator .tabulator-header { position: sticky; top: var(--header-h); z-index: 5; }
 .tabulator .tabulator-col { background: var(--accent2) !important; border-right: 1px solid rgba(255,255,255,.08); }
 .tabulator .tabulator-col-title,
 .tabulator .tabulator-col-title-holder,
@@ -511,8 +576,8 @@ input { font-family: inherit; }
 <!-- ═══════════════ LOGIN SCREEN ═══════════════ -->
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
-    <div class="caja-logo">PreKOM</div>
-    <div class="caja-version" id="version-label">v1.11</div>
+    <div class="caja-logo">preKOM</div>
+    <div class="caja-version" id="version-label">v3.0.0</div>
     <div class="caja-sub">Preparación de Kick Off Meeting</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -552,7 +617,7 @@ input { font-family: inherit; }
 <!-- ═══════════════ OBRAS SCREEN ("Cambiar obra") ═══════════════ -->
 <div id="obras-screen" class="pantalla-centrada">
   <div class="caja">
-    <div class="caja-logo">PreKOM</div>
+    <div class="caja-logo">preKOM</div>
     <div class="caja-sub">Elegí una obra</div>
     <div id="lista-obras"><div class="obras-vacio">Cargando obras…</div></div>
   </div>
@@ -561,8 +626,8 @@ input { font-family: inherit; }
 <!-- ═══════════════ APP ═══════════════ -->
 <div id="app">
   <header id="app-header">
-    <div class="hdr-logo">PreKOM</div>
-    <div class="hdr-version" id="version-label-app">v1.11</div>
+    <div class="hdr-logo">preKOM</div>
+    <div class="hdr-version" id="version-label-app">v3.0.0</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -620,6 +685,21 @@ input { font-family: inherit; }
     </div>
   </div>
 </div>
+
+<!-- ═══════════════ DIALOG genérico (v3.0.0) — mostrarConfirm/mostrarAviso ═══════════════ -->
+<div id="dialogo-overlay" onclick="if(event.target===this) cerrarDialogo(false)">
+  <div class="dialogo-caja">
+    <div class="dialogo-cabecera">
+      <span class="dialogo-icono" id="dialogo-icono"></span>
+      <span class="dialogo-title" id="dialogo-title"></span>
+    </div>
+    <div class="dialogo-desc" id="dialogo-desc"></div>
+    <div class="dialogo-botones" id="dialogo-botones"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ TOAST genérico (v3.0.0) — mostrarToast ═══════════════ -->
+<div id="toast" class="toast"></div>
 
 <!-- ═══════════════ MODAL — Links de la obra ═══════════════ -->
 <div class="modal-overlay hidden" id="modal-links">
@@ -858,7 +938,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v2.04';
+const APP_VERSION = 'v3.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -886,7 +966,7 @@ window.addEventListener('error', function (e) {
 });
 window.addEventListener('unhandledrejection', function (e) {
   console.error('Promesa rechazada sin capturar:', e.reason);
-  alert('Ocurrió un error inesperado: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  mostrarAviso('Ocurrió un error inesperado: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
 });
 
 // ── ESTADO EN MEMORIA ───────────────────────────────────────
@@ -929,6 +1009,63 @@ function colorTag(nombreColor) {
   if (COLOR_MAP[c]) return COLOR_MAP[c];
   if (/^#[0-9a-f]{3,6}$/i.test(c)) return c;
   return 'var(--muted)';
+}
+
+// ── DIALOG genérico (v3.0.0) — mostrarConfirm/mostrarAviso ──
+// Portado tal cual de index_bdc_v6_0_0.html: reemplaza confirm()/
+// alert() nativos del navegador por un modal propio. Basado en
+// Promise para poder usarse con await.
+let dialogoResolve = null;
+
+function mostrarConfirm(titulo, desc, opciones) {
+  opciones = opciones || {};
+  return new Promise(function (resolve) {
+    dialogoResolve = resolve;
+    document.getElementById('dialogo-icono').textContent = '';
+    document.getElementById('dialogo-title').textContent = titulo;
+    document.getElementById('dialogo-desc').textContent = desc;
+    document.getElementById('dialogo-botones').innerHTML =
+      '<button class="btn-dialogo-cancelar" onclick="cerrarDialogo(false)">' + escaparHtml(opciones.textoCancelar || 'Cancelar') + '</button>' +
+      '<button class="' + (opciones.danger ? 'btn-dialogo-danger' : 'btn-dialogo-aceptar') + '" onclick="cerrarDialogo(true)">' + escaparHtml(opciones.textoAceptar || 'Aceptar') + '</button>';
+    document.getElementById('dialogo-overlay').classList.add('visible');
+  });
+}
+
+function mostrarAviso(mensaje, titulo) {
+  return new Promise(function (resolve) {
+    dialogoResolve = resolve;
+    document.getElementById('dialogo-icono').textContent = '⚠️';
+    document.getElementById('dialogo-title').textContent = titulo || 'Aviso';
+    document.getElementById('dialogo-desc').textContent = mensaje;
+    document.getElementById('dialogo-botones').innerHTML =
+      '<button class="btn-dialogo-aceptar" style="flex:1" onclick="cerrarDialogo(true)">Aceptar</button>';
+    document.getElementById('dialogo-overlay').classList.add('visible');
+  });
+}
+
+function cerrarDialogo(resultado) {
+  document.getElementById('dialogo-overlay').classList.remove('visible');
+  if (dialogoResolve) {
+    const r = dialogoResolve;
+    dialogoResolve = null;
+    r(!!resultado);
+  }
+}
+
+// ── TOAST genérico (v3.0.0) — mostrarToast ──────────────────
+// No bloqueante, se desvanece solo (~2s). Un toast nuevo reemplaza
+// al anterior en vez de apilarse.
+let toastTimeoutId = null;
+
+function mostrarToast(mensaje) {
+  const el = document.getElementById('toast');
+  el.textContent = mensaje;
+  el.classList.add('visible');
+  if (toastTimeoutId) clearTimeout(toastTimeoutId);
+  toastTimeoutId = setTimeout(function () {
+    el.classList.remove('visible');
+    toastTimeoutId = null;
+  }, 2000);
 }
 
 // ── HELPERS DE FETCH ────────────────────────────────────────
@@ -1059,7 +1196,7 @@ function mostrarPasoLogin(paso) {
 }
 
 const MOTIVOS_AUTH = {
-  no_encontrado: 'Ese email no está habilitado para PreKOM. Consultá con el administrador.',
+  no_encontrado: 'Ese email no está habilitado para preKOM. Consultá con el administrador.',
   inactivo: 'Tu usuario está inactivo. Consultá con el administrador.',
   bloqueado: 'Tu usuario quedó bloqueado por intentos fallidos. Consultá con el administrador.'
 };
@@ -1094,7 +1231,7 @@ document.getElementById('btn-pedir-pin').addEventListener('click', async functio
 
 function textoErrorSolicitarPin(motivo, restanteSegundos) {
   if (motivo === 'cooldown') return 'Esperá ' + restanteSegundos + ' segundos antes de pedir otro código.';
-  if (motivo === 'no_encontrado') return 'Ese email no está habilitado para PreKOM.';
+  if (motivo === 'no_encontrado') return 'Ese email no está habilitado para preKOM.';
   if (motivo === 'inactivo') return 'Tu usuario está inactivo.';
   if (motivo === 'bloqueado') return 'Tu usuario está bloqueado por intentos fallidos.';
   return 'No se pudo enviar el código. Probá de nuevo.';
@@ -1466,7 +1603,7 @@ async function elegirColorFondo(hex) {
       email: emailActual
     });
     if (!res.ok) {
-      alert(res.error || 'No se pudo guardar el color.');
+      mostrarAviso(res.error || 'No se pudo guardar el color.');
       return;
     }
     const nodo = arbol.find(function (n) { return n.punto === punto; });
@@ -1474,7 +1611,7 @@ async function elegirColorFondo(hex) {
     cerrarSelectorColor();
     if (nodo) renderNodo(nodo);
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
   }
 }
 
@@ -1527,7 +1664,7 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
       email: emailActual
     });
     if (!res.ok) {
-      alert(res.error || 'No se pudo guardar.');
+      mostrarAviso(res.error || 'No se pudo guardar.');
       this.disabled = false;
       return;
     }
@@ -1536,7 +1673,7 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
     cerrarEditor();
     renderNodo(nodo);
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
   }
   this.disabled = false;
 });
@@ -1615,7 +1752,7 @@ async function toggleFavorito(nombreTab) {
       favoritosActuales.push(nombreTab);
     }
   } catch (err) {
-    alert('No se pudo actualizar el favorito.');
+    mostrarAviso('No se pudo actualizar el favorito.');
     return;
   }
   if (vistaActual === 'listas') renderListasHub();
@@ -1714,7 +1851,7 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
     } else {
-      alert('No se pudo actualizar la lista.');
+      mostrarAviso('No se pudo actualizar la lista.');
     }
   }
 }
@@ -1737,7 +1874,7 @@ async function actualizarListaActual() {
     valoresListas = (resValores.ok && resValores.valores) ? resValores.valores : valoresListas;
     await cargarYMontarLista(listaAbierta, false);
   } catch (err) {
-    alert('No se pudo actualizar.');
+    mostrarAviso('No se pudo actualizar.');
   }
   btn.disabled = false;
   btn.textContent = textoOriginal;
@@ -1797,7 +1934,18 @@ function columnaTabulator(col) {
       editor: 'list',
       editorParams: { values: valuesMap },
       headerFilter: 'list',
-      headerFilterParams: { values: valuesMap, clearable: true },
+      headerFilterParams: {
+        values: valuesMap,
+        clearable: true,
+        // v3.0.0 — las opciones del desplegable de filtro se ven con
+        // el mismo badge de color que ya usan las celdas (colorTag/
+        // COLOR_MAP), en vez de texto plano.
+        itemFormatter: function (label, value, item, element) {
+          const opcion = opciones.find(function (o) { return o.valor === value; });
+          const bg = opcion ? colorTag(opcion.color) : 'var(--muted)';
+          return '<span class="tag-valor" style="background:' + bg + '">' + escaparHtml(label) + '</span>';
+        }
+      },
       formatter: function (cell) {
         const v = cell.getValue();
         if (!v) return '';
@@ -1861,7 +2009,7 @@ function montarTabulator(nombreTab, schema, datos) {
   // ediciones de celda nunca llegaran al backend en v1.00/v1.01/v1.02.
   tablaListaTabulator.on('cellEdited', function (cell) {
     guardarCeldaEditada(nombreTab, cell).catch(function (err) {
-      alert('Error inesperado al guardar la celda: ' + (err && err.message ? err.message : err));
+      mostrarAviso('Error inesperado al guardar la celda: ' + (err && err.message ? err.message : err));
       cell.restoreOldValue();
     });
   });
@@ -1880,11 +2028,11 @@ async function guardarCeldaEditada(nombreTab, cell) {
       obraId: obraActual.obraId, nombreLista: nombreTab, fila: filaAEnviar, email: emailActual
     });
     if (!res.ok) {
-      alert(res.error || 'No se pudo guardar el cambio.');
+      mostrarAviso(res.error || 'No se pudo guardar el cambio.');
       cell.restoreOldValue();
     }
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
     cell.restoreOldValue();
   }
 }
@@ -1894,18 +2042,19 @@ async function agregarFilaLista(nombreTab) {
     const res = await llamarBackend('guardarFilaLista', {
       obraId: obraActual.obraId, nombreLista: nombreTab, fila: {}, email: emailActual
     });
-    if (!res.ok) { alert(res.error || 'No se pudo crear la fila.'); return; }
+    if (!res.ok) { mostrarAviso(res.error || 'No se pudo crear la fila.'); return; }
     const filaNueva = { id: res.id };
     schemaListaAbierta.forEach(function (col) { if (col.campo !== 'id' && !(col.campo in filaNueva)) filaNueva[col.campo] = ''; });
     await tablaListaTabulator.addRow(filaNueva, false);
     actualizarContadorFilas();
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
   }
 }
 
-function confirmarBorrarFila(nombreTab, fila) {
-  if (!confirm('¿Borrar esta fila (id=' + fila.id + ')? No se puede deshacer.')) return;
+async function confirmarBorrarFila(nombreTab, fila) {
+  const ok = await mostrarConfirm('Borrar fila', '¿Borrar esta fila (id=' + fila.id + ')? No se puede deshacer.', { danger: true, textoAceptar: 'Borrar' });
+  if (!ok) return;
   borrarFilaListaFrontend(nombreTab, fila.id);
 }
 
@@ -1914,11 +2063,11 @@ async function borrarFilaListaFrontend(nombreTab, filaId) {
     const res = await llamarBackend('borrarFilaLista', {
       obraId: obraActual.obraId, nombreLista: nombreTab, filaId: filaId, email: emailActual
     });
-    if (!res.ok) { alert(res.error || 'No se pudo borrar la fila.'); return; }
+    if (!res.ok) { mostrarAviso(res.error || 'No se pudo borrar la fila.'); return; }
     tablaListaTabulator.deleteRow(filaId);
     actualizarContadorFilas();
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
   }
 }
 
@@ -1985,11 +2134,11 @@ document.getElementById('btn-agregar-comentario').addEventListener('click', asyn
     const res = await llamarBackend('agregarComentario', {
       obraId: obraActual.obraId, nombreLista: comentariosListaAbierta, texto: texto, email: emailActual
     });
-    if (!res.ok) { alert(res.error || 'No se pudo agregar el comentario.'); this.disabled = false; return; }
+    if (!res.ok) { mostrarAviso(res.error || 'No se pudo agregar el comentario.'); this.disabled = false; return; }
     document.getElementById('comentario-input').value = '';
     await cargarComentarios();
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
   }
   this.disabled = false;
 });
@@ -1997,10 +2146,10 @@ document.getElementById('btn-agregar-comentario').addEventListener('click', asyn
 async function ocultarComentarioFrontend(comentarioId) {
   try {
     const res = await llamarBackend('ocultarComentario', { obraId: obraActual.obraId, comentarioId: comentarioId, email: emailActual });
-    if (!res.ok) { alert(res.motivo === 'no_autorizado' ? 'Solo el autor puede ocultar su propio comentario.' : (res.error || 'No se pudo ocultar.')); return; }
+    if (!res.ok) { mostrarAviso(res.motivo === 'no_autorizado' ? 'Solo el autor puede ocultar su propio comentario.' : (res.error || 'No se pudo ocultar.')); return; }
     await cargarComentarios();
   } catch (err) {
-    alert('No se pudo conectar con el backend.');
+    mostrarAviso('No se pudo conectar con el backend.');
   }
 }
 </script>
