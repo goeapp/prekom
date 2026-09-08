@@ -614,7 +614,7 @@ input { font-family: inherit; }
    así el listado de resultados también queda ancho y alineado
    con las cards de abajo.
 ───────────────────────────────────────────────── */
-#contenido-buscador-wrap { position: relative; max-width: 1680px; margin: 24px auto 0; padding: 0 28px; }
+#contenido-buscador-wrap { position: relative; width: 100%; max-width: 1680px; margin: 24px auto 0; padding: 0 28px; box-sizing: border-box; }
 .contenido-buscador-caja { position: relative; }
 .contenido-buscador-input {
   width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
@@ -662,7 +662,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo"><span class="logo-pre">pre</span><span class="logo-kom">KOM</span></div>
-    <div class="caja-version" id="version-label">v4.0.1</div>
+    <div class="caja-version" id="version-label">v4.0.2</div>
     <div class="caja-sub">Preparación Start Up de Obra</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -712,7 +712,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo"><span class="logo-pre">pre</span><span class="logo-kom">KOM</span></div>
-    <div class="hdr-version" id="version-label-app">v4.0.1</div>
+    <div class="hdr-version" id="version-label-app">v4.0.2</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -1036,7 +1036,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v4.0.1';
+const APP_VERSION = 'v4.0.2';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
