@@ -294,6 +294,18 @@ input { font-family: inherit; }
 }
 .card .ver-mas { background: none; border: none; color: var(--accent); font-size: 13px; font-weight: 700; padding: 0; }
 
+/* NUEVO v4.0.0 (batch 3) — badge de comentarios (cards y header del
+   nodo). Mismo componente en ambos lugares: en las cards solo
+   aparece si hay >0 (ver b.3); en el header del nodo siempre está
+   (es la forma de agregar el primer comentario). */
+.badge-comentarios {
+  align-self: flex-start; background: var(--accent2); color: #fff; border: none;
+  border-radius: 999px; font-size: 11px; font-weight: 600; padding: 4px 10px;
+  cursor: pointer; white-space: nowrap;
+}
+.badge-comentarios:hover { opacity: .88; }
+.badge-comentarios-header { align-self: flex-start; margin-top: 2px; }
+
 /* Subpuntos dentro de un nodo — misma grilla de cards que el Home */
 .arbol-subtitulo { font-size: .78rem; color: var(--muted); font-weight: 600; margin: 24px 0 12px; text-transform: uppercase; letter-spacing: .03em; }
 
@@ -588,6 +600,42 @@ input { font-family: inherit; }
 }
 .comentario-form textarea:focus { outline: none; border-color: var(--accent); }
 
+/* NUEVO v4.0.0 (batch 3) — resalta el comentario apuntado desde un
+   resultado de búsqueda (irAResultadoComentario_) */
+.comentario-item.comentario-resaltado { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ─────────────────────────────────────────────────
+   NUEVO v4.0.0 (batch 3) — Buscador único de Contenido
+   (Título+Resumen de todos los nodos + texto de Comentarios)
+───────────────────────────────────────────────── */
+#contenido-buscador-wrap { position: relative; max-width: 640px; margin: 0 auto 18px; }
+.contenido-buscador-input {
+  width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 14px; font-size: .88rem; font-family: inherit; background: var(--surface);
+}
+.contenido-buscador-input:focus { outline: none; border-color: var(--accent); }
+#contenido-buscador-resultados {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; max-height: 420px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md); z-index: 60; padding: 6px 0;
+}
+.buscador-seccion-titulo {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--muted); padding: 8px 14px 4px;
+}
+.buscador-item {
+  display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer;
+  padding: 8px 14px; border-radius: 0;
+}
+.buscador-item:hover { background: var(--bg); }
+.buscador-item-breadcrumb { font-size: .7rem; color: var(--muted); margin-bottom: 2px; }
+.buscador-item-snippet { font-size: .82rem; color: var(--text); line-height: 1.4; }
+.buscador-item-snippet mark { background: #fef3c7; color: inherit; font-weight: 700; }
+.buscador-sin-resultados { color: var(--muted); font-size: .82rem; text-align: center; padding: 16px 0; }
+
+/* mark dentro del Resumen (a — click en resultado de Contenido) */
+.resumen-box mark { background: #fef3c7; color: inherit; font-weight: 700; }
+
 @media (max-width: 560px) {
   .hdr-obra-nombre { display: none; }
   .cards-grid { grid-template-columns: 1fr; }
@@ -600,7 +648,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo"><span class="logo-pre">pre</span><span class="logo-kom">KOM</span></div>
-    <div class="caja-version" id="version-label">v3.1.3</div>
+    <div class="caja-version" id="version-label">v4.0.0</div>
     <div class="caja-sub">Preparación Start Up de Obra</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -650,7 +698,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo"><span class="logo-pre">pre</span><span class="logo-kom">KOM</span></div>
-    <div class="hdr-version" id="version-label-app">v3.0.1</div>
+    <div class="hdr-version" id="version-label-app">v4.0.0</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -661,6 +709,16 @@ input { font-family: inherit; }
     <div class="hdr-sep"></div>
     <div class="hdr-email" id="hdr-email"></div>
   </header>
+
+  <!-- NUEVO v4.0.0 (batch 3) — buscador único de Contenido: texto de
+       los nodos (Título+Resumen) y de los Comentarios, resultados
+       agrupados en 2 secciones. Solo visible en la vista Contenido
+       (toggle en marcarNavActiva). -->
+  <div id="contenido-buscador-wrap" class="hidden">
+    <input type="text" id="contenido-buscador-input" class="contenido-buscador-input"
+           placeholder="Buscar en el contenido y los comentarios de esta obra…" autocomplete="off">
+    <div id="contenido-buscador-resultados" class="hidden"></div>
+  </div>
 
   <main class="view" id="main-view">
     <div class="estado-vacio">Cargando…</div>
@@ -961,7 +1019,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v3.1.3';
+const APP_VERSION = 'v4.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -998,6 +1056,7 @@ let puedeEditarContenido = false;   // v2.02 — por obra, recalculado en mostra
 let puedeEditarListas = false;      // v2.02 — ídem
 let obraActual = null;      // { obraId, nombreObra }
 let arbol = [];             // ArbolContenido completo de la obra
+let comentariosContenido = []; // NUEVO v4.0.0 (batch 3) — TODOS los comentarios de Contenido de la obra, precargados
 let links = [];
 let configObra = null;
 let caminoActual = [];      // nodos del breadcrumb actual
@@ -1016,6 +1075,7 @@ let listaAbierta = null;         // nombreTab de la lista abierta en detalle
 let schemaListaAbierta = [];     // schema de la lista abierta
 let tablaListaTabulator = null;  // instancia Tabulator activa
 let comentariosListaAbierta = null; // nombreTab con el panel de Comentarios abierto
+let comentariosContenidoAbierto = null; // NUEVO v4.0.0 (batch 3) — punto del Árbol con el panel de Comentarios abierto
 let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
 
 function filtroBusquedaGlobal(data) {
@@ -1381,6 +1441,9 @@ document.getElementById('btn-nav-listas').addEventListener('click', function () 
 function marcarNavActiva(vista) {
   document.getElementById('btn-nav-arbol').classList.toggle('active', vista === 'arbol');
   document.getElementById('btn-nav-listas').classList.toggle('active', vista === 'listas' || vista === 'lista-detalle');
+  // NUEVO v4.0.0 (batch 3) — el buscador de Contenido solo tiene
+  // sentido en la vista Contenido
+  document.getElementById('contenido-buscador-wrap').classList.toggle('hidden', vista !== 'arbol');
 }
 
 function destruirTablaSiExiste() {
@@ -1399,7 +1462,7 @@ async function mostrarApp() {
   document.getElementById('btn-nav-listas').disabled = true;
 
   try {
-    const [resArbol, resLinks, resConfig, resListas, resGrupos, resValores, resFavoritos, resPermisos] = await Promise.all([
+    const [resArbol, resLinks, resConfig, resListas, resGrupos, resValores, resFavoritos, resPermisos, resComentariosContenido] = await Promise.all([
       llamarBackend('leerArbolContenido', { obraId: obraActual.obraId }),
       llamarBackend('leerLinks', { obraId: obraActual.obraId }),
       llamarBackend('leerConfigObra', { obraId: obraActual.obraId }),
@@ -1407,10 +1470,13 @@ async function mostrarApp() {
       llamarBackend('listarGrupos', { obraId: obraActual.obraId }),
       llamarBackend('leerListaValores', { obraId: obraActual.obraId }),
       llamarBackend('leerFavoritos', { obraId: obraActual.obraId, email: emailActual }),
-      llamarBackend('verificarPermisosObra', { obraId: obraActual.obraId, email: emailActual })
+      llamarBackend('verificarPermisosObra', { obraId: obraActual.obraId, email: emailActual }),
+      // NUEVO v4.0.0 (batch 3) — precarga completa para badges de comentarios + búsqueda (a)/(c)
+      llamarBackend('leerComentariosContenidoObra', { obraId: obraActual.obraId })
     ]);
 
     arbol = (resArbol.ok && resArbol.arbol) ? resArbol.arbol : [];
+    comentariosContenido = (resComentariosContenido.ok && resComentariosContenido.comentarios) ? resComentariosContenido.comentarios : [];
     links = (resLinks.ok && resLinks.links) ? resLinks.links : [];
     configObra = (resConfig.ok && resConfig.config) ? resConfig.config : null;
     listasIndex = (resListas.ok && resListas.listas) ? resListas.listas : [];
@@ -1501,11 +1567,21 @@ function renderCardsGrid(nodos, opts) {
   const truncado = opts.maxCols ? 200 : 60;
   return '<div class="' + clase + '"' + style + '>' + nodos.map(function (n) {
     const sub = contarSubpuntos(n.punto);
+    // NUEVO v4.0.0 (batch 3) — badge de comentarios propios del nodo
+    // (sin acumular hacia hijos, ver b.3), solo si hay >0. stopPropagation
+    // para no disparar la navegación del <button> card al tocar el badge.
+    const nCom = contarComentariosNodo(n.punto);
+    const badgeCom = nCom > 0
+      ? '<span class="badge-comentarios" onclick="event.stopPropagation(); abrirComentariosNodo(\'' + n.punto + '\')">' +
+          nCom + (nCom === 1 ? ' Comentario' : ' Comentarios') +
+        '</span>'
+      : '';
     return '' +
       '<button class="card" onclick="abrirNodo(\'' + n.punto + '\')">' +
         '<div class="card-punto">' + escaparHtml(n.punto) + '</div>' +
         '<div class="card-titulo">' + escaparHtml(n.titulo) + '</div>' +
         '<div class="card-desc">' + escaparHtml(primerosCaracteres(n.resumen, truncado)) + '</div>' +
+        badgeCom +
         '<div class="card-footer">' +
           '<span>' + sub + (sub === 1 ? ' subpunto' : ' subpuntos') + '</span>' +
           '<span class="ver-mas">Ver más →</span>' +
@@ -1571,6 +1647,13 @@ function renderNodo(nodo) {
   const btnColor = puedeEditarContenido
     ? '<button class="btn-color-swatch" style="background:' + colorActual + '" title="Cambiar color" onclick="abrirSelectorColor(\'' + nodo.punto + '\')"></button>'
     : '';
+  // NUEVO v4.0.0 (batch 3) — a diferencia del badge de las cards
+  // (solo visible si hay >0), el botón del nodo propio siempre está
+  // visible: es la única forma de agregar el primer comentario.
+  const nComNodo = contarComentariosNodo(nodo.punto);
+  const btnComentarios = '<button class="badge-comentarios badge-comentarios-header" onclick="abrirComentariosNodo(\'' + nodo.punto + '\')">' +
+    (nComNodo > 0 ? (nComNodo + (nComNodo === 1 ? ' Comentario' : ' Comentarios')) : 'Comentarios') +
+    '</button>';
 
   // El marco de color envuelve header + Resumen + Subpuntos — la
   // breadcrumb queda afuera, a propósito (ver diseño acordado)
@@ -1581,7 +1664,7 @@ function renderNodo(nodo) {
           '<div class="nodo-punto">' + escaparHtml(nodo.punto) + '</div>' +
           '<div class="nodo-titulo">' + escaparHtml(nodo.titulo) + '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:10px;align-items:flex-start">' + btnColor + btnEditar + '</div>' +
+        '<div style="display:flex;gap:10px;align-items:flex-start">' + btnComentarios + btnColor + btnEditar + '</div>' +
       '</div>' +
       '<div class="resumen-box' + (resumenLimpio ? '' : ' vacio') + '">' +
         (resumenLimpio || 'Todavía no hay Resumen cargado para este punto.') +
@@ -2273,6 +2356,7 @@ function cerrarComentarios() {
   document.getElementById('comentarios-overlay').classList.remove('visible');
   document.getElementById('comentarios-panel').classList.remove('abierto');
   comentariosListaAbierta = null;
+  comentariosContenidoAbierto = null; // NUEVO v4.0.0 (batch 3)
 }
 
 async function cargarComentarios() {
@@ -2306,17 +2390,32 @@ function renderComentarios(comentarios) {
   }).join('');
 }
 
+// v4.0.0 (batch 3) — el mismo botón/panel ahora sirve para 2
+// contextos (Listas y Contenido); branchea según cuál de los dos
+// "abierto" esté seteado (mutuamente excluyentes, ver
+// abrirComentarios/abrirComentariosNodo).
 document.getElementById('btn-agregar-comentario').addEventListener('click', async function () {
   const texto = document.getElementById('comentario-input').value.trim();
-  if (!texto || !comentariosListaAbierta) return;
+  if (!texto || (!comentariosListaAbierta && !comentariosContenidoAbierto)) return;
   this.disabled = true;
   try {
-    const res = await llamarBackend('agregarComentario', {
-      obraId: obraActual.obraId, nombreLista: comentariosListaAbierta, texto: texto, email: emailActual
-    });
-    if (!res.ok) { mostrarAviso(res.error || 'No se pudo agregar el comentario.'); this.disabled = false; return; }
-    document.getElementById('comentario-input').value = '';
-    await cargarComentarios();
+    if (comentariosContenidoAbierto) {
+      const res = await llamarBackend('agregarComentarioContenido', {
+        obraId: obraActual.obraId, punto: comentariosContenidoAbierto, texto: texto, email: emailActual
+      });
+      if (!res.ok) { mostrarAviso(res.error || 'No se pudo agregar el comentario.'); this.disabled = false; return; }
+      document.getElementById('comentario-input').value = '';
+      await recargarComentariosContenido();
+      renderComentariosNodo();
+      refrescarVistaContenidoActual_();
+    } else {
+      const res = await llamarBackend('agregarComentario', {
+        obraId: obraActual.obraId, nombreLista: comentariosListaAbierta, texto: texto, email: emailActual
+      });
+      if (!res.ok) { mostrarAviso(res.error || 'No se pudo agregar el comentario.'); this.disabled = false; return; }
+      document.getElementById('comentario-input').value = '';
+      await cargarComentarios();
+    }
   } catch (err) {
     mostrarAviso('No se pudo conectar con el backend.');
   }
@@ -2330,6 +2429,204 @@ async function ocultarComentarioFrontend(comentarioId) {
     await cargarComentarios();
   } catch (err) {
     mostrarAviso('No se pudo conectar con el backend.');
+  }
+}
+
+// ── BATCH 3 (v4.0.0) — Comentarios en Contenido (por nodo) ──────
+// Mismo componente de panel que Comentarios de Listas (arriba),
+// reapuntado a punto del Árbol en vez de nombreTab. comentariosContenido
+// ya está precargado completo en memoria (mostrarApp) — acá solo se
+// filtra y se re-pide al backend tras cada alta/ocultamiento.
+
+function comentariosDeNodo(punto) {
+  return comentariosContenido.filter(function (c) { return c.punto === punto; });
+}
+function contarComentariosNodo(punto) {
+  return comentariosDeNodo(punto).length;
+}
+
+async function recargarComentariosContenido() {
+  const res = await llamarBackend('leerComentariosContenidoObra', { obraId: obraActual.obraId });
+  comentariosContenido = (res.ok && res.comentarios) ? res.comentarios : comentariosContenido;
+}
+
+// Re-renderiza lo que esté detrás del panel de comentarios (main-view)
+// para que los badges de comentarios reflejen el alta/ocultamiento
+// recién hecho — el panel es un <aside> aparte, no se pisa.
+function refrescarVistaContenidoActual_() {
+  if (comentariosContenidoAbierto) {
+    const nodo = arbol.find(function (n) { return n.punto === comentariosContenidoAbierto; });
+    if (nodo) renderNodo(nodo);
+  }
+}
+
+function abrirComentariosNodo(punto) {
+  comentariosContenidoAbierto = punto;
+  comentariosListaAbierta = null;
+  const nodo = arbol.find(function (n) { return n.punto === punto; }) || { titulo: punto };
+  document.getElementById('comentarios-titulo').textContent = 'Comentarios — ' + nodo.titulo;
+  document.getElementById('comentarios-overlay').classList.add('visible');
+  document.getElementById('comentarios-panel').classList.add('abierto');
+  document.getElementById('comentario-input').value = '';
+  renderComentariosNodo();
+}
+
+function renderComentariosNodo() {
+  const body = document.getElementById('comentarios-body');
+  const lista = comentariosDeNodo(comentariosContenidoAbierto);
+  if (!lista.length) {
+    body.innerHTML = '<div class="comentarios-vacio">Todavía no hay comentarios en este punto.</div>';
+    return;
+  }
+  body.innerHTML = lista.map(function (c) {
+    const esAutor = String(c.usuario || '').trim().toLowerCase() === String(emailActual || '').trim().toLowerCase();
+    const fecha = c.fecha ? new Date(c.fecha).toLocaleString('es-AR') : '';
+    return '' +
+      '<div class="comentario-item" data-comentario-id="' + c.id + '">' +
+        '<span class="comentario-autor">' + escaparHtml(c.usuario) + '</span>' +
+        '<span class="comentario-fecha">' + fecha + '</span>' +
+        '<div class="comentario-texto">' + escaparHtml(c.texto) + '</div>' +
+        (esAutor ? '<button class="comentario-ocultar" onclick="ocultarComentarioContenidoFrontend(' + c.id + ')">Ocultar</button>' : '') +
+      '</div>';
+  }).join('');
+}
+
+async function ocultarComentarioContenidoFrontend(comentarioId) {
+  try {
+    const res = await llamarBackend('ocultarComentarioContenido', { obraId: obraActual.obraId, comentarioId: comentarioId, email: emailActual });
+    if (!res.ok) { mostrarAviso(res.motivo === 'no_autorizado' ? 'Solo el autor puede ocultar su propio comentario.' : (res.error || 'No se pudo ocultar.')); return; }
+    await recargarComentariosContenido();
+    renderComentariosNodo();
+    refrescarVistaContenidoActual_();
+  } catch (err) {
+    mostrarAviso('No se pudo conectar con el backend.');
+  }
+}
+
+// ── BATCH 3 (v4.0.0) — Buscador único de Contenido (a + c) ──────
+// Busca sobre `arbol` (Título+Resumen, texto plano) y sobre
+// `comentariosContenido` (texto), ambos ya precargados en memoria —
+// sin llamadas al backend por tecla. Resultados agrupados en 2
+// secciones, cada uno con breadcrumb + snippet resaltado.
+
+let buscadorContenidoDebounce_ = null;
+document.getElementById('contenido-buscador-input').addEventListener('input', function () {
+  clearTimeout(buscadorContenidoDebounce_);
+  const q = this.value;
+  buscadorContenidoDebounce_ = setTimeout(function () { ejecutarBusquedaContenido_(q); }, 250);
+});
+
+function textoPlano_(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html || '';
+  return (tmp.textContent || '').trim();
+}
+
+function breadcrumbTexto_(punto) {
+  return caminoHasta(punto).map(function (n) { return n.titulo; }).join(' › ');
+}
+
+function snippetConTermino_(texto, termino, radio) {
+  radio = radio || 60;
+  const idx = texto.toLowerCase().indexOf(termino.toLowerCase());
+  if (idx === -1) return texto.length > radio * 2 ? texto.slice(0, radio * 2) + '…' : texto;
+  const inicio = Math.max(0, idx - radio);
+  const fin = Math.min(texto.length, idx + termino.length + radio);
+  return (inicio > 0 ? '…' : '') + texto.slice(inicio, fin) + (fin < texto.length ? '…' : '');
+}
+
+function resaltarTermino_(texto, termino) {
+  const idx = texto.toLowerCase().indexOf(termino.toLowerCase());
+  if (idx === -1) return escaparHtml(texto);
+  return escaparHtml(texto.slice(0, idx)) + '<mark>' + escaparHtml(texto.slice(idx, idx + termino.length)) + '</mark>' + escaparHtml(texto.slice(idx + termino.length));
+}
+
+function ejecutarBusquedaContenido_(queryOriginal) {
+  const wrap = document.getElementById('contenido-buscador-resultados');
+  const query = (queryOriginal || '').trim();
+  if (query.length < 2) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+  const q = query.toLowerCase();
+
+  const matchesContenido = arbol.filter(function (n) {
+    return n.titulo.toLowerCase().indexOf(q) !== -1 || textoPlano_(n.resumen).toLowerCase().indexOf(q) !== -1;
+  }).sort(comparePorPunto);
+
+  const matchesComentarios = comentariosContenido.filter(function (c) {
+    return String(c.texto || '').toLowerCase().indexOf(q) !== -1;
+  });
+
+  let html = '';
+  if (matchesContenido.length) {
+    html += '<div class="buscador-seccion-titulo">Contenido (' + matchesContenido.length + ')</div>';
+    html += matchesContenido.map(function (n) {
+      const base = n.titulo.toLowerCase().indexOf(q) !== -1 ? n.titulo : textoPlano_(n.resumen);
+      const snip = snippetConTermino_(base, query);
+      return '<button class="buscador-item" onclick="irAResultadoContenido_(\'' + n.punto + '\', ' + JSON.stringify(query) + ')">' +
+        '<div class="buscador-item-breadcrumb">' + escaparHtml(breadcrumbTexto_(n.punto)) + '</div>' +
+        '<div class="buscador-item-snippet">' + resaltarTermino_(snip, query) + '</div>' +
+      '</button>';
+    }).join('');
+  }
+  if (matchesComentarios.length) {
+    html += '<div class="buscador-seccion-titulo">Comentarios (' + matchesComentarios.length + ')</div>';
+    html += matchesComentarios.map(function (c) {
+      const snip = snippetConTermino_(String(c.texto || ''), query);
+      return '<button class="buscador-item" onclick="irAResultadoComentario_(\'' + c.punto + '\', ' + c.id + ', ' + JSON.stringify(query) + ')">' +
+        '<div class="buscador-item-breadcrumb">' + escaparHtml(breadcrumbTexto_(c.punto)) + '</div>' +
+        '<div class="buscador-item-snippet">' + resaltarTermino_(snip, query) + '</div>' +
+      '</button>';
+    }).join('');
+  }
+  wrap.innerHTML = html || '<div class="buscador-sin-resultados">Sin coincidencias.</div>';
+  wrap.classList.remove('hidden');
+}
+
+function cerrarResultadosBusqueda_() {
+  document.getElementById('contenido-buscador-resultados').classList.add('hidden');
+  document.getElementById('contenido-buscador-input').value = '';
+}
+
+function irAResultadoContenido_(punto, termino) {
+  cerrarResultadosBusqueda_();
+  abrirNodo(punto);
+  setTimeout(function () { resaltarEnResumen_(termino); }, 0);
+}
+
+async function irAResultadoComentario_(punto, comentarioId, termino) {
+  cerrarResultadosBusqueda_();
+  abrirNodo(punto);
+  abrirComentariosNodo(punto);
+  setTimeout(function () {
+    const el = document.querySelector('.comentario-item[data-comentario-id="' + comentarioId + '"]');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('comentario-resaltado');
+      setTimeout(function () { el.classList.remove('comentario-resaltado'); }, 2500);
+    }
+  }, 100);
+}
+
+// Resalta la primera coincidencia del término dentro del Resumen ya
+// renderizado (HTML sanitizado de Quill) sin romper su markup —
+// recorre solo nodos de texto (TreeWalker) y envuelve el rango
+// encontrado en <mark>.
+function resaltarEnResumen_(termino) {
+  const box = document.querySelector('#nodo-marco .resumen-box');
+  if (!box || !termino) return;
+  const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, null);
+  const termLower = termino.toLowerCase();
+  let nodoTexto;
+  while ((nodoTexto = walker.nextNode())) {
+    const idx = nodoTexto.nodeValue.toLowerCase().indexOf(termLower);
+    if (idx !== -1) {
+      const rango = document.createRange();
+      rango.setStart(nodoTexto, idx);
+      rango.setEnd(nodoTexto, idx + termino.length);
+      const mark = document.createElement('mark');
+      rango.surroundContents(mark);
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      break;
+    }
   }
 }
 </script>
