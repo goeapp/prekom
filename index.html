@@ -961,7 +961,19 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v5.1.1.html — lógica
+// PreKOM — index_prekom_v5.1.2.html — lógica
+// v5.1.2 — fix de raíz sobre Notas: reportado por Ale, el texto (o
+// cualquier otro cambio) de una nota se perdía en el Sheet si se
+// editaba/movía ANTES de que el backend confirmara su creación —
+// ese guardado salía con el ID temporal que se usa mientras se
+// espera la confirmación, un ID que el Sheet todavía no conoce, así
+// que fallaba siempre (toast repetido "no se pudo guardar") y el
+// cambio real nunca llegaba a la fila. Fix: mientras una nota tiene
+// ID temporal, cualquier cambio se guarda en un buffer
+// (`notasCambiosPendientes`) en vez de mandarse al backend; apenas
+// `crearNota_` confirma con el ID real, se manda ese buffer completo
+// en un solo guardado. Ver Handoff_PreKOM_v5.1.2.md.
+//
 // v5.1.1 — patch de 7 puntos sobre Notas Batch 1, reportados por Ale
 // probando v5.1.0 (ver Handoff_PreKOM_v5.1.1.md):
 //  1) Fix: el texto tipeado en una nota recién creada desaparecía
@@ -1186,7 +1198,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v5.1.1';
+const APP_VERSION = 'v5.1.2';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1498,6 +1510,7 @@ let notasPinchStart = null;
 let notaDragState = null;                // arrastre de UNA nota puntual (distinto del pan del tablero)
 let notaMenuAbiertoId = null;
 let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de la nota activa
+let notasCambiosPendientes = new Map();  // NUEVO v5.1.2 — idTemp → cambios acumulados mientras esa nota no tiene ID real todavía
 let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
 
 function filtroBusquedaGlobal(data) {
@@ -3396,9 +3409,17 @@ async function notaCrear_(x, y, opts) {
       nota.fechaCreacion = res.fechaCreacion;
       nota.fechaModificacion = res.fechaModificacion;
       notaActualizarIdEnDom_(idTemp, nota);
+      // NUEVO v5.1.2 — recién ahora la nota tiene ID real: si mientras
+      // tanto se editó texto/color/tamaño/posición (quedó en el buffer
+      // porque el ID temporal no existía en el Sheet), se manda todo
+      // junto en un solo guardado con el ID correcto.
+      const pendientes = notasCambiosPendientes.get(idTemp);
+      notasCambiosPendientes.delete(idTemp);
+      if (pendientes) actualizarNotaBackend_(nota.id, pendientes);
     }
   } catch (err) {
     notas = notas.filter(function (n) { return n.id !== idTemp; });
+    notasCambiosPendientes.delete(idTemp); // NUEVO v5.1.2 — no dejar buffer huérfano si la creación falló
     pintarNotasCanvas();
     mostrarToast('No se pudo crear la nota');
   }
@@ -3496,7 +3517,20 @@ function notaGuardarTexto_(id, textoNuevo) {
   actualizarNotaBackend_(id, { texto: texto });
 }
 
-async function actualizarNotaBackend_(id, cambios) {
+function actualizarNotaBackend_(id, cambios) {
+  // NUEVO v5.1.2 — mientras la nota tiene ID temporal (crearNota_ todavía
+  // no confirmó), el Sheet no conoce ese ID: cualquier llamada acá fallaría
+  // siempre. Se acumula en un buffer y se aplica junto cuando llegue el ID
+  // real (ver notaCrear_) — no se llama al backend con un ID que no existe.
+  if (String(id).indexOf('tmp') === 0) {
+    const previos = notasCambiosPendientes.get(id) || {};
+    notasCambiosPendientes.set(id, Object.assign(previos, cambios));
+    return;
+  }
+  actualizarNotaBackendReal_(id, cambios);
+}
+
+async function actualizarNotaBackendReal_(id, cambios) {
   try {
     const res = await llamarBackend('actualizarNota', { obraId: obraActual.obraId, notaId: id, cambios: cambios, email: emailActual });
     if (!res.ok) throw new Error(res.error || 'actualizarNota falló');
