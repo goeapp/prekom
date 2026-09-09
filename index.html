@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/dist/tabler-icons.min.css">
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator_simple.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
@@ -225,6 +226,40 @@ input { font-family: inherit; }
 .hdr-btn-cambiar-obra:hover { border-color: var(--accent); color: var(--accent); }
 .hdr-sep { flex: 1; }
 .hdr-email { font-size: .72rem; color: rgba(255,255,255,.4); white-space: nowrap; }
+
+/* ── Lápiz Global v2.1 (integración PreKOM v5.0.0) ── */
+.hdr-btn-lapiz { border-color: #ec4899; color: #ec4899; }
+.hdr-btn-lapiz:hover { background: #ec4899; color: #fff; }
+.hdr-btn-lapiz.activo { background: #ec4899; color: #fff; }
+.lpz-canvas { position:absolute; top:0; left:0; z-index:9990; pointer-events:none; touch-action:none; }
+.lpz-canvas.activo { pointer-events:auto; cursor:crosshair; }
+.lpz-bar {
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:9991;
+  display:none; align-items:center; gap:10px;
+  background:rgba(15,23,42,.95); border:1px solid #334155; border-radius:14px;
+  padding:8px 14px; box-shadow:0 8px 30px rgba(0,0,0,.45);
+  font-family:'DM Sans',sans-serif;
+}
+.lpz-bar.show { display:flex; }
+.lpz-bar-handle { cursor:grab; color:#64748b; font-size:16px; padding:0 4px; user-select:none; }
+.lpz-bar-handle:active { cursor:grabbing; }
+.lpz-color-dot { width:20px; height:20px; border-radius:50%; border:2px solid transparent; cursor:pointer; box-sizing:border-box; }
+.lpz-color-dot.activo { border-color:#fff; box-shadow:0 0 0 2px #0f172a, 0 0 0 3px #fff; }
+.lpz-grosor-dot { width:24px; height:24px; border-radius:50%; background:#1e293b; border:1px solid #334155; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.lpz-grosor-dot span { display:block; border-radius:50%; background:#94a3b8; }
+.lpz-grosor-dot.activo { border-color:#fff; background:#334155; }
+.lpz-grosor-dot.activo span { background:#fff; }
+.lpz-bar-btn {
+  font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.06em;
+  padding:6px 12px; border-radius:99px; border:1px solid #ef4444; color:#ef4444;
+  background:transparent; cursor:pointer; white-space:nowrap;
+}
+.lpz-bar-btn:hover { background:#ef4444; color:#fff; }
+.lpz-bar-close { color:#64748b; cursor:pointer; font-size:16px; padding:0 4px; }
+.lpz-bar-close:hover { color:#fff; }
+.lpz-modo-btn { width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:#1e293b; border:1px solid #334155; color:#94a3b8; cursor:pointer; font-size:14px; }
+.lpz-modo-btn.activo { background:#334155; border-color:#fff; color:#fff; }
+.lpz-bar-sep { width:1px; align-self:stretch; background:#334155; }
 
 /* ─────────────────────────────────────────────────
    DIALOG "Sesión actual" (Ctrl+Alt+U) — de BDC
@@ -662,7 +697,7 @@ input { font-family: inherit; }
 <div id="login-screen" class="pantalla-centrada">
   <div class="caja">
     <div class="caja-logo"><span class="logo-pre">pre</span><span class="logo-kom">KOM</span></div>
-    <div class="caja-version" id="version-label">v4.0.2</div>
+    <div class="caja-version" id="version-label">v5.0.0</div>
     <div class="caja-sub">Preparación Start Up de Obra</div>
 
     <div id="paso-email" class="login-paso activo">
@@ -712,7 +747,7 @@ input { font-family: inherit; }
 <div id="app">
   <header id="app-header">
     <div class="hdr-logo"><span class="logo-pre">pre</span><span class="logo-kom">KOM</span></div>
-    <div class="hdr-version" id="version-label-app">v4.0.2</div>
+    <div class="hdr-version" id="version-label-app">v5.0.0</div>
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
@@ -720,6 +755,9 @@ input { font-family: inherit; }
     </div>
     <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
     <button class="hdr-btn-cambiar-obra hidden" id="btn-links">Links</button>
+    <button class="hdr-btn-cambiar-obra hdr-btn-lapiz" id="btn-lapiz-toggle" onclick="lapizToggle()" title="Lápiz — anotar sobre la pantalla (Esc para salir)">
+      <i class="ti ti-pencil"></i> Lápiz
+    </button>
     <div class="hdr-sep"></div>
     <div class="hdr-email" id="hdr-email"></div>
   </header>
@@ -828,9 +866,38 @@ input { font-family: inherit; }
   </div>
 </aside>
 
+<canvas id="lpz-canvas" class="lpz-canvas"></canvas>
+<div class="lpz-bar" id="lpz-bar">
+  <span class="lpz-bar-handle" title="Arrastrar">⠿</span>
+  <div style="display:flex;gap:4px;">
+    <span class="lpz-modo-btn activo" data-modo="libre" onclick="lapizSetModo('libre', this)" title="Trazo libre"><i class="ti ti-pencil"></i></span>
+    <span class="lpz-modo-btn" data-modo="linea" onclick="lapizSetModo('linea', this)" title="Línea"><i class="ti ti-minus"></i></span>
+    <span class="lpz-modo-btn" data-modo="rectangulo" onclick="lapizSetModo('rectangulo', this)" title="Rectángulo"><i class="ti ti-square"></i></span>
+    <span class="lpz-modo-btn" data-modo="circulo" onclick="lapizSetModo('circulo', this)" title="Círculo"><i class="ti ti-circle"></i></span>
+  </div>
+  <span class="lpz-bar-sep"></span>
+  <div style="display:flex;gap:6px;">
+    <span class="lpz-color-dot activo" style="background:#ef4444" data-color="#ef4444" onclick="lapizSetColor('#ef4444', this)"></span>
+    <span class="lpz-color-dot" style="background:#f97316" data-color="#f97316" onclick="lapizSetColor('#f97316', this)"></span>
+    <span class="lpz-color-dot" style="background:#eab308" data-color="#eab308" onclick="lapizSetColor('#eab308', this)"></span>
+    <span class="lpz-color-dot" style="background:#22c55e" data-color="#22c55e" onclick="lapizSetColor('#22c55e', this)"></span>
+    <span class="lpz-color-dot" style="background:#38bdf8" data-color="#38bdf8" onclick="lapizSetColor('#38bdf8', this)"></span>
+    <span class="lpz-color-dot" style="background:#ffffff" data-color="#ffffff" onclick="lapizSetColor('#ffffff', this)"></span>
+  </div>
+  <div style="display:flex;gap:6px;">
+    <span class="lpz-grosor-dot" data-grosor="2" onclick="lapizSetGrosor(2, this)"><span style="width:4px;height:4px;"></span></span>
+    <span class="lpz-grosor-dot activo" data-grosor="4" onclick="lapizSetGrosor(4, this)"><span style="width:8px;height:8px;"></span></span>
+    <span class="lpz-grosor-dot" data-grosor="8" onclick="lapizSetGrosor(8, this)"><span style="width:12px;height:12px;"></span></span>
+  </div>
+  <button class="lpz-bar-btn" onclick="lapizBorrar()"><i class="ti ti-eraser"></i> Borrar marcas</button>
+  <span class="lpz-bar-sep"></span>
+  <span class="lpz-modo-btn" onclick="capturarPantalla()" title="Capturar pantalla (con las marcas dibujadas) — guarda un PNG"><i class="ti ti-camera"></i></span>
+  <span class="lpz-bar-close" onclick="lapizToggle()" title="Cerrar (Esc)">✕</span>
+</div>
+
 <script>
 // ============================================================
-// PreKOM — index_prekom_v2.04.html — lógica
+// PreKOM — index_prekom_v5.0.0.html — lógica
 // v2.04 — fix chico: "PREKOM" se veía todo en mayúsculas en el logo
 // (login y header) porque Bebas Neue es una tipografía todo-mayúsculas
 // (sin formas de minúscula real) — el texto real ya decía "PreKOM"
@@ -1036,7 +1103,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v4.0.2';
+const APP_VERSION = 'v5.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1055,6 +1122,237 @@ const SESION_DIAS = 7;
 
 document.getElementById('version-label').textContent = APP_VERSION;
 document.getElementById('version-label-app').textContent = APP_VERSION;
+
+// ============================================================
+// LÁPIZ GLOBAL v2.1 — integración PreKOM v5.0.0
+// Overlay de anotación libre para videollamadas, disponible en cualquier
+// tab/pantalla de la app. Nunca toca el estado de la app ni se exporta:
+// es 100% efímero, tanto el dibujo como la posición de la barra.
+// Fuente de verdad del diseño: lapiz_global_guia_integracion_v2_1.md
+// Sin el componente opcional de auto-ocultar header/FAB (no se adopta en
+// PreKOM). Suma respecto al módulo genérico: se desactiva y borra solo si
+// el usuario cambia de pestaña del navegador (Page Visibility API).
+// ============================================================
+let lapizState = { activo:false, color:'#ef4444', grosor:4, modo:'libre', dibujando:false, dragActivo:false, dragOffX:0, dragOffY:0, startX:0, startY:0 };
+let _lapizCtx = null;
+let _lapizSnapshot = null;
+
+function lapizInit(){
+  const canvas = document.getElementById('lpz-canvas');
+  if(!canvas) return;
+  _lapizCtx = canvas.getContext('2d');
+  lapizBorrar(); // sizing inicial (documento completo) + limpieza
+  window.addEventListener('resize', lapizResize);
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && lapizState.activo) lapizToggle(); });
+
+  canvas.addEventListener('pointerdown', lapizPointerDown);
+  canvas.addEventListener('pointermove', lapizPointerMove);
+  canvas.addEventListener('pointerup', lapizPointerUp);
+  canvas.addEventListener('pointerleave', lapizPointerUp);
+  canvas.addEventListener('wheel', e => { if(lapizState.activo) window.scrollBy(0, e.deltaY); }, {passive:true});
+
+  const handle = document.querySelector('.lpz-bar-handle');
+  if(handle) handle.addEventListener('pointerdown', lapizBarraDragStart);
+
+  // Nuevo en PreKOM (no estaba en el módulo genérico v2.1): si el usuario
+  // cambia de pestaña del navegador con el lápiz activo, se desactiva y
+  // borra solo — evita dejarlo bloqueando clics sin querer al volver.
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden && lapizState.activo) lapizToggle();
+  });
+}
+
+function lapizSyncCanvasSize(){
+  const canvas = document.getElementById('lpz-canvas');
+  if(!canvas) return;
+  canvas.width = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth);
+  canvas.height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight);
+}
+
+function lapizResize(){
+  lapizBorrar();
+}
+
+function lapizToggle(){
+  lapizState.activo = !lapizState.activo;
+  const canvas = document.getElementById('lpz-canvas');
+  const bar = document.getElementById('lpz-bar');
+  const btn = document.getElementById('btn-lapiz-toggle');
+  canvas.classList.toggle('activo', lapizState.activo);
+  bar.classList.toggle('show', lapizState.activo);
+  btn.classList.toggle('activo', lapizState.activo);
+  if(lapizState.activo){
+    bar.style.left = '50%'; bar.style.top = ''; bar.style.bottom = '20px';
+    bar.style.transform = 'translateX(-50%)';
+    lapizSyncCanvasSize();
+  } else {
+    lapizBorrar();
+  }
+}
+
+// Hook obligatorio (§5 de la guía): se llama también desde marcarNavActiva()
+// — cambio de vista principal (Contenido/Listas/detalle de Lista) — y desde
+// el listener de visibilitychange de arriba.
+function lapizBorrar(){
+  lapizSyncCanvasSize();
+  if(!_lapizCtx) return;
+  const canvas = document.getElementById('lpz-canvas');
+  _lapizCtx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function lapizSetColor(hex, el){
+  lapizState.color = hex;
+  document.querySelectorAll('.lpz-color-dot').forEach(d => d.classList.remove('activo'));
+  el.classList.add('activo');
+}
+
+function lapizSetGrosor(px, el){
+  lapizState.grosor = px;
+  document.querySelectorAll('.lpz-grosor-dot').forEach(d => d.classList.remove('activo'));
+  el.classList.add('activo');
+}
+
+function lapizSetModo(modo, el){
+  lapizState.modo = modo;
+  document.querySelectorAll('.lpz-modo-btn').forEach(d => d.classList.remove('activo'));
+  el.classList.add('activo');
+}
+
+function lapizPointerDown(e){
+  if(!lapizState.activo) return;
+  lapizState.dibujando = true;
+  if(lapizState.modo === 'libre'){
+    _lapizCtx.beginPath();
+    _lapizCtx.moveTo(e.pageX, e.pageY);
+  } else {
+    lapizState.startX = e.pageX;
+    lapizState.startY = e.pageY;
+    const canvas = document.getElementById('lpz-canvas');
+    _lapizSnapshot = _lapizCtx.getImageData(0, 0, canvas.width, canvas.height);
+  }
+}
+function lapizPointerMove(e){
+  if(!lapizState.activo || !lapizState.dibujando) return;
+  _lapizCtx.strokeStyle = lapizState.color;
+  _lapizCtx.lineWidth = lapizState.grosor;
+  _lapizCtx.lineCap = 'round';
+  _lapizCtx.lineJoin = 'round';
+  if(lapizState.modo === 'libre'){
+    _lapizCtx.lineTo(e.pageX, e.pageY);
+    _lapizCtx.stroke();
+  } else {
+    lapizDibujarFigura(e.pageX, e.pageY);
+  }
+}
+function lapizPointerUp(e){
+  if(lapizState.dibujando && lapizState.modo !== 'libre' && e){
+    lapizDibujarFigura(e.pageX, e.pageY);
+  }
+  lapizState.dibujando = false;
+  _lapizSnapshot = null;
+}
+
+function lapizDibujarFigura(x, y){
+  if(!_lapizSnapshot) return;
+  _lapizCtx.putImageData(_lapizSnapshot, 0, 0);
+  _lapizCtx.beginPath();
+  const sx = lapizState.startX, sy = lapizState.startY;
+  if(lapizState.modo === 'linea'){
+    _lapizCtx.moveTo(sx, sy);
+    _lapizCtx.lineTo(x, y);
+  } else if(lapizState.modo === 'rectangulo'){
+    _lapizCtx.rect(sx, sy, x - sx, y - sy);
+  } else if(lapizState.modo === 'circulo'){
+    const cx = (sx + x) / 2, cy = (sy + y) / 2;
+    const rx = Math.abs(x - sx) / 2 || 0.01, ry = Math.abs(y - sy) / 2 || 0.01;
+    _lapizCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  }
+  _lapizCtx.stroke();
+}
+
+function lapizBarraDragStart(e){
+  e.preventDefault();
+  const bar = document.getElementById('lpz-bar');
+  const rect = bar.getBoundingClientRect();
+  lapizState.dragActivo = true;
+  lapizState.dragOffX = e.clientX - rect.left;
+  lapizState.dragOffY = e.clientY - rect.top;
+  bar.style.transform = 'none';
+  bar.style.bottom = 'auto'; // NO '' — ver guía §1, bug real documentado
+  bar.style.left = rect.left + 'px';
+  bar.style.top = rect.top + 'px';
+  document.addEventListener('pointermove', lapizBarraDragMove);
+  document.addEventListener('pointerup', lapizBarraDragEnd);
+}
+function lapizBarraDragMove(e){
+  if(!lapizState.dragActivo) return;
+  const bar = document.getElementById('lpz-bar');
+  const rect = bar.getBoundingClientRect();
+  let x = e.clientX - lapizState.dragOffX;
+  let y = e.clientY - lapizState.dragOffY;
+  x = Math.max(0, Math.min(x, window.innerWidth - rect.width));
+  y = Math.max(0, Math.min(y, window.innerHeight - rect.height));
+  bar.style.left = x + 'px';
+  bar.style.top = y + 'px';
+}
+function lapizBarraDragEnd(){
+  lapizState.dragActivo = false;
+  document.removeEventListener('pointermove', lapizBarraDragMove);
+  document.removeEventListener('pointerup', lapizBarraDragEnd);
+}
+
+// Timestamp para el nombre del archivo de captura — formato compacto sin
+// caracteres inválidos para nombre de archivo (a diferencia de
+// toLocaleString, que ya se usa en Comentarios pero da "9/9/2026, 14:30:00").
+function lapizTimestampArchivo(){
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+}
+
+function lapizOcultarUIParaCaptura(oculto){
+  const bar = document.getElementById('lpz-bar');
+  if(bar) bar.style.visibility = oculto ? 'hidden' : '';
+}
+
+async function capturarPantalla(){
+  let stream = null;
+  lapizOcultarUIParaCaptura(true);
+  try{
+    await new Promise(requestAnimationFrame);
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, preferCurrentTab: true });
+    const video = document.createElement('video');
+    video.srcObject = stream;
+    video.muted = true;
+    await video.play();
+    if(!video.videoWidth){
+      await new Promise(resolve => { video.onloadedmetadata = resolve; });
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    stream.getTracks().forEach(t => t.stop());
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const contextoId = (obraActual && obraActual.obraId) ? obraActual.obraId : 'prekom';
+      a.download = `${contextoId}_pantalla_${lapizTimestampArchivo()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      mostrarToast('Captura guardada');
+    }, 'image/png');
+  } catch(err){
+    if(stream) stream.getTracks().forEach(t => t.stop());
+    if(err.name === 'NotAllowedError') mostrarToast('Captura cancelada');
+    else { mostrarToast('Error al capturar: ' + err.message); console.error(err); }
+  } finally {
+    lapizOcultarUIParaCaptura(false);
+  }
+}
 
 // ── RED DE SEGURIDAD — cualquier error silencioso queda visible ──
 // (v1.01: agregado porque una edición de celda no llegaba al backend
@@ -1458,6 +1756,9 @@ document.getElementById('btn-nav-listas').addEventListener('click', function () 
 function marcarNavActiva(vista) {
   document.getElementById('btn-nav-arbol').classList.toggle('active', vista === 'arbol');
   document.getElementById('btn-nav-listas').classList.toggle('active', vista === 'listas' || vista === 'lista-detalle');
+  // Hook obligatorio de Lápiz Global (§5 de la guía) — cambio de vista
+  // principal borra cualquier marca dibujada.
+  if(typeof lapizBorrar === 'function') lapizBorrar();
   // NUEVO v4.0.0 (batch 3) — el buscador de Contenido solo tiene
   // sentido en la vista Contenido
   document.getElementById('contenido-buscador-wrap').classList.toggle('hidden', vista !== 'arbol');
@@ -1513,6 +1814,8 @@ async function mostrarApp() {
 
     document.getElementById('btn-nav-arbol').disabled = false;
     document.getElementById('btn-nav-listas').disabled = false;
+
+    lapizInit(); // Lápiz Global — una sola vez, tras el primer render
 
     vistaActual = 'arbol';
     renderHome();
