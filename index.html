@@ -684,6 +684,7 @@ input { font-family: inherit; }
   cursor: move; transform: rotate(var(--nota-rot, 0deg)); touch-action: none; overflow: hidden;
 }
 .nota-postit.fijada { cursor: default; }
+.nota-postit.seleccionada { outline: 3px solid var(--accent); outline-offset: 2px; } /* NUEVO v5.1.1 */
 .nota-postit.tam-S { width: 140px; height: 140px; }
 .nota-postit.tam-M { width: 200px; height: 200px; }
 .nota-postit.tam-L { width: 260px; height: 260px; }
@@ -708,6 +709,13 @@ input { font-family: inherit; }
 .nota-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: none; padding: 7px 6px; font-size: .8rem; border-radius: 6px; }
 .nota-menu-item:hover { background: #f1f5f9; }
 .nota-menu-danger { color: var(--danger); }
+.nota-menu-autor { font-size: .68rem; color: var(--muted); line-height: 1.4; margin-bottom: 8px; } /* NUEVO v5.1.1 */
+
+/* NUEVO v5.1.1 — spinner en botones de la toolbar de Notas mientras cargan */
+@keyframes notas-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.notas-toolbar button.cargando i { display: inline-block; animation: notas-spin .8s linear infinite; }
+.btn-toolbar:disabled { opacity: .55; cursor: not-allowed; }
+.btn-toolbar:disabled:hover { border-color: var(--border); color: inherit; }
 .contenido-buscador-limpiar {
   position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
   width: 24px; height: 24px; border: none; background: var(--border); color: var(--muted);
@@ -953,19 +961,25 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v5.1.0.html — lógica
-// v5.1.0 — Notas Batch 1 (tablero tipo Miro), diseño cerrado y
-// confirmado por Ale (ver Handoff_PreKOM_v5.1.0.md): nuevo tab
-// "Notas" con tablero zoom/pan (transform CSS, JS plano, sin
-// librerías), notas post-it (autoajuste de texto, menú contextual
-// clic-derecho/mantener-presionado con color/tamaño/duplicar/
-// traer-al-frente-atrás/ocultar/fijar posición), compartidas entre
-// todos los que ven la obra (sin gate de permisos, confirmado por
-// Ale), guardado optimista por acción + botón "Actualizar" (sin
-// tiempo real multiusuario). Objetos adicionales (Región/marco,
-// Línea/flecha, Texto libre, Emoji) quedan para Batch 2. Lápiz
-// Global sigue disponible también en esta vista (confirmado por
-// Ale). Consume gas_prekom_v2_05.gs (hoja Notas + 4 actions nuevas).
+// PreKOM — index_prekom_v5.1.1.html — lógica
+// v5.1.1 — patch de 7 puntos sobre Notas Batch 1, reportados por Ale
+// probando v5.1.0 (ver Handoff_PreKOM_v5.1.1.md):
+//  1) Fix: el texto tipeado en una nota recién creada desaparecía
+//     unos segundos después — la confirmación del backend disparaba
+//     un repintado completo del canvas que pisaba lo que se estaba
+//     escribiendo. Ahora la confirmación solo actualiza el ID/zIndex
+//     en el DOM existente, sin recrear el elemento.
+//  2) Resaltado (outline) en la nota seleccionada.
+//  3) "Ocultar" → "Quitar" en el menú contextual, ícono papelera.
+//  4) Autor + fecha/hora de carga, visible en tooltip y en el
+//     encabezado del menú contextual.
+//  5) Fix: el menú contextual se cortaba cerca del borde de la
+//     pantalla — ahora mide su tamaño real antes de posicionarse y
+//     se abre hacia el lado que tenga espacio.
+//  6) Fix: "Centrar" llevaba a un punto fijo del canvas (0,0), no a
+//     donde estaban las notas — ahora centra sobre el rectángulo
+//     real que ocupan.
+//  7) Spinner en el botón "Actualizar" mientras carga.
 //
 // v2.04 — fix chico: "PREKOM" se veía todo en mayúsculas en el logo
 // (login y header) porque Bebas Neue es una tipografía todo-mayúsculas
@@ -1172,7 +1186,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v5.1.0';
+const APP_VERSION = 'v5.1.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1483,6 +1497,7 @@ let notasPanStart = null;
 let notasPinchStart = null;
 let notaDragState = null;                // arrastre de UNA nota puntual (distinto del pan del tablero)
 let notaMenuAbiertoId = null;
+let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de la nota activa
 let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
 
 function filtroBusquedaGlobal(data) {
@@ -1860,7 +1875,7 @@ function marcarNavActiva(vista) {
   // propio (sin el padding/max-width de .view normal); se activa/
   // desactiva acá para que cualquier navegación de salida lo saque.
   document.getElementById('main-view').classList.toggle('view-notas', vista === 'notas');
-  if (vista !== 'notas') notaCerrarMenu_();
+  if (vista !== 'notas') { notaCerrarMenu_(); notaSeleccionadaId = null; } // NUEVO v5.1.1 — no arrastrar selección entre vistas
 }
 
 function destruirTablaSiExiste() {
@@ -3124,7 +3139,7 @@ function renderNotasEsqueleto_() {
         '<button class="btn-toolbar" onclick="notasCentrarVista()" title="Centrar vista">Centrar</button>' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(1)" title="Acercar">+</button>' +
       '</div>' +
-      '<button class="btn-toolbar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
+      '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
       '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
     '</div>' +
     '<div class="notas-board" id="notas-board">' +
@@ -3133,12 +3148,16 @@ function renderNotasEsqueleto_() {
 }
 
 async function cargarNotas() {
+  const btn = document.getElementById('btn-notas-actualizar'); // NUEVO v5.1.1 — spinner mientras carga
+  if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
   try {
     const res = await llamarBackend('leerNotas', { obraId: obraActual.obraId });
     notas = (res.ok && res.notas) ? res.notas : [];
     pintarNotasCanvas();
   } catch (err) {
     mostrarToast('No se pudo cargar Notas');
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
   }
 }
 
@@ -3148,13 +3167,28 @@ function pintarNotasCanvas() {
   canvas.innerHTML = notas.map(function (n) { return renderNotaHtml_(n); }).join('');
   notas.forEach(function (n) { notaAutoajustarTexto_(n.id); });
   wireNotasEventosNotas_();
+  // NUEVO v5.1.1 — un repintado completo recrea los divs, así que hay
+  // que reaplicar el resaltado de selección (se pierde con el innerHTML nuevo)
+  if (notaSeleccionadaId) {
+    const div = document.querySelector('.nota-postit[data-id="' + notaSeleccionadaId + '"]');
+    if (div) div.classList.add('seleccionada'); else notaSeleccionadaId = null;
+  }
+}
+
+// NUEVO v5.1.1 — texto de "cargado por" para el tooltip y el menú contextual
+function notaFechaTexto_(n) {
+  const fecha = n.fechaCreacion ? new Date(n.fechaCreacion).toLocaleString('es-AR') : '';
+  const usuario = n.usuario || '';
+  if (!usuario && !fecha) return '';
+  return 'Cargado por ' + usuario + (fecha ? (' · ' + fecha) : '');
 }
 
 function renderNotaHtml_(n) {
   const rot = notaRotacion_(n.id);
   const pin = n.fijada ? '<span class="nota-pin" title="Posición fijada"><i class="ti ti-pin"></i></span>' : '';
+  const tooltip = escaparHtml(notaFechaTexto_(n)); // NUEVO v5.1.1
   return '' +
-    '<div class="nota-postit tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" ' +
+    '<div class="nota-postit tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
       'style="left:' + n.x + 'px; top:' + n.y + 'px; background:' + n.color + '; --nota-rot:' + rot + 'deg; z-index:' + (n.zIndex || 0) + '">' +
       pin +
       '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
@@ -3170,6 +3204,23 @@ function notaAutoajustarTexto_(id) {
     fontSize -= 1;
     el.style.fontSize = fontSize + 'px';
   }
+}
+
+// NUEVO v5.1.1 — resaltado visual de la nota seleccionada (pedido por
+// Ale, mismo espíritu que el resaltado de selección de Miro, sin los
+// puntitos de resize ya que el tamaño de la nota es S/M/L fijo).
+function notaSeleccionar_(id) {
+  if (notaSeleccionadaId === id) return;
+  notaDeseleccionar_();
+  notaSeleccionadaId = id;
+  const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
+  if (div) div.classList.add('seleccionada');
+}
+
+function notaDeseleccionar_() {
+  const anterior = document.querySelector('.nota-postit.seleccionada');
+  if (anterior) anterior.classList.remove('seleccionada');
+  notaSeleccionadaId = null;
 }
 
 // ── Tablero: pan (1 puntero) / pinch-zoom (2 punteros) / rueda ──
@@ -3189,8 +3240,32 @@ function aplicarTransformNotas_() {
   canvas.style.transform = 'translate(' + notasView.panX + 'px,' + notasView.panY + 'px) scale(' + notasView.zoom + ')';
 }
 
+const NOTAS_TAMANIOS_PX = { S: 140, M: 200, L: 260 }; // NUEVO v5.1.1 — usado para calcular el bounding box real en Centrar
+
 function notasCentrarVista() {
-  notasView = { panX: 0, panY: 0, zoom: 1 };
+  const board = document.getElementById('notas-board');
+  const rect = board.getBoundingClientRect();
+  if (notas.length === 0) {
+    notasView = { panX: 0, panY: 0, zoom: 1 };
+    aplicarTransformNotas_();
+    return;
+  }
+  // NUEVO v5.1.1 — antes centraba en el punto fijo (0,0) del canvas, no
+  // donde estaban las notas. Ahora calcula el rectángulo real que ocupan
+  // (considerando el tamaño S/M/L de cada una) y centra sobre eso.
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  notas.forEach(function (n) {
+    const dim = NOTAS_TAMANIOS_PX[n.tamaño] || NOTAS_TAMANIOS_PX.M;
+    minX = Math.min(minX, n.x);
+    minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + dim);
+    maxY = Math.max(maxY, n.y + dim);
+  });
+  const centroX = (minX + maxX) / 2;
+  const centroY = (minY + maxY) / 2;
+  notasView.zoom = 1;
+  notasView.panX = rect.width / 2 - centroX;
+  notasView.panY = rect.height / 2 - centroY;
   aplicarTransformNotas_();
 }
 
@@ -3221,6 +3296,10 @@ function notasOnWheel_(e) {
 }
 
 function notasOnPointerDown_(e) {
+  // NUEVO v5.1.1 — clic/tap en el fondo vacío del tablero deselecciona
+  // la nota activa (el resaltado no debe quedar pegado para siempre)
+  if (!e.target.closest('.nota-postit')) notaDeseleccionar_();
+
   const board = e.currentTarget;
   board.setPointerCapture(e.pointerId);
   notasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -3306,13 +3385,35 @@ async function notaCrear_(x, y, opts) {
     });
     if (!res.ok) throw new Error(res.error || 'crearNota falló');
     const nota = notas.find(function (n) { return n.id === idTemp; });
-    if (nota) { nota.id = res.id; nota.zIndex = res.zIndex; }
-    pintarNotasCanvas();
+    if (nota) {
+      // FIX v5.1.1 — reportado por Ale: antes esto llamaba a
+      // pintarNotasCanvas() (repintado completo), que recreaba el div
+      // y borraba el texto que se estuviera tipeando en ese momento. Ahora
+      // solo actualiza el ID/zIndex/fecha en memoria y en el DOM existente,
+      // sin tocar el contenido editable.
+      nota.id = res.id;
+      nota.zIndex = res.zIndex;
+      nota.fechaCreacion = res.fechaCreacion;
+      nota.fechaModificacion = res.fechaModificacion;
+      notaActualizarIdEnDom_(idTemp, nota);
+    }
   } catch (err) {
     notas = notas.filter(function (n) { return n.id !== idTemp; });
     pintarNotasCanvas();
     mostrarToast('No se pudo crear la nota');
   }
+}
+
+// NUEVO v5.1.1 — actualiza el data-id/zIndex/tooltip de una nota YA
+// existente en el DOM sin recrearla (ver fix #1 del patch v5.1.1).
+function notaActualizarIdEnDom_(idViejo, nota) {
+  const div = document.querySelector('.nota-postit[data-id="' + idViejo + '"]');
+  if (!div) return;
+  div.dataset.id = nota.id;
+  div.style.zIndex = nota.zIndex || 0;
+  div.title = notaFechaTexto_(nota);
+  const texto = div.querySelector('.nota-texto');
+  if (texto) texto.dataset.id = nota.id;
 }
 
 function notaEnfocarTexto_(id) {
@@ -3325,6 +3426,7 @@ function notaEnfocarTexto_(id) {
 // ── Mover / editar texto (optimista, un guardado al soltar/salir) ──
 function wireNotasEventosNotas_() {
   document.querySelectorAll('.nota-postit').forEach(function (div) {
+    div.addEventListener('pointerdown', function () { notaSeleccionar_(div.dataset.id); }); // NUEVO v5.1.1
     div.addEventListener('pointerdown', notaOnPointerDown_);
     div.addEventListener('contextmenu', notaOnContextMenu_);
     // Long-press (touch) — mismo menú que clic derecho, ya que en
@@ -3412,12 +3514,26 @@ function notaOnContextMenu_(e) {
 function notaAbrirMenu_(id, clientX, clientY) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
   if (!nota) return;
+  notaSeleccionar_(id); // NUEVO v5.1.1 — abrir el menú también resalta la nota
   notaMenuAbiertoId = id;
   const menu = document.getElementById('notas-menu-contextual');
   menu.innerHTML = renderNotaMenuHtml_(nota);
-  menu.style.left = Math.min(clientX, window.innerWidth - 220) + 'px';
-  menu.style.top = Math.min(clientY, window.innerHeight - 300) + 'px';
+  // FIX v5.1.1 — reportado por Ale: con un límite fijo (300px) el menú se
+  // cortaba cerca del borde de la pantalla, y el punto "Ocultar"/"Quitar"
+  // quedaba invisible. Ahora se mide el tamaño REAL del menú (ya armado,
+  // recién agregada la línea de autor+fecha) y se decide de qué lado abrir.
+  menu.style.left = '-9999px';
+  menu.style.top = '0px';
   menu.classList.remove('hidden');
+  const alto = menu.offsetHeight;
+  const ancho = menu.offsetWidth;
+  const margen = 8;
+  let left = (clientX + ancho + margen > window.innerWidth) ? clientX - ancho : clientX;
+  let top = (clientY + alto + margen > window.innerHeight) ? clientY - alto : clientY;
+  left = Math.max(margen, left);
+  top = Math.max(margen, top);
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
   setTimeout(function () { document.addEventListener('pointerdown', notaCerrarMenuSiAfuera_); }, 0);
 }
 
@@ -3443,6 +3559,7 @@ function renderNotaMenuHtml_(nota) {
     return '<button class="nota-menu-tam' + (t === nota.tamaño ? ' activo' : '') + '" onclick="notaCambiarTamaño_(\'' + nota.id + '\',\'' + t + '\')">' + t + '</button>';
   }).join('');
   return '' +
+    '<div class="nota-menu-autor">' + escaparHtml(notaFechaTexto_(nota)) + '</div>' +
     '<div class="nota-menu-seccion-label">Color</div>' +
     '<div class="nota-menu-swatches">' + swatches + '</div>' +
     '<div class="nota-menu-seccion-label">Tamaño</div>' +
@@ -3453,7 +3570,7 @@ function renderNotaMenuHtml_(nota) {
     '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'atras\')"><i class="ti ti-stack-back"></i> Enviar atrás</button>' +
     '<button class="nota-menu-item" onclick="notaToggleFijada_(\'' + nota.id + '\')"><i class="ti ti-pin"></i> ' + (nota.fijada ? 'Desfijar posición' : 'Fijar posición') + '</button>' +
     '<div class="nota-menu-sep"></div>' +
-    '<button class="nota-menu-item nota-menu-danger" onclick="notaOcultar_(\'' + nota.id + '\')"><i class="ti ti-eye-off"></i> Ocultar</button>';
+    '<button class="nota-menu-item nota-menu-danger" onclick="notaOcultar_(\'' + nota.id + '\')"><i class="ti ti-trash"></i> Quitar</button>';
 }
 
 function notaCambiarColor_(id, hex) {
@@ -3504,15 +3621,16 @@ function notaToggleFijada_(id) {
 
 async function notaOcultar_(id) {
   notaCerrarMenu_();
-  const ok = await mostrarConfirm('Ocultar nota', '¿Ocultar esta nota? No se borra, pero deja de verse en el tablero.', { danger: true, textoAceptar: 'Ocultar' });
+  const ok = await mostrarConfirm('Quitar nota', '¿Quitar esta nota? No se borra, pero deja de verse en el tablero.', { danger: true, textoAceptar: 'Quitar' });
   if (!ok) return;
+  if (notaSeleccionadaId === id) notaSeleccionadaId = null; // NUEVO v5.1.1
   notas = notas.filter(function (n) { return String(n.id) !== String(id); });
   pintarNotasCanvas();
   try {
     const res = await llamarBackend('ocultarNota', { obraId: obraActual.obraId, notaId: id, email: emailActual });
     if (!res.ok) throw new Error(res.error || 'ocultarNota falló');
   } catch (err) {
-    mostrarToast('No se pudo ocultar — probá Actualizar');
+    mostrarToast('No se pudo quitar — probá Actualizar');
   }
 }
 </script>
