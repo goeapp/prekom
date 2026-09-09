@@ -961,7 +961,29 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v5.1.2.html — lógica
+// PreKOM — index_prekom_v5.1.3.html — lógica
+// v5.1.3 — fix estructural sobre Notas (reemplaza el enfoque de
+// v5.1.2, que mitigaba pero no cerraba del todo la carrera): idea de
+// Ale — el ID de una nota nueva ya no lo define el backend al
+// confirmar la creación, se genera en el CLIENTE (crypto.randomUUID())
+// y viaja como parte del pedido de creación. Antes, mientras la nota
+// tenía un ID temporal (a la espera de que el backend confirmara y
+// diera el ID real), CUALQUIER acción sobre ella —no solo el texto,
+// también el menú contextual (color/tamaño/etc.)— podía quedar armada
+// con ese ID viejo; si el ID real llegaba mientras la acción todavía
+// no se había disparado, esa acción apuntaba a un ID que ya no
+// existía en memoria y no hacía nada (la falla "aleatoria" que
+// reportó Ale). Con un ID estable desde el origen, no hay más
+// traducción de IDs que se pueda desincronizar. Se conserva el buffer
+// de v5.1.2 (`notasCambiosPendientes`) como red de seguridad para la
+// única carrera que sigue siendo real: que el pedido de "guardar
+// cambio" le gane por red al pedido de "crear nota" y llegue al
+// backend antes de que la fila exista físicamente en el Sheet.
+// Backend (`gas_prekom_v2_06.gs`): `crearNota_` ahora recibe el `id`
+// en vez de calcularlo, e ignora reintentos duplicados del mismo ID
+// (idempotencia) por si un reintento de red repitiera el pedido.
+// Ver Handoff_PreKOM_v5.1.3.md.
+//
 // v5.1.2 — fix de raíz sobre Notas: reportado por Ale, el texto (o
 // cualquier otro cambio) de una nota se perdía en el Sheet si se
 // editaba/movía ANTES de que el backend confirmara su creación —
@@ -1198,7 +1220,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v5.1.2';
+const APP_VERSION = 'v5.1.3';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1510,7 +1532,8 @@ let notasPinchStart = null;
 let notaDragState = null;                // arrastre de UNA nota puntual (distinto del pan del tablero)
 let notaMenuAbiertoId = null;
 let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de la nota activa
-let notasCambiosPendientes = new Map();  // NUEVO v5.1.2 — idTemp → cambios acumulados mientras esa nota no tiene ID real todavía
+let notasCambiosPendientes = new Map();  // NUEVO v5.1.2 — id → cambios acumulados mientras esa nota todavía no está confirmada en el Sheet
+let notasPendientesCreacion = new Set(); // NUEVO v5.1.3 — ids con crearNota en vuelo (reemplaza el chequeo por prefijo 'tmp')
 let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
 
 function filtroBusquedaGlobal(data) {
@@ -3380,61 +3403,63 @@ function notasMinZIndex_() {
   return notas.reduce(function (min, n) { return Math.min(min, n.zIndex || 0); }, 0);
 }
 
+// NUEVO v5.1.3 — genera el ID definitivo de una nota EN EL CLIENTE, antes
+// de mandar nada al backend (ver comentario de cabecera del archivo).
+function notaGenerarId_() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'n' + Date.now() + Math.random().toString(36).slice(2, 10); // fallback para navegadores muy viejos
+}
+
 // ── Crear / duplicar (optimista) ─────────────────────────────
 async function notaCrear_(x, y, opts) {
   opts = opts || {};
-  const idTemp = 'tmp' + Date.now() + Math.random().toString(36).slice(2, 6);
+  const id = notaGenerarId_(); // NUEVO v5.1.3 — este ID ya es el definitivo, no se reemplaza después
   const notaOptimista = {
-    id: idTemp, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'M',
+    id: id, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'M',
     x: Math.round(x), y: Math.round(y), zIndex: notasMaxZIndex_() + 1, fijada: false, usuario: emailActual
   };
   notas.push(notaOptimista);
+  notasPendientesCreacion.add(id); // NUEVO v5.1.3 — mientras esté acá, actualizarNotaBackend_ bufferea en vez de llamar al backend
   pintarNotasCanvas();
-  if (!opts.texto) notaEnfocarTexto_(idTemp);
+  if (!opts.texto) notaEnfocarTexto_(id);
   try {
     const res = await llamarBackend('crearNota', {
-      obraId: obraActual.obraId, texto: notaOptimista.texto, color: notaOptimista.color, tamaño: notaOptimista.tamaño,
+      obraId: obraActual.obraId, id: id, texto: notaOptimista.texto, color: notaOptimista.color, tamaño: notaOptimista.tamaño,
       x: notaOptimista.x, y: notaOptimista.y, email: emailActual
     });
     if (!res.ok) throw new Error(res.error || 'crearNota falló');
-    const nota = notas.find(function (n) { return n.id === idTemp; });
+    const nota = notas.find(function (n) { return n.id === id; });
     if (nota) {
-      // FIX v5.1.1 — reportado por Ale: antes esto llamaba a
-      // pintarNotasCanvas() (repintado completo), que recreaba el div
-      // y borraba el texto que se estuviera tipeando en ese momento. Ahora
-      // solo actualiza el ID/zIndex/fecha en memoria y en el DOM existente,
-      // sin tocar el contenido editable.
-      nota.id = res.id;
       nota.zIndex = res.zIndex;
       nota.fechaCreacion = res.fechaCreacion;
       nota.fechaModificacion = res.fechaModificacion;
-      notaActualizarIdEnDom_(idTemp, nota);
-      // NUEVO v5.1.2 — recién ahora la nota tiene ID real: si mientras
-      // tanto se editó texto/color/tamaño/posición (quedó en el buffer
-      // porque el ID temporal no existía en el Sheet), se manda todo
-      // junto en un solo guardado con el ID correcto.
-      const pendientes = notasCambiosPendientes.get(idTemp);
-      notasCambiosPendientes.delete(idTemp);
-      if (pendientes) actualizarNotaBackend_(nota.id, pendientes);
+      notaActualizarMetaEnDom_(id, nota); // solo zIndex/tooltip — el ID nunca cambió, no hace falta tocarlo
     }
+    notasPendientesCreacion.delete(id);
+    // Si mientras tanto se editó texto/color/tamaño/posición (quedó en el
+    // buffer porque la fila todavía no existía confirmada en el Sheet), se
+    // manda todo junto en un solo guardado — ya sin ningún cambio de ID.
+    const pendientes = notasCambiosPendientes.get(id);
+    notasCambiosPendientes.delete(id);
+    if (pendientes) actualizarNotaBackend_(id, pendientes);
   } catch (err) {
-    notas = notas.filter(function (n) { return n.id !== idTemp; });
-    notasCambiosPendientes.delete(idTemp); // NUEVO v5.1.2 — no dejar buffer huérfano si la creación falló
+    notas = notas.filter(function (n) { return n.id !== id; });
+    notasPendientesCreacion.delete(id);
+    notasCambiosPendientes.delete(id); // no dejar buffer huérfano si la creación falló
     pintarNotasCanvas();
     mostrarToast('No se pudo crear la nota');
   }
 }
 
-// NUEVO v5.1.1 — actualiza el data-id/zIndex/tooltip de una nota YA
-// existente en el DOM sin recrearla (ver fix #1 del patch v5.1.1).
-function notaActualizarIdEnDom_(idViejo, nota) {
-  const div = document.querySelector('.nota-postit[data-id="' + idViejo + '"]');
+// NUEVO v5.1.3 — reemplaza a notaActualizarIdEnDom_ (ya no hace falta
+// tocar el data-id, el ID es estable desde que se creó la nota). Solo
+// sincroniza zIndex (por si otro usuario creó notas en simultáneo) y el
+// tooltip (recién acá se sabe la fechaCreacion real).
+function notaActualizarMetaEnDom_(id, nota) {
+  const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
   if (!div) return;
-  div.dataset.id = nota.id;
   div.style.zIndex = nota.zIndex || 0;
   div.title = notaFechaTexto_(nota);
-  const texto = div.querySelector('.nota-texto');
-  if (texto) texto.dataset.id = nota.id;
 }
 
 function notaEnfocarTexto_(id) {
@@ -3518,11 +3543,11 @@ function notaGuardarTexto_(id, textoNuevo) {
 }
 
 function actualizarNotaBackend_(id, cambios) {
-  // NUEVO v5.1.2 — mientras la nota tiene ID temporal (crearNota_ todavía
-  // no confirmó), el Sheet no conoce ese ID: cualquier llamada acá fallaría
-  // siempre. Se acumula en un buffer y se aplica junto cuando llegue el ID
-  // real (ver notaCrear_) — no se llama al backend con un ID que no existe.
-  if (String(id).indexOf('tmp') === 0) {
+  // NUEVO v5.1.3 — mientras la creación de esta nota sigue en vuelo
+  // (`notasPendientesCreacion`), el Sheet todavía no tiene la fila: se
+  // acumulan los cambios en un buffer y se aplican juntos cuando
+  // `notaCrear_` confirme (ver ahí) — no se llama al backend antes de eso.
+  if (notasPendientesCreacion.has(id)) {
     const previos = notasCambiosPendientes.get(id) || {};
     notasCambiosPendientes.set(id, Object.assign(previos, cambios));
     return;
