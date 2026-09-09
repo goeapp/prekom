@@ -656,6 +656,58 @@ input { font-family: inherit; }
   padding: 10px 40px 10px 14px; font-size: .88rem; font-family: inherit; background: var(--surface);
 }
 .contenido-buscador-input:focus { outline: none; border-color: var(--accent); }
+
+/* ─────────────────────────────────────────────────
+   NOTAS — tablero tipo Miro (batch 1) — NUEVO v5.1.0
+───────────────────────────────────────────────── */
+.view.view-notas {
+  padding: 0; max-width: none; height: calc(100vh - var(--header-h));
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.notas-toolbar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface);
+  flex-wrap: wrap;
+}
+.notas-zoom-controls { display: flex; gap: 4px; }
+.notas-hint { margin-left: auto; font-size: .72rem; color: var(--muted); }
+.notas-board {
+  flex: 1 1 auto; position: relative; overflow: hidden;
+  background-color: #eef1f5;
+  background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+  background-size: 22px 22px;
+  cursor: grab; touch-action: none;
+}
+.notas-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; will-change: transform; }
+.nota-postit {
+  position: absolute; box-shadow: var(--shadow-md); border-radius: 2px; padding: 14px;
+  cursor: move; transform: rotate(var(--nota-rot, 0deg)); touch-action: none; overflow: hidden;
+}
+.nota-postit.fijada { cursor: default; }
+.nota-postit.tam-S { width: 140px; height: 140px; }
+.nota-postit.tam-M { width: 200px; height: 200px; }
+.nota-postit.tam-L { width: 260px; height: 260px; }
+.nota-pin { position: absolute; top: 6px; right: 6px; color: rgba(0,0,0,.45); font-size: 14px; }
+.nota-texto {
+  width: 100%; height: 100%; outline: none; overflow: hidden;
+  font-family: 'DM Sans', sans-serif; font-weight: 500; color: #1e293b;
+  line-height: 1.35; word-break: break-word; white-space: pre-wrap;
+}
+#notas-menu-contextual {
+  position: fixed; z-index: 500; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md); padding: 10px; width: 200px;
+}
+.nota-menu-seccion-label { font-size: .68rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin: 6px 0; }
+.nota-menu-swatches { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-bottom: 4px; }
+.nota-menu-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+.nota-menu-swatch.activo { border-color: var(--accent-border); }
+.nota-menu-tamaños { display: flex; gap: 6px; margin-bottom: 4px; }
+.nota-menu-tam { flex: 1; padding: 5px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; font-size: .76rem; font-weight: 700; }
+.nota-menu-tam.activo { background: var(--accent); border-color: var(--accent-border); color: #fff; }
+.nota-menu-sep { height: 1px; background: var(--border); margin: 8px 0; }
+.nota-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: none; padding: 7px 6px; font-size: .8rem; border-radius: 6px; }
+.nota-menu-item:hover { background: #f1f5f9; }
+.nota-menu-danger { color: var(--danger); }
 .contenido-buscador-limpiar {
   position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
   width: 24px; height: 24px; border: none; background: var(--border); color: var(--muted);
@@ -752,6 +804,7 @@ input { font-family: inherit; }
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
       <button class="hdr-nav-btn" id="btn-nav-listas" disabled>Listas</button>
+      <button class="hdr-nav-btn" id="btn-nav-notas" disabled>Notas</button>
     </div>
     <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
     <button class="hdr-btn-cambiar-obra hidden" id="btn-links">Links</button>
@@ -866,6 +919,9 @@ input { font-family: inherit; }
   </div>
 </aside>
 
+<!-- ═══════════════ NOTAS — menú contextual (batch 1) ═══════════════ -->
+<div id="notas-menu-contextual" class="hidden"></div>
+
 <canvas id="lpz-canvas" class="lpz-canvas"></canvas>
 <div class="lpz-bar" id="lpz-bar">
   <span class="lpz-bar-handle" title="Arrastrar">⠿</span>
@@ -897,7 +953,20 @@ input { font-family: inherit; }
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v5.0.1.html — lógica
+// PreKOM — index_prekom_v5.1.0.html — lógica
+// v5.1.0 — Notas Batch 1 (tablero tipo Miro), diseño cerrado y
+// confirmado por Ale (ver Handoff_PreKOM_v5.1.0.md): nuevo tab
+// "Notas" con tablero zoom/pan (transform CSS, JS plano, sin
+// librerías), notas post-it (autoajuste de texto, menú contextual
+// clic-derecho/mantener-presionado con color/tamaño/duplicar/
+// traer-al-frente-atrás/ocultar/fijar posición), compartidas entre
+// todos los que ven la obra (sin gate de permisos, confirmado por
+// Ale), guardado optimista por acción + botón "Actualizar" (sin
+// tiempo real multiusuario). Objetos adicionales (Región/marco,
+// Línea/flecha, Texto libre, Emoji) quedan para Batch 2. Lápiz
+// Global sigue disponible también en esta vista (confirmado por
+// Ale). Consume gas_prekom_v2_05.gs (hoja Notas + 4 actions nuevas).
+//
 // v2.04 — fix chico: "PREKOM" se veía todo en mayúsculas en el logo
 // (login y header) porque Bebas Neue es una tipografía todo-mayúsculas
 // (sin formas de minúscula real) — el texto real ya decía "PreKOM"
@@ -1103,7 +1172,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v5.0.1';
+const APP_VERSION = 'v5.1.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1405,6 +1474,15 @@ let schemaListaAbierta = [];     // schema de la lista abierta
 let tablaListaTabulator = null;  // instancia Tabulator activa
 let comentariosListaAbierta = null; // nombreTab con el panel de Comentarios abierto
 let comentariosContenidoAbierto = null; // NUEVO v4.0.0 (batch 3) — punto del Árbol con el panel de Comentarios abierto
+
+// NUEVO v5.1.0 — Notas (tablero tipo Miro, batch 1)
+let notas = [];                          // notas de la obra, cargadas al entrar al tab (no precargadas en mostrarApp)
+let notasView = { panX: 0, panY: 0, zoom: 1 }; // transform del tablero — solo de sesión, no se persiste
+let notasPointers = new Map();           // pointerId → {x,y} en pantalla — pan (1 dedo) / pinch (2 dedos) del tablero
+let notasPanStart = null;
+let notasPinchStart = null;
+let notaDragState = null;                // arrastre de UNA nota puntual (distinto del pan del tablero)
+let notaMenuAbiertoId = null;
 let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
 
 function filtroBusquedaGlobal(data) {
@@ -1766,16 +1844,23 @@ document.getElementById('btn-cambiar-obra').addEventListener('click', cambiarObr
 
 document.getElementById('btn-nav-arbol').addEventListener('click', function () { renderHome(); });
 document.getElementById('btn-nav-listas').addEventListener('click', function () { renderListasHub(); });
+document.getElementById('btn-nav-notas').addEventListener('click', function () { renderNotasHub(); });
 
 function marcarNavActiva(vista) {
   document.getElementById('btn-nav-arbol').classList.toggle('active', vista === 'arbol');
   document.getElementById('btn-nav-listas').classList.toggle('active', vista === 'listas' || vista === 'lista-detalle');
+  document.getElementById('btn-nav-notas').classList.toggle('active', vista === 'notas'); // NUEVO v5.1.0
   // Hook obligatorio de Lápiz Global (§5 de la guía) — cambio de vista
   // principal borra cualquier marca dibujada.
   if(typeof lapizBorrar === 'function') lapizBorrar();
   // NUEVO v4.0.0 (batch 3) — el buscador de Contenido solo tiene
   // sentido en la vista Contenido
   document.getElementById('contenido-buscador-wrap').classList.toggle('hidden', vista !== 'arbol');
+  // NUEVO v5.1.0 — el tablero de Notas necesita layout full-height
+  // propio (sin el padding/max-width de .view normal); se activa/
+  // desactiva acá para que cualquier navegación de salida lo saque.
+  document.getElementById('main-view').classList.toggle('view-notas', vista === 'notas');
+  if (vista !== 'notas') notaCerrarMenu_();
 }
 
 function destruirTablaSiExiste() {
@@ -1792,6 +1877,7 @@ async function mostrarApp() {
   document.getElementById('main-view').innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Cargando datos de la obra…</div>';
   document.getElementById('btn-nav-arbol').disabled = true;
   document.getElementById('btn-nav-listas').disabled = true;
+  document.getElementById('btn-nav-notas').disabled = true;
 
   try {
     const [resArbol, resLinks, resConfig, resListas, resGrupos, resValores, resFavoritos, resPermisos, resComentariosContenido] = await Promise.all([
@@ -1828,6 +1914,7 @@ async function mostrarApp() {
 
     document.getElementById('btn-nav-arbol').disabled = false;
     document.getElementById('btn-nav-listas').disabled = false;
+    document.getElementById('btn-nav-notas').disabled = false;
 
     lapizInit(); // Lápiz Global — una sola vez, tras el primer render
 
@@ -3000,6 +3087,432 @@ function resaltarEnResumen_(termino) {
       mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
       break;
     }
+  }
+}
+// ============================================================
+// NOTAS — tablero tipo Miro (batch 1) — NUEVO v5.1.0
+// Sin gate de permisos (confirmado por Ale): cualquiera con acceso a
+// la obra puede crear/mover/editar/ocultar/duplicar cualquier nota.
+// Guardado optimista por acción — la UI nunca espera al backend
+// salvo la carga inicial del tab. `x`/`y` viven en coordenadas del
+// canvas (sin escalar); el zoom/pan es puramente visual, vía
+// `transform: translate()+scale()` en #notas-canvas.
+// ============================================================
+
+function notaRotacion_(id) {
+  // Rotación leve determinística por ID (look post-it) — no aleatoria
+  // en cada render, para que la nota no "salte" de ángulo al refrescar.
+  return ((Math.abs(Number(String(id).replace(/\D/g, '')) || 0) * 37) % 7) - 3;
+}
+
+async function renderNotasHub() {
+  vistaActual = 'notas';
+  marcarNavActiva('notas');
+  destruirTablaSiExiste();
+  document.getElementById('main-view').innerHTML = renderNotasEsqueleto_();
+  wireNotasBoard_();
+  aplicarTransformNotas_();
+  await cargarNotas();
+}
+
+function renderNotasEsqueleto_() {
+  return '' +
+    '<div class="notas-toolbar">' +
+      '<button class="btn-toolbar principal" onclick="notaCrearEnCentro_()"><i class="ti ti-note"></i> + Nota</button>' +
+      '<div class="notas-zoom-controls">' +
+        '<button class="btn-toolbar" onclick="notasZoomBoton_(-1)" title="Alejar">−</button>' +
+        '<button class="btn-toolbar" onclick="notasCentrarVista()" title="Centrar vista">Centrar</button>' +
+        '<button class="btn-toolbar" onclick="notasZoomBoton_(1)" title="Acercar">+</button>' +
+      '</div>' +
+      '<button class="btn-toolbar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
+      '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
+    '</div>' +
+    '<div class="notas-board" id="notas-board">' +
+      '<div class="notas-canvas" id="notas-canvas"></div>' +
+    '</div>';
+}
+
+async function cargarNotas() {
+  try {
+    const res = await llamarBackend('leerNotas', { obraId: obraActual.obraId });
+    notas = (res.ok && res.notas) ? res.notas : [];
+    pintarNotasCanvas();
+  } catch (err) {
+    mostrarToast('No se pudo cargar Notas');
+  }
+}
+
+function pintarNotasCanvas() {
+  const canvas = document.getElementById('notas-canvas');
+  if (!canvas) return;
+  canvas.innerHTML = notas.map(function (n) { return renderNotaHtml_(n); }).join('');
+  notas.forEach(function (n) { notaAutoajustarTexto_(n.id); });
+  wireNotasEventosNotas_();
+}
+
+function renderNotaHtml_(n) {
+  const rot = notaRotacion_(n.id);
+  const pin = n.fijada ? '<span class="nota-pin" title="Posición fijada"><i class="ti ti-pin"></i></span>' : '';
+  return '' +
+    '<div class="nota-postit tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" ' +
+      'style="left:' + n.x + 'px; top:' + n.y + 'px; background:' + n.color + '; --nota-rot:' + rot + 'deg; z-index:' + (n.zIndex || 0) + '">' +
+      pin +
+      '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+    '</div>';
+}
+
+function notaAutoajustarTexto_(id) {
+  const el = document.querySelector('.nota-texto[data-id="' + id + '"]');
+  if (!el) return;
+  let fontSize = 15;
+  el.style.fontSize = fontSize + 'px';
+  while (fontSize > 9 && el.scrollHeight > el.clientHeight) {
+    fontSize -= 1;
+    el.style.fontSize = fontSize + 'px';
+  }
+}
+
+// ── Tablero: pan (1 puntero) / pinch-zoom (2 punteros) / rueda ──
+function wireNotasBoard_() {
+  const board = document.getElementById('notas-board');
+  board.addEventListener('wheel', notasOnWheel_, { passive: false });
+  board.addEventListener('pointerdown', notasOnPointerDown_);
+  board.addEventListener('pointermove', notasOnPointerMove_);
+  board.addEventListener('pointerup', notasOnPointerUp_);
+  board.addEventListener('pointercancel', notasOnPointerUp_);
+  board.addEventListener('dblclick', notasOnDblClick_);
+}
+
+function aplicarTransformNotas_() {
+  const canvas = document.getElementById('notas-canvas');
+  if (!canvas) return;
+  canvas.style.transform = 'translate(' + notasView.panX + 'px,' + notasView.panY + 'px) scale(' + notasView.zoom + ')';
+}
+
+function notasCentrarVista() {
+  notasView = { panX: 0, panY: 0, zoom: 1 };
+  aplicarTransformNotas_();
+}
+
+function notasDistanciaPuntos_(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function notasAplicarZoom_(factor, screenX, screenY) {
+  const nuevoZoom = Math.min(2.5, Math.max(0.3, notasView.zoom * factor));
+  const factorReal = nuevoZoom / notasView.zoom;
+  // Mantiene fijo el punto del canvas que está bajo (screenX,screenY)
+  notasView.panX = screenX - (screenX - notasView.panX) * factorReal;
+  notasView.panY = screenY - (screenY - notasView.panY) * factorReal;
+  notasView.zoom = nuevoZoom;
+  aplicarTransformNotas_();
+}
+
+function notasZoomBoton_(dir) {
+  const board = document.getElementById('notas-board');
+  const rect = board.getBoundingClientRect();
+  notasAplicarZoom_(dir > 0 ? 1.15 : 1 / 1.15, rect.width / 2, rect.height / 2);
+}
+
+function notasOnWheel_(e) {
+  e.preventDefault();
+  const rect = e.currentTarget.getBoundingClientRect();
+  notasAplicarZoom_(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - rect.left, e.clientY - rect.top);
+}
+
+function notasOnPointerDown_(e) {
+  const board = e.currentTarget;
+  board.setPointerCapture(e.pointerId);
+  notasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (notasPointers.size === 1) {
+    notasPanStart = { x0: e.clientX, y0: e.clientY, panX0: notasView.panX, panY0: notasView.panY };
+  } else if (notasPointers.size === 2) {
+    notasPanStart = null;
+    const pts = Array.from(notasPointers.values());
+    const rect = board.getBoundingClientRect();
+    notasPinchStart = {
+      dist0: notasDistanciaPuntos_(pts[0], pts[1]),
+      zoom0: notasView.zoom, panX0: notasView.panX, panY0: notasView.panY,
+      midScreen0: { x: (pts[0].x + pts[1].x) / 2 - rect.left, y: (pts[0].y + pts[1].y) / 2 - rect.top }
+    };
+  }
+}
+
+function notasOnPointerMove_(e) {
+  if (!notasPointers.has(e.pointerId)) return;
+  notasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (notasPointers.size === 1 && notasPanStart) {
+    notasView.panX = notasPanStart.panX0 + (e.clientX - notasPanStart.x0);
+    notasView.panY = notasPanStart.panY0 + (e.clientY - notasPanStart.y0);
+    aplicarTransformNotas_();
+  } else if (notasPointers.size === 2 && notasPinchStart) {
+    const pts = Array.from(notasPointers.values());
+    const factorReal = notasDistanciaPuntos_(pts[0], pts[1]) / notasPinchStart.dist0;
+    const nuevoZoom = Math.min(2.5, Math.max(0.3, notasPinchStart.zoom0 * factorReal));
+    const factorAplicado = nuevoZoom / notasPinchStart.zoom0;
+    notasView.panX = notasPinchStart.midScreen0.x - (notasPinchStart.midScreen0.x - notasPinchStart.panX0) * factorAplicado;
+    notasView.panY = notasPinchStart.midScreen0.y - (notasPinchStart.midScreen0.y - notasPinchStart.panY0) * factorAplicado;
+    notasView.zoom = nuevoZoom;
+    aplicarTransformNotas_();
+  }
+}
+
+function notasOnPointerUp_(e) {
+  notasPointers.delete(e.pointerId);
+  if (notasPointers.size < 2) notasPinchStart = null;
+  if (notasPointers.size === 0) notasPanStart = null;
+}
+
+function notasOnDblClick_(e) {
+  if (e.target.closest('.nota-postit')) return; // dblclick en una nota no crea otra
+  const rect = e.currentTarget.getBoundingClientRect();
+  const canvasX = (e.clientX - rect.left - notasView.panX) / notasView.zoom;
+  const canvasY = (e.clientY - rect.top - notasView.panY) / notasView.zoom;
+  notaCrear_(canvasX - 100, canvasY - 100); // centra la nota (tamaño M=200) en el punto clickeado
+}
+
+function notaCrearEnCentro_() {
+  const board = document.getElementById('notas-board');
+  const rect = board.getBoundingClientRect();
+  const canvasX = (rect.width / 2 - notasView.panX) / notasView.zoom;
+  const canvasY = (rect.height / 2 - notasView.panY) / notasView.zoom;
+  notaCrear_(canvasX - 100, canvasY - 100);
+}
+
+function notasMaxZIndex_() {
+  return notas.reduce(function (max, n) { return Math.max(max, n.zIndex || 0); }, 0);
+}
+function notasMinZIndex_() {
+  return notas.reduce(function (min, n) { return Math.min(min, n.zIndex || 0); }, 0);
+}
+
+// ── Crear / duplicar (optimista) ─────────────────────────────
+async function notaCrear_(x, y, opts) {
+  opts = opts || {};
+  const idTemp = 'tmp' + Date.now() + Math.random().toString(36).slice(2, 6);
+  const notaOptimista = {
+    id: idTemp, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'M',
+    x: Math.round(x), y: Math.round(y), zIndex: notasMaxZIndex_() + 1, fijada: false, usuario: emailActual
+  };
+  notas.push(notaOptimista);
+  pintarNotasCanvas();
+  if (!opts.texto) notaEnfocarTexto_(idTemp);
+  try {
+    const res = await llamarBackend('crearNota', {
+      obraId: obraActual.obraId, texto: notaOptimista.texto, color: notaOptimista.color, tamaño: notaOptimista.tamaño,
+      x: notaOptimista.x, y: notaOptimista.y, email: emailActual
+    });
+    if (!res.ok) throw new Error(res.error || 'crearNota falló');
+    const nota = notas.find(function (n) { return n.id === idTemp; });
+    if (nota) { nota.id = res.id; nota.zIndex = res.zIndex; }
+    pintarNotasCanvas();
+  } catch (err) {
+    notas = notas.filter(function (n) { return n.id !== idTemp; });
+    pintarNotasCanvas();
+    mostrarToast('No se pudo crear la nota');
+  }
+}
+
+function notaEnfocarTexto_(id) {
+  setTimeout(function () {
+    const el = document.querySelector('.nota-texto[data-id="' + id + '"]');
+    if (el) el.focus();
+  }, 0);
+}
+
+// ── Mover / editar texto (optimista, un guardado al soltar/salir) ──
+function wireNotasEventosNotas_() {
+  document.querySelectorAll('.nota-postit').forEach(function (div) {
+    div.addEventListener('pointerdown', notaOnPointerDown_);
+    div.addEventListener('contextmenu', notaOnContextMenu_);
+    // Long-press (touch) — mismo menú que clic derecho, ya que en
+    // mobile no existe el clic derecho.
+    let timerLongPress = null;
+    div.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'touch') return;
+      timerLongPress = setTimeout(function () { notaAbrirMenu_(div.dataset.id, e.clientX, e.clientY); }, 550);
+    });
+    ['pointerup', 'pointercancel', 'pointermove'].forEach(function (ev) {
+      div.addEventListener(ev, function () { if (timerLongPress) { clearTimeout(timerLongPress); timerLongPress = null; } });
+    });
+  });
+  document.querySelectorAll('.nota-texto').forEach(function (div) {
+    div.addEventListener('input', function () { notaAutoajustarTexto_(div.dataset.id); });
+    div.addEventListener('blur', function () { notaGuardarTexto_(div.dataset.id, div.textContent); });
+    div.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); // no arrastra la nota al seleccionar/editar texto
+  });
+}
+
+function notaOnPointerDown_(e) {
+  const div = e.currentTarget;
+  const id = div.dataset.id;
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota || nota.fijada) return;
+  e.stopPropagation(); // no dispara el pan del tablero de fondo
+  div.setPointerCapture(e.pointerId);
+  notaDragState = { id: id, pointerId: e.pointerId, startXPantalla: e.clientX, startYPantalla: e.clientY, notaX0: nota.x, notaY0: nota.y, movio: false };
+  div.addEventListener('pointermove', notaOnPointerMoveDrag_);
+  div.addEventListener('pointerup', notaOnPointerUpDrag_);
+  div.addEventListener('pointercancel', notaOnPointerUpDrag_);
+}
+
+function notaOnPointerMoveDrag_(e) {
+  if (!notaDragState || e.pointerId !== notaDragState.pointerId) return;
+  const dxPantalla = e.clientX - notaDragState.startXPantalla;
+  const dyPantalla = e.clientY - notaDragState.startYPantalla;
+  if (Math.abs(dxPantalla) > 3 || Math.abs(dyPantalla) > 3) notaDragState.movio = true;
+  const nota = notas.find(function (n) { return String(n.id) === String(notaDragState.id); });
+  if (!nota) return;
+  nota.x = Math.round(notaDragState.notaX0 + dxPantalla / notasView.zoom);
+  nota.y = Math.round(notaDragState.notaY0 + dyPantalla / notasView.zoom);
+  const div = document.querySelector('.nota-postit[data-id="' + notaDragState.id + '"]');
+  if (div) { div.style.left = nota.x + 'px'; div.style.top = nota.y + 'px'; }
+}
+
+function notaOnPointerUpDrag_(e) {
+  if (!notaDragState || e.pointerId !== notaDragState.pointerId) return;
+  const div = e.currentTarget;
+  div.removeEventListener('pointermove', notaOnPointerMoveDrag_);
+  div.removeEventListener('pointerup', notaOnPointerUpDrag_);
+  div.removeEventListener('pointercancel', notaOnPointerUpDrag_);
+  const id = notaDragState.id;
+  const movio = notaDragState.movio;
+  notaDragState = null;
+  if (!movio) return; // fue un tap/click, no un drag real — no guarda nada
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (nota) actualizarNotaBackend_(id, { x: nota.x, y: nota.y });
+}
+
+function notaGuardarTexto_(id, textoNuevo) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  const texto = (textoNuevo || '').trim();
+  if (texto === (nota.texto || '')) return; // sin cambios reales
+  nota.texto = texto;
+  actualizarNotaBackend_(id, { texto: texto });
+}
+
+async function actualizarNotaBackend_(id, cambios) {
+  try {
+    const res = await llamarBackend('actualizarNota', { obraId: obraActual.obraId, notaId: id, cambios: cambios, email: emailActual });
+    if (!res.ok) throw new Error(res.error || 'actualizarNota falló');
+  } catch (err) {
+    mostrarToast('No se pudo guardar el cambio — probá Actualizar');
+  }
+}
+
+// ── Menú contextual (clic derecho / mantener presionado) ─────
+function notaOnContextMenu_(e) {
+  e.preventDefault();
+  notaAbrirMenu_(e.currentTarget.dataset.id, e.clientX, e.clientY);
+}
+
+function notaAbrirMenu_(id, clientX, clientY) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  notaMenuAbiertoId = id;
+  const menu = document.getElementById('notas-menu-contextual');
+  menu.innerHTML = renderNotaMenuHtml_(nota);
+  menu.style.left = Math.min(clientX, window.innerWidth - 220) + 'px';
+  menu.style.top = Math.min(clientY, window.innerHeight - 300) + 'px';
+  menu.classList.remove('hidden');
+  setTimeout(function () { document.addEventListener('pointerdown', notaCerrarMenuSiAfuera_); }, 0);
+}
+
+function notaCerrarMenuSiAfuera_(e) {
+  const menu = document.getElementById('notas-menu-contextual');
+  if (menu.contains(e.target)) return;
+  notaCerrarMenu_();
+}
+
+function notaCerrarMenu_() {
+  const menu = document.getElementById('notas-menu-contextual');
+  if (menu) menu.classList.add('hidden');
+  document.removeEventListener('pointerdown', notaCerrarMenuSiAfuera_);
+  notaMenuAbiertoId = null;
+}
+
+function renderNotaMenuHtml_(nota) {
+  const swatches = PALETA_COLORES_FONDO.map(function (hex) {
+    return '<span class="nota-menu-swatch' + (hex.toUpperCase() === String(nota.color || '').toUpperCase() ? ' activo' : '') +
+      '" style="background:' + hex + '" onclick="notaCambiarColor_(\'' + nota.id + '\',\'' + hex + '\')"></span>';
+  }).join('');
+  const tamaños = ['S', 'M', 'L'].map(function (t) {
+    return '<button class="nota-menu-tam' + (t === nota.tamaño ? ' activo' : '') + '" onclick="notaCambiarTamaño_(\'' + nota.id + '\',\'' + t + '\')">' + t + '</button>';
+  }).join('');
+  return '' +
+    '<div class="nota-menu-seccion-label">Color</div>' +
+    '<div class="nota-menu-swatches">' + swatches + '</div>' +
+    '<div class="nota-menu-seccion-label">Tamaño</div>' +
+    '<div class="nota-menu-tamaños">' + tamaños + '</div>' +
+    '<div class="nota-menu-sep"></div>' +
+    '<button class="nota-menu-item" onclick="notaDuplicar_(\'' + nota.id + '\')"><i class="ti ti-copy"></i> Duplicar</button>' +
+    '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'frente\')"><i class="ti ti-stack-front"></i> Traer al frente</button>' +
+    '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'atras\')"><i class="ti ti-stack-back"></i> Enviar atrás</button>' +
+    '<button class="nota-menu-item" onclick="notaToggleFijada_(\'' + nota.id + '\')"><i class="ti ti-pin"></i> ' + (nota.fijada ? 'Desfijar posición' : 'Fijar posición') + '</button>' +
+    '<div class="nota-menu-sep"></div>' +
+    '<button class="nota-menu-item nota-menu-danger" onclick="notaOcultar_(\'' + nota.id + '\')"><i class="ti ti-eye-off"></i> Ocultar</button>';
+}
+
+function notaCambiarColor_(id, hex) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  nota.color = hex;
+  const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
+  if (div) div.style.background = hex;
+  actualizarNotaBackend_(id, { color: hex });
+  notaCerrarMenu_();
+}
+
+function notaCambiarTamaño_(id, tam) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  nota.tamaño = tam;
+  pintarNotasCanvas();
+  actualizarNotaBackend_(id, { tamaño: tam });
+  notaCerrarMenu_();
+}
+
+function notaDuplicar_(id) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  notaCerrarMenu_();
+  notaCrear_(nota.x + 24, nota.y + 24, { texto: nota.texto, color: nota.color, tamaño: nota.tamaño });
+}
+
+function notaZOrden_(id, direccion) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  const nuevoZ = direccion === 'frente' ? (notasMaxZIndex_() + 1) : (notasMinZIndex_() - 1);
+  nota.zIndex = nuevoZ;
+  const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
+  if (div) div.style.zIndex = nuevoZ;
+  actualizarNotaBackend_(id, { zIndex: nuevoZ });
+  notaCerrarMenu_();
+}
+
+function notaToggleFijada_(id) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota) return;
+  nota.fijada = !nota.fijada;
+  pintarNotasCanvas();
+  actualizarNotaBackend_(id, { fijada: nota.fijada });
+  notaCerrarMenu_();
+}
+
+async function notaOcultar_(id) {
+  notaCerrarMenu_();
+  const ok = await mostrarConfirm('Ocultar nota', '¿Ocultar esta nota? No se borra, pero deja de verse en el tablero.', { danger: true, textoAceptar: 'Ocultar' });
+  if (!ok) return;
+  notas = notas.filter(function (n) { return String(n.id) !== String(id); });
+  pintarNotasCanvas();
+  try {
+    const res = await llamarBackend('ocultarNota', { obraId: obraActual.obraId, notaId: id, email: emailActual });
+    if (!res.ok) throw new Error(res.error || 'ocultarNota falló');
+  } catch (err) {
+    mostrarToast('No se pudo ocultar — probá Actualizar');
   }
 }
 </script>
