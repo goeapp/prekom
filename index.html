@@ -694,20 +694,10 @@ input { font-family: inherit; }
   position: absolute; border: 2px dashed var(--accent); border-radius: 4px;
   background: rgba(217,119,6,.12); pointer-events: none;
 }
-/* NUEVO v6.2.0 — menú "+ Agregar" de la toolbar (Nota/Región/Texto libre/Emoji) */
-.notas-crear-wrap { position: relative; }
-.notas-menu-crear {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md); padding: 6px; min-width: 170px;
-  display: flex; flex-direction: column; gap: 2px;
-}
-.notas-menu-crear.hidden { display: none; }
-.notas-menu-crear button {
-  display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left;
-  padding: 8px 10px; border-radius: var(--radius-sm); font-size: .82rem; color: var(--text); cursor: pointer;
-}
-.notas-menu-crear button:hover { background: var(--bg); }
+/* NUEVO v7.1.2 — grilla de fondo del tablero de Notas (toggle) y
+   estado "activo" reutilizable para botones de toolbar tipo toggle */
+.notas-board.grilla-visible { background-image: radial-gradient(circle, var(--border) 1.5px, transparent 1.5px); }
+.btn-toolbar.activo { background: var(--accent); border-color: var(--accent-border); color: #fff; }
 .notas-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; will-change: transform; }
 .nota-postit {
   position: absolute; box-shadow: var(--shadow-md); border-radius: 2px; padding: 14px;
@@ -1293,7 +1283,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.1';
+const APP_VERSION = 'v7.1.2';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2711,7 +2701,7 @@ async function abrirLista(nombreTab) {
  * grilla. `esPrimeraCarga` controla el estado visual de "Cargando…"
  * (solo se muestra la primera vez que se abre la lista).
  */
-async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
+async function cargarYMontarLista(nombreTab, esPrimeraCarga, reintentando) {
   try {
     const [resSchema, resDatos] = await Promise.all([
       llamarBackend('leerListaSchema', { obraId: obraActual.obraId, nombreLista: nombreTab }),
@@ -2727,6 +2717,11 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
     destruirTablaSiExiste();
     montarTabulator(nombreTab, schemaListaAbierta, datos);
   } catch (err) {
+    // FIX v7.1.2 — mismo mitigador que recargarListasYGrupos_ (v7.1.1):
+    // 1 reintento automático antes de mostrar el error, para los blips
+    // de red puntuales (confirmado con Ale vía el panel de Ejecuciones
+    // de Apps Script: el backend en sí no tiene errores).
+    if (!reintentando) { await cargarYMontarLista(nombreTab, esPrimeraCarga, true); return; }
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
     } else {
@@ -3320,24 +3315,25 @@ async function renderNotasHub() {
 function renderNotasEsqueleto_() {
   return '' +
     '<div class="notas-toolbar">' +
-      '<div class="notas-crear-wrap">' +
-        '<button class="btn-toolbar principal" id="btn-notas-crear-toggle" onclick="notasToggleMenuCrear_()"><i class="ti ti-plus"></i> Agregar</button>' +
-        '<div class="notas-menu-crear hidden" id="notas-menu-crear">' +
-          '<button onclick="notasMenuCrearAccion_(\'nota\')"><i class="ti ti-note"></i> Nota</button>' +
-          '<button onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Región</button>' +
-          '<button onclick="notasMenuCrearAccion_(\'texto\')"><i class="ti ti-typography"></i> Texto libre</button>' +
-          '<button onclick="notasMenuCrearAccion_(\'emoji\')"><i class="ti ti-mood-smile"></i> Emoji</button>' +
-        '</div>' +
-      '</div>' +
+      // FIX v7.1.2 — el menú desplegable "+ Agregar" pasa a 3 botones
+      // directos en la toolbar (confirmado por Ale); Texto libre se saca
+      // del tablero ("no suma") — el tipo sigue soportado en el render
+      // por si ya existiera alguna nota vieja de ese tipo en el Sheet,
+      // pero ya no se puede crear una nueva desde acá.
+      '<button class="btn-toolbar principal" onclick="notasMenuCrearAccion_(\'nota\')"><i class="ti ti-note"></i> Nota</button>' +
+      '<button class="btn-toolbar" onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Región</button>' +
+      '<button class="btn-toolbar" onclick="notasMenuCrearAccion_(\'emoji\')"><i class="ti ti-mood-smile"></i> Emoji</button>' +
       '<div class="notas-zoom-controls">' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(-1)" title="Alejar">−</button>' +
         '<button class="btn-toolbar" onclick="notasCentrarVista()" title="Centrar vista">Centrar</button>' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(1)" title="Acercar">+</button>' +
       '</div>' +
+      // NUEVO v7.1.2 — toggle de grilla de fondo (confirmado por Ale)
+      '<button class="btn-toolbar" id="btn-notas-grilla" onclick="notasToggleGrilla_()"><i class="ti ti-grid-dots"></i> Grilla</button>' +
       '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
-      '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' + // NUEVO v6.2.0: "Agregar" reemplaza al botón "+ Nota" suelto, con las 4 opciones del batch
+      '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
     '</div>' +
-    '<div class="notas-board" id="notas-board">' +
+    '<div class="notas-board' + (notasGrillaVisible ? ' grilla-visible' : '') + '" id="notas-board">' +
       '<div class="notas-canvas" id="notas-canvas"></div>' +
     '</div>';
 }
@@ -3491,9 +3487,19 @@ function aplicarTransformNotas_() {
   const canvas = document.getElementById('notas-canvas');
   if (!canvas) return;
   canvas.style.transform = 'translate(' + notasView.panX + 'px,' + notasView.panY + 'px) scale(' + notasView.zoom + ')';
+  // NUEVO v7.1.2 — si la grilla de fondo está visible, se sincroniza con
+  // el mismo pan/zoom del canvas (mismo criterio que el resto del
+  // tablero) para que se sienta pegada al contenido, no al viewport.
+  const board = document.getElementById('notas-board');
+  if (board && board.classList.contains('grilla-visible')) {
+    const paso = NOTAS_GRILLA_PX * notasView.zoom;
+    board.style.backgroundSize = paso + 'px ' + paso + 'px';
+    board.style.backgroundPosition = notasView.panX + 'px ' + notasView.panY + 'px';
+  }
 }
 
 const NOTAS_TAMANIOS_PX = { S: 140, M: 200, L: 260 }; // NUEVO v5.1.1 — usado para calcular el bounding box real en Centrar
+const NOTAS_GRILLA_PX = 40; // NUEVO v7.1.2 — espaciado de la grilla de fondo, en px del canvas (antes de aplicar zoom)
 
 // NUEVO v6.2.0 — dimensiones reales según el tipo, para que "Centrar"
 // (fit-all) calcule bien el bounding box con los tipos nuevos: región
@@ -3727,31 +3733,27 @@ function notaCrearEmoji_() {
   notaCrear_(canvasX - 35, canvasY - 35, { tipo: 'emoji' });
 }
 
-// NUEVO v6.2.0 — menú "+ Agregar" de la toolbar
-function notasToggleMenuCrear_() {
-  const menu = document.getElementById('notas-menu-crear');
-  if (!menu) return;
-  const abrir = menu.classList.contains('hidden');
-  menu.classList.toggle('hidden');
-  if (abrir) setTimeout(function () { document.addEventListener('pointerdown', notasCerrarMenuCrearSiAfuera_); }, 0);
-}
-function notasCerrarMenuCrearSiAfuera_(e) {
-  const menu = document.getElementById('notas-menu-crear');
-  const boton = document.getElementById('btn-notas-crear-toggle');
-  if ((menu && menu.contains(e.target)) || (boton && boton.contains(e.target))) return;
-  notasCerrarMenuCrear_();
-}
-function notasCerrarMenuCrear_() {
-  const menu = document.getElementById('notas-menu-crear');
-  if (menu) menu.classList.add('hidden');
-  document.removeEventListener('pointerdown', notasCerrarMenuCrearSiAfuera_);
-}
+// FIX v7.1.2 — antes abría/cerraba el menú desplegable "+ Agregar"
+// (notasToggleMenuCrear_/notasCerrarMenuCrearSiAfuera_/notasCerrarMenuCrear_,
+// sacados); ahora los 3 botones llaman esto directo.
 function notasMenuCrearAccion_(tipo) {
-  notasCerrarMenuCrear_();
   if (tipo === 'nota') { notaCrearEnCentro_(); return; }
-  if (tipo === 'texto') { notaCrearEnCentro_({ tipo: 'texto' }); return; }
   if (tipo === 'emoji') { notaCrearEmoji_(); return; }
   if (tipo === 'region') { notasActivarModoDibujoRegion_(); return; }
+}
+
+// NUEVO v7.1.2 — toggle de la grilla de fondo del tablero (confirmado
+// por Ale); estado en memoria, no se persiste — se resetea cada vez
+// que se entra al tab. Sincronizada con el pan/zoom en
+// aplicarTransformNotas_() para que se sienta pegada al tablero.
+let notasGrillaVisible = false;
+function notasToggleGrilla_() {
+  notasGrillaVisible = !notasGrillaVisible;
+  const board = document.getElementById('notas-board');
+  const btn = document.getElementById('btn-notas-grilla');
+  if (board) board.classList.toggle('grilla-visible', notasGrillaVisible);
+  if (btn) btn.classList.toggle('activo', notasGrillaVisible);
+  aplicarTransformNotas_();
 }
 
 function notasMaxZIndex_() {
@@ -3867,7 +3869,26 @@ function wireNotasEventosNotas_() {
       notaAutoajustarTexto_(div.dataset.id);
     });
     div.addEventListener('blur', function () { notaGuardarTexto_(div.dataset.id, div.textContent); });
-    div.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); // no arrastra la nota al seleccionar/editar texto
+    // FIX v7.1.2 — diagnóstico real del bug de mover Emoji reportado por
+    // Ale (necesitaba clic derecho primero, y al arrastrar paneaba todo
+    // el tablero en vez de mover el emoji): en post-it/región/texto
+    // libre, .nota-texto solo ocupa el interior (hay margen del propio
+    // .nota-postit alrededor donde SÍ se puede agarrar para arrastrar),
+    // pero en Emoji (.tipo-emoji, padding:0) .nota-texto cubre el 100%
+    // de la caja de 70x70 — no queda ningún margen del padre donde
+    // caiga el pointerdown, así que el stopPropagation() de acá abajo
+    // bloqueaba SIEMPRE el drag de notaOnPointerDown_ (el del
+    // .nota-postit padre), sin importar dónde se tocara dentro del
+    // emoji. El pointerdown entonces nunca iniciaba un drag de nota —
+    // si el usuario erraba el emoji al querer arrastrar, terminaba
+    // agarrando el tablero de fondo (pan), que es el "mueve toda la
+    // pantalla" reportado. En Emoji no hace falta distinguir "clic para
+    // mover" de "clic para editar texto" (es 1 solo carácter, no hay
+    // cursor que posicionar de forma significativa), así que se lo deja
+    // arrastrar como cualquier otra nota.
+    if (!nota || nota.tipo !== 'emoji') {
+      div.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); // no arrastra la nota al seleccionar/editar texto
+    }
   });
   // NUEVO v6.2.0 — handle de resize de región (drag distinto del de mover)
   document.querySelectorAll('.nota-resize-handle').forEach(function (handle) {
