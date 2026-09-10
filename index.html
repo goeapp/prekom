@@ -1278,7 +1278,11 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v6.2.0';
+// v7.0.0 — sin cambios funcionales de frontend. Backend consolidó
+// inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
+// la action 'inicializarObra' es idéntico, solo bump de versión para
+// marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
+const APP_VERSION = 'v7.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
