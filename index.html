@@ -679,6 +679,26 @@ input { font-family: inherit; }
   background-size: 22px 22px;
   cursor: grab; touch-action: none;
 }
+/* NUEVO v6.2.0 — modo "dibujar región" (Notas Batch 2, entrega 1) */
+.notas-board.modo-dibujo-region { cursor: crosshair; }
+.notas-dibujo-preview {
+  position: absolute; border: 2px dashed var(--accent); border-radius: 4px;
+  background: rgba(217,119,6,.12); pointer-events: none;
+}
+/* NUEVO v6.2.0 — menú "+ Agregar" de la toolbar (Nota/Región/Texto libre/Emoji) */
+.notas-crear-wrap { position: relative; }
+.notas-menu-crear {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md); padding: 6px; min-width: 170px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.notas-menu-crear.hidden { display: none; }
+.notas-menu-crear button {
+  display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left;
+  padding: 8px 10px; border-radius: var(--radius-sm); font-size: .82rem; color: var(--text); cursor: pointer;
+}
+.notas-menu-crear button:hover { background: var(--bg); }
 .notas-canvas { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; will-change: transform; }
 .nota-postit {
   position: absolute; box-shadow: var(--shadow-md); border-radius: 2px; padding: 14px;
@@ -700,6 +720,38 @@ input { font-family: inherit; }
      scrollHeight vs clientHeight, no depende del alineado del texto. */
   display: flex; align-items: center; justify-content: center; text-align: center;
 }
+
+/* NUEVO v6.2.0 — Región/marco (Notas Batch 2, entrega 1). Sin sombra,
+   sin rotación (no se le fija --nota-rot en el render), marco
+   punteado + relleno semi-transparente (color con alpha, calculado en
+   JS con hexToRgba_), tamaño libre (ancho/alto, no S/M/L). overflow
+   visible para que el handle de resize (fuera del borde) no se corte. */
+.nota-postit.tipo-region {
+  box-shadow: none; border: 2px dashed; border-radius: 8px;
+  box-sizing: border-box; overflow: visible; padding: 0;
+}
+.nota-postit.tipo-region .nota-texto.nota-region-etiqueta {
+  position: absolute; top: 6px; left: 8px; right: 8px; width: auto; height: auto;
+  display: block; text-align: left; justify-content: flex-start; align-items: flex-start;
+  font-size: 12px; font-weight: 700; color: rgba(15,23,42,.7);
+  background: transparent; padding: 0; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nota-resize-handle {
+  position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px;
+  border-radius: 3px; background: var(--surface); border: 2px solid var(--accent);
+  cursor: nwse-resize; touch-action: none;
+}
+
+/* NUEVO v6.2.0 — Texto libre: misma caja/autoajuste que el post-it,
+   sin fondo (no se setea background inline), sin sombra, sin rotación. */
+.nota-postit.tipo-texto { box-shadow: none; }
+
+/* NUEVO v6.2.0 — Emoji: sticker suelto, caja fija chica, sin fondo,
+   sin sombra, sin rotación, 1 solo carácter grande centrado (reutiliza
+   el flex-center de .nota-texto de arriba). */
+.nota-postit.tipo-emoji { box-shadow: none; width: 70px; height: 70px; padding: 0; }
+.nota-postit.tipo-emoji .nota-texto { font-size: 42px; line-height: 1; }
 #notas-menu-contextual {
   position: fixed; z-index: 500; background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-sm); box-shadow: var(--shadow-md); padding: 10px; width: 200px;
@@ -1226,7 +1278,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v6.1.0';
+const APP_VERSION = 'v6.2.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1540,6 +1592,10 @@ let notaMenuAbiertoId = null;
 let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de la nota activa
 let notasCambiosPendientes = new Map();  // NUEVO v5.1.2 — id → cambios acumulados mientras esa nota todavía no está confirmada en el Sheet
 let notasPendientesCreacion = new Set(); // NUEVO v5.1.3 — ids con crearNota en vuelo (reemplaza el chequeo por prefijo 'tmp')
+let notasModoDibujo = null;              // NUEVO v6.2.0 — 'region' mientras se está dibujando una región nueva (arrastre estilo Lápiz)
+let notasDibujoRegion = null;            // NUEVO v6.2.0 — {pointerId,x0,y0} del arrastre en curso
+let notaResizeState = null;              // NUEVO v6.2.0 — resize de región (distinto del arrastre de mover)
+const NOTA_REGION_MIN_PX = 140;          // NUEVO v6.2.0 — mínimo de región = tamaño de nota S, confirmado por Ale
 let terminoBusquedaLista = '';      // término actual del buscador de la lista abierta
 
 function filtroBusquedaGlobal(data) {
@@ -1857,6 +1913,12 @@ function onKeydownGlobal(e) {
   if (e.ctrlKey && e.altKey && (e.key === 'u' || e.key === 'U')) {
     e.preventDefault();
     abrirSessionDialog();
+  }
+  // NUEVO v6.2.0 — Esc cancela el modo "dibujar región" (Notas Batch 2)
+  if (e.key === 'Escape' && notasModoDibujo) {
+    notasDibujoPreviewQuitar_();
+    notasDibujoRegion = null;
+    notasDesactivarModoDibujo_();
   }
 }
 function abrirSessionDialog() {
@@ -3200,14 +3262,22 @@ async function renderNotasHub() {
 function renderNotasEsqueleto_() {
   return '' +
     '<div class="notas-toolbar">' +
-      '<button class="btn-toolbar principal" onclick="notaCrearEnCentro_()"><i class="ti ti-note"></i> + Nota</button>' +
+      '<div class="notas-crear-wrap">' +
+        '<button class="btn-toolbar principal" id="btn-notas-crear-toggle" onclick="notasToggleMenuCrear_()"><i class="ti ti-plus"></i> Agregar</button>' +
+        '<div class="notas-menu-crear hidden" id="notas-menu-crear">' +
+          '<button onclick="notasMenuCrearAccion_(\'nota\')"><i class="ti ti-note"></i> Nota</button>' +
+          '<button onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Región</button>' +
+          '<button onclick="notasMenuCrearAccion_(\'texto\')"><i class="ti ti-typography"></i> Texto libre</button>' +
+          '<button onclick="notasMenuCrearAccion_(\'emoji\')"><i class="ti ti-mood-smile"></i> Emoji</button>' +
+        '</div>' +
+      '</div>' +
       '<div class="notas-zoom-controls">' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(-1)" title="Alejar">−</button>' +
         '<button class="btn-toolbar" onclick="notasCentrarVista()" title="Centrar vista">Centrar</button>' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(1)" title="Acercar">+</button>' +
       '</div>' +
       '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
-      '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
+      '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' + // NUEVO v6.2.0: "Agregar" reemplaza al botón "+ Nota" suelto, con las 4 opciones del batch
     '</div>' +
     '<div class="notas-board" id="notas-board">' +
       '<div class="notas-canvas" id="notas-canvas"></div>' +
@@ -3232,7 +3302,10 @@ function pintarNotasCanvas() {
   const canvas = document.getElementById('notas-canvas');
   if (!canvas) return;
   canvas.innerHTML = notas.map(function (n) { return renderNotaHtml_(n); }).join('');
-  notas.forEach(function (n) { notaAutoajustarTexto_(n.id); });
+  // NUEVO v6.2.0 — el autoajuste de fuente (shrink-to-fit) solo aplica a
+  // post-it y texto libre; región tiene etiqueta de fuente fija chica,
+  // emoji tiene fuente fija grande (1 solo carácter, nunca desborda).
+  notas.forEach(function (n) { if ((n.tipo || 'postit') !== 'region' && n.tipo !== 'emoji') notaAutoajustarTexto_(n.id); });
   wireNotasEventosNotas_();
   // NUEVO v5.1.1 — un repintado completo recrea los divs, así que hay
   // que reaplicar el resaltado de selección (se pierde con el innerHTML nuevo)
@@ -3250,10 +3323,65 @@ function notaFechaTexto_(n) {
   return 'Cargado por ' + usuario + (fecha ? (' · ' + fecha) : '');
 }
 
+// NUEVO v6.2.0 — convierte un hex de la paleta a rgba() con alpha, para
+// el relleno semi-transparente de Región (así no tapa del todo a las
+// notas que agrupa, que quedan siempre arriba en z-index).
+function hexToRgba_(hex, alpha) {
+  const h = String(hex || '').replace('#', '');
+  const full = h.length === 3 ? h.split('').map(function (c) { return c + c; }).join('') : h;
+  const r = parseInt(full.substring(0, 2), 16) || 0;
+  const g = parseInt(full.substring(2, 4), 16) || 0;
+  const b = parseInt(full.substring(4, 6), 16) || 0;
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+}
+
 function renderNotaHtml_(n) {
-  const rot = notaRotacion_(n.id);
+  const tipo = n.tipo || 'postit';
   const pin = n.fijada ? '<span class="nota-pin" title="Posición fijada"><i class="ti ti-pin"></i></span>' : '';
   const tooltip = escaparHtml(notaFechaTexto_(n)); // NUEVO v5.1.1
+
+  // NUEVO v6.2.0 — Región/marco: tamaño libre (ancho/alto), sin
+  // rotación, relleno semi-transparente + marco del color elegido,
+  // etiqueta chica arriba (no ocupa toda la caja como el post-it) y
+  // el handle de resize en la esquina inferior derecha.
+  if (tipo === 'region') {
+    const ancho = n.ancho || 280, alto = n.alto || 200;
+    const color = n.color || COLOR_FONDO_DEFAULT;
+    return '' +
+      '<div class="nota-postit tipo-region' + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+        'style="left:' + n.x + 'px; top:' + n.y + 'px; width:' + ancho + 'px; height:' + alto + 'px; background:' + hexToRgba_(color, .22) + '; border-color:' + color + '; z-index:' + (n.zIndex || 0) + '">' +
+        pin +
+        '<div class="nota-texto nota-region-etiqueta" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+        (n.fijada ? '' : '<div class="nota-resize-handle" data-id="' + n.id + '"></div>') +
+      '</div>';
+  }
+
+  // NUEVO v6.2.0 — Texto libre: misma caja S/M/L que el post-it (y
+  // mismo autoajuste de fuente), sin background inline (queda
+  // transparente) y sin --nota-rot (sin rotación).
+  if (tipo === 'texto') {
+    return '' +
+      '<div class="nota-postit tipo-texto tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+        'style="left:' + n.x + 'px; top:' + n.y + 'px; z-index:' + (n.zIndex || 0) + '">' +
+        pin +
+        '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+      '</div>';
+  }
+
+  // NUEVO v6.2.0 — Emoji: caja fija chica (ver CSS .tipo-emoji), sin
+  // background, sin rotación, 1 carácter grande (notaEmojiLimitar_ lo
+  // acota a 1 en el input).
+  if (tipo === 'emoji') {
+    return '' +
+      '<div class="nota-postit tipo-emoji' + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+        'style="left:' + n.x + 'px; top:' + n.y + 'px; z-index:' + (n.zIndex || 0) + '">' +
+        pin +
+        '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+      '</div>';
+  }
+
+  // tipo === 'postit' — comportamiento original, sin cambios
+  const rot = notaRotacion_(n.id);
   return '' +
     '<div class="nota-postit tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
       'style="left:' + n.x + 'px; top:' + n.y + 'px; background:' + n.color + '; --nota-rot:' + rot + 'deg; z-index:' + (n.zIndex || 0) + '">' +
@@ -3309,6 +3437,18 @@ function aplicarTransformNotas_() {
 
 const NOTAS_TAMANIOS_PX = { S: 140, M: 200, L: 260 }; // NUEVO v5.1.1 — usado para calcular el bounding box real en Centrar
 
+// NUEVO v6.2.0 — dimensiones reales según el tipo, para que "Centrar"
+// (fit-all) calcule bien el bounding box con los tipos nuevos: región
+// tiene ancho/alto libres (no cuadrada), emoji es una caja fija chica,
+// post-it y texto libre siguen siendo cuadradas S/M/L como antes.
+function notaDimensiones_(n) {
+  const tipo = n.tipo || 'postit';
+  if (tipo === 'region') return { ancho: n.ancho || 280, alto: n.alto || 200 };
+  if (tipo === 'emoji') return { ancho: 70, alto: 70 };
+  const dim = NOTAS_TAMANIOS_PX[n.tamaño] || NOTAS_TAMANIOS_PX.M;
+  return { ancho: dim, alto: dim };
+}
+
 function notasCentrarVista() {
   const board = document.getElementById('notas-board');
   const rect = board.getBoundingClientRect();
@@ -3322,11 +3462,11 @@ function notasCentrarVista() {
   // (considerando el tamaño S/M/L de cada una) y centra sobre eso.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   notas.forEach(function (n) {
-    const dim = NOTAS_TAMANIOS_PX[n.tamaño] || NOTAS_TAMANIOS_PX.M;
+    const dim = notaDimensiones_(n); // NUEVO v6.2.0 — antes asumía cuadrada S/M/L para todas, ahora respeta región/emoji
     minX = Math.min(minX, n.x);
     minY = Math.min(minY, n.y);
-    maxX = Math.max(maxX, n.x + dim);
-    maxY = Math.max(maxY, n.y + dim);
+    maxX = Math.max(maxX, n.x + dim.ancho);
+    maxY = Math.max(maxY, n.y + dim.alto);
   });
   const centroX = (minX + maxX) / 2;
   const centroY = (minY + maxY) / 2;
@@ -3374,12 +3514,61 @@ function notasOnWheel_(e) {
   notasAplicarZoom_(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - rect.left, e.clientY - rect.top);
 }
 
+// NUEVO v6.2.0 — modo "dibujar región": arrastre estilo Lápiz en modo
+// rectángulo. Se activa desde el menú "+ Agregar" (notasActivarModoDibujoRegion_)
+// y consume el próximo pointerdown/move/up del tablero, en vez de pan/pinch.
+function notasDibujoPreviewCrear_(x, y) {
+  const canvas = document.getElementById('notas-canvas');
+  if (!canvas) return;
+  const div = document.createElement('div');
+  div.id = 'notas-dibujo-preview';
+  div.className = 'notas-dibujo-preview';
+  div.style.left = x + 'px'; div.style.top = y + 'px'; div.style.width = '0px'; div.style.height = '0px';
+  canvas.appendChild(div);
+}
+function notasDibujoPreviewActualizar_(x0, y0, x1, y1) {
+  const div = document.getElementById('notas-dibujo-preview');
+  if (!div) return;
+  div.style.left = Math.min(x0, x1) + 'px';
+  div.style.top = Math.min(y0, y1) + 'px';
+  div.style.width = Math.abs(x1 - x0) + 'px';
+  div.style.height = Math.abs(y1 - y0) + 'px';
+}
+function notasDibujoPreviewQuitar_() {
+  const div = document.getElementById('notas-dibujo-preview');
+  if (div) div.remove();
+}
+function notasActivarModoDibujoRegion_() {
+  notasModoDibujo = 'region';
+  const board = document.getElementById('notas-board');
+  if (board) board.classList.add('modo-dibujo-region');
+  mostrarToast('Arrastrá en el tablero para dibujar la región (Esc para cancelar)');
+}
+function notasDesactivarModoDibujo_() {
+  notasModoDibujo = null;
+  const board = document.getElementById('notas-board');
+  if (board) board.classList.remove('modo-dibujo-region');
+}
+
 function notasOnPointerDown_(e) {
+  const board = e.currentTarget;
+
+  // NUEVO v6.2.0 — en modo dibujo, este pointerdown arranca el arrastre
+  // de la región en vez de pan/selección; no llega al resto de la función.
+  if (notasModoDibujo === 'region' && !e.target.closest('.nota-postit')) {
+    const rect = board.getBoundingClientRect();
+    const canvasX = (e.clientX - rect.left - notasView.panX) / notasView.zoom;
+    const canvasY = (e.clientY - rect.top - notasView.panY) / notasView.zoom;
+    board.setPointerCapture(e.pointerId);
+    notasDibujoRegion = { pointerId: e.pointerId, x0: canvasX, y0: canvasY };
+    notasDibujoPreviewCrear_(canvasX, canvasY);
+    return;
+  }
+
   // NUEVO v5.1.1 — clic/tap en el fondo vacío del tablero deselecciona
   // la nota activa (el resaltado no debe quedar pegado para siempre)
   if (!e.target.closest('.nota-postit')) notaDeseleccionar_();
 
-  const board = e.currentTarget;
   board.setPointerCapture(e.pointerId);
   notasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -3398,6 +3587,15 @@ function notasOnPointerDown_(e) {
 }
 
 function notasOnPointerMove_(e) {
+  // NUEVO v6.2.0 — actualiza el rectángulo de preview mientras se dibuja la región
+  if (notasDibujoRegion && e.pointerId === notasDibujoRegion.pointerId) {
+    const board = document.getElementById('notas-board');
+    const rect = board.getBoundingClientRect();
+    const canvasX = (e.clientX - rect.left - notasView.panX) / notasView.zoom;
+    const canvasY = (e.clientY - rect.top - notasView.panY) / notasView.zoom;
+    notasDibujoPreviewActualizar_(notasDibujoRegion.x0, notasDibujoRegion.y0, canvasX, canvasY);
+    return;
+  }
   if (!notasPointers.has(e.pointerId)) return;
   notasPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -3418,12 +3616,32 @@ function notasOnPointerMove_(e) {
 }
 
 function notasOnPointerUp_(e) {
+  // NUEVO v6.2.0 — al soltar, crea la región con el rectángulo dibujado
+  // (normalizado — el arrastre puede ir en cualquier dirección) y sale
+  // del modo dibujo (acción de una sola vez por click en "Región").
+  if (notasDibujoRegion && e.pointerId === notasDibujoRegion.pointerId) {
+    const board = document.getElementById('notas-board');
+    const rect = board.getBoundingClientRect();
+    const canvasX = (e.clientX - rect.left - notasView.panX) / notasView.zoom;
+    const canvasY = (e.clientY - rect.top - notasView.panY) / notasView.zoom;
+    const x0 = notasDibujoRegion.x0, y0 = notasDibujoRegion.y0;
+    notasDibujoPreviewQuitar_();
+    notasDibujoRegion = null;
+    notasDesactivarModoDibujo_();
+    const x = Math.round(Math.min(x0, canvasX));
+    const y = Math.round(Math.min(y0, canvasY));
+    const ancho = Math.max(NOTA_REGION_MIN_PX, Math.round(Math.abs(canvasX - x0)));
+    const alto = Math.max(NOTA_REGION_MIN_PX, Math.round(Math.abs(canvasY - y0)));
+    notaCrear_(x, y, { tipo: 'region', ancho: ancho, alto: alto });
+    return;
+  }
   notasPointers.delete(e.pointerId);
   if (notasPointers.size < 2) notasPinchStart = null;
   if (notasPointers.size === 0) notasPanStart = null;
 }
 
 function notasOnDblClick_(e) {
+  if (notasModoDibujo) return; // NUEVO v6.2.0 — en modo dibujo, el dblclick no compite con el arrastre
   if (e.target.closest('.nota-postit')) return; // dblclick en una nota no crea otra
   const rect = e.currentTarget.getBoundingClientRect();
   const canvasX = (e.clientX - rect.left - notasView.panX) / notasView.zoom;
@@ -3431,12 +3649,50 @@ function notasOnDblClick_(e) {
   notaCrear_(canvasX - 70, canvasY - 70); // NUEVO v6.1.0 — centra la nota (default S=140) en el punto clickeado
 }
 
-function notaCrearEnCentro_() {
+function notaCrearEnCentro_(opts) {
   const board = document.getElementById('notas-board');
   const rect = board.getBoundingClientRect();
   const canvasX = (rect.width / 2 - notasView.panX) / notasView.zoom;
   const canvasY = (rect.height / 2 - notasView.panY) / notasView.zoom;
-  notaCrear_(canvasX - 70, canvasY - 70); // NUEVO v6.1.0 — centra la nota (default S=140) en el centro del tablero
+  notaCrear_(canvasX - 70, canvasY - 70, opts); // NUEVO v6.1.0 — centra la nota (default S=140) en el centro del tablero
+}
+
+// NUEVO v6.2.0 — Emoji nace centrado en la vista, caja fija 70x70 (ver
+// CSS .tipo-emoji), foco automático + leyenda del atajo del SO (no se
+// puede simular Win+./Cmd+Ctrl+Espacio desde el navegador).
+function notaCrearEmoji_() {
+  const board = document.getElementById('notas-board');
+  const rect = board.getBoundingClientRect();
+  const canvasX = (rect.width / 2 - notasView.panX) / notasView.zoom;
+  const canvasY = (rect.height / 2 - notasView.panY) / notasView.zoom;
+  notaCrear_(canvasX - 35, canvasY - 35, { tipo: 'emoji' });
+}
+
+// NUEVO v6.2.0 — menú "+ Agregar" de la toolbar
+function notasToggleMenuCrear_() {
+  const menu = document.getElementById('notas-menu-crear');
+  if (!menu) return;
+  const abrir = menu.classList.contains('hidden');
+  menu.classList.toggle('hidden');
+  if (abrir) setTimeout(function () { document.addEventListener('pointerdown', notasCerrarMenuCrearSiAfuera_); }, 0);
+}
+function notasCerrarMenuCrearSiAfuera_(e) {
+  const menu = document.getElementById('notas-menu-crear');
+  const boton = document.getElementById('btn-notas-crear-toggle');
+  if ((menu && menu.contains(e.target)) || (boton && boton.contains(e.target))) return;
+  notasCerrarMenuCrear_();
+}
+function notasCerrarMenuCrear_() {
+  const menu = document.getElementById('notas-menu-crear');
+  if (menu) menu.classList.add('hidden');
+  document.removeEventListener('pointerdown', notasCerrarMenuCrearSiAfuera_);
+}
+function notasMenuCrearAccion_(tipo) {
+  notasCerrarMenuCrear_();
+  if (tipo === 'nota') { notaCrearEnCentro_(); return; }
+  if (tipo === 'texto') { notaCrearEnCentro_({ tipo: 'texto' }); return; }
+  if (tipo === 'emoji') { notaCrearEmoji_(); return; }
+  if (tipo === 'region') { notasActivarModoDibujoRegion_(); return; }
 }
 
 function notasMaxZIndex_() {
@@ -3456,19 +3712,34 @@ function notaGenerarId_() {
 // ── Crear / duplicar (optimista) ─────────────────────────────
 async function notaCrear_(x, y, opts) {
   opts = opts || {};
+  const tipo = opts.tipo || 'postit'; // NUEVO v6.2.0
+  const esRegion = tipo === 'region';
   const id = notaGenerarId_(); // NUEVO v5.1.3 — este ID ya es el definitivo, no se reemplaza después
   const notaOptimista = {
-    id: id, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'S', // NUEVO v6.1.0 — tip 3: default S en vez de M
-    x: Math.round(x), y: Math.round(y), zIndex: notasMaxZIndex_() + 1, fijada: false, usuario: emailActual
+    id: id, tipo: tipo, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'S', // NUEVO v6.1.0 — tip 3: default S en vez de M
+    ancho: opts.ancho || null, alto: opts.alto || null, // NUEVO v6.2.0 — solo los usa región
+    x: Math.round(x), y: Math.round(y),
+    // NUEVO v6.2.0 — una región nace atrás de todo automáticamente (piso
+    // de zIndex), el resto sigue naciendo adelante de todo (techo)
+    zIndex: esRegion ? (notasMinZIndex_() - 1) : (notasMaxZIndex_() + 1),
+    fijada: false, usuario: emailActual
   };
   notas.push(notaOptimista);
   notasPendientesCreacion.add(id); // NUEVO v5.1.3 — mientras esté acá, actualizarNotaBackend_ bufferea en vez de llamar al backend
   pintarNotasCanvas();
-  if (!opts.texto) notaEnfocarTexto_(id);
+  if (tipo === 'emoji') {
+    // NUEVO v6.2.0 — foco automático + leyenda del atajo del SO (no se
+    // puede simular Win+./Cmd+Ctrl+Espacio desde el navegador)
+    notaEnfocarTexto_(id);
+    mostrarToast('Escribí o pegá tu emoji (Win + . en Windows, Cmd + Ctrl + Espacio en Mac)');
+  } else if (!opts.texto && !esRegion) {
+    notaEnfocarTexto_(id); // una región recién dibujada no roba el foco — no tiene sentido ahí
+  }
   try {
     const res = await llamarBackend('crearNota', {
       obraId: obraActual.obraId, id: id, texto: notaOptimista.texto, color: notaOptimista.color, tamaño: notaOptimista.tamaño,
-      x: notaOptimista.x, y: notaOptimista.y, email: emailActual
+      x: notaOptimista.x, y: notaOptimista.y, email: emailActual,
+      tipo: notaOptimista.tipo, ancho: notaOptimista.ancho, alto: notaOptimista.alto // NUEVO v6.2.0
     });
     if (!res.ok) throw new Error(res.error || 'crearNota falló');
     const nota = notas.find(function (n) { return n.id === id; });
@@ -3530,10 +3801,37 @@ function wireNotasEventosNotas_() {
     });
   });
   document.querySelectorAll('.nota-texto').forEach(function (div) {
-    div.addEventListener('input', function () { notaAutoajustarTexto_(div.dataset.id); });
+    // NUEVO v6.2.0 — emoji: acota a 1 carácter en vez de autoajustar fuente
+    const nota = notas.find(function (n) { return String(n.id) === String(div.dataset.id); });
+    div.addEventListener('input', function () {
+      if (nota && nota.tipo === 'emoji') { notaEmojiLimitar_(div); return; }
+      notaAutoajustarTexto_(div.dataset.id);
+    });
     div.addEventListener('blur', function () { notaGuardarTexto_(div.dataset.id, div.textContent); });
     div.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); // no arrastra la nota al seleccionar/editar texto
   });
+  // NUEVO v6.2.0 — handle de resize de región (drag distinto del de mover)
+  document.querySelectorAll('.nota-resize-handle').forEach(function (handle) {
+    handle.addEventListener('pointerdown', notaResizeOnPointerDown_);
+  });
+}
+
+// NUEVO v6.2.0 — acota el contenido de una nota tipo emoji a 1 solo
+// carácter (respeta pares subrogados/secuencias de 2 puntos de código,
+// vía Array.from — cubre la enorme mayoría de emojis; secuencias ZWJ
+// muy compuestas, tipo familias con piel+género combinados, pueden
+// partirse, caso raro y aceptado).
+function notaEmojiLimitar_(div) {
+  const chars = Array.from(div.textContent || '');
+  if (chars.length > 1) {
+    div.textContent = chars[0];
+    const range = document.createRange();
+    range.selectNodeContents(div);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
 }
 
 function notaOnPointerDown_(e) {
@@ -3574,6 +3872,45 @@ function notaOnPointerUpDrag_(e) {
   if (!movio) return; // fue un tap/click, no un drag real — no guarda nada
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
   if (nota) actualizarNotaBackend_(id, { x: nota.x, y: nota.y });
+}
+
+// NUEVO v6.2.0 — resize de región, arrastre desde la esquina (handle),
+// distinto del arrastre de mover (notaOnPointerDown_): stopPropagation
+// evita que el mismo pointerdown también dispare el drag de mover.
+function notaResizeOnPointerDown_(e) {
+  e.stopPropagation();
+  const handle = e.currentTarget;
+  const id = handle.dataset.id;
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota || nota.fijada) return;
+  notaSeleccionar_(id);
+  handle.setPointerCapture(e.pointerId);
+  notaResizeState = { id: id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, anchoO: nota.ancho, altoO: nota.alto };
+  handle.addEventListener('pointermove', notaResizeOnPointerMove_);
+  handle.addEventListener('pointerup', notaResizeOnPointerUp_);
+  handle.addEventListener('pointercancel', notaResizeOnPointerUp_);
+}
+function notaResizeOnPointerMove_(e) {
+  if (!notaResizeState || e.pointerId !== notaResizeState.pointerId) return;
+  const dx = (e.clientX - notaResizeState.startX) / notasView.zoom;
+  const dy = (e.clientY - notaResizeState.startY) / notasView.zoom;
+  const nota = notas.find(function (n) { return String(n.id) === String(notaResizeState.id); });
+  if (!nota) return;
+  nota.ancho = Math.max(NOTA_REGION_MIN_PX, Math.round(notaResizeState.anchoO + dx));
+  nota.alto = Math.max(NOTA_REGION_MIN_PX, Math.round(notaResizeState.altoO + dy));
+  const div = document.querySelector('.nota-postit[data-id="' + nota.id + '"]');
+  if (div) { div.style.width = nota.ancho + 'px'; div.style.height = nota.alto + 'px'; }
+}
+function notaResizeOnPointerUp_(e) {
+  if (!notaResizeState || e.pointerId !== notaResizeState.pointerId) return;
+  const handle = e.currentTarget;
+  handle.removeEventListener('pointermove', notaResizeOnPointerMove_);
+  handle.removeEventListener('pointerup', notaResizeOnPointerUp_);
+  handle.removeEventListener('pointercancel', notaResizeOnPointerUp_);
+  const id = notaResizeState.id;
+  notaResizeState = null;
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (nota) actualizarNotaBackend_(id, { ancho: nota.ancho, alto: nota.alto });
 }
 
 function notaGuardarTexto_(id, textoNuevo) {
@@ -3653,6 +3990,14 @@ function notaCerrarMenu_() {
 }
 
 function renderNotaMenuHtml_(nota) {
+  const tipo = nota.tipo || 'postit';
+  // NUEVO v6.2.0 — Color/Tamaño según el tipo (cerrado con Ale): postit
+  // tiene los dos; región solo Color (tinta el marco/relleno, el
+  // tamaño se maneja con el resize); texto libre solo Tamaño (controla
+  // la caja/autoajuste, no tiene fondo que colorear); emoji ninguno
+  // (visual fijo).
+  const mostrarColor = (tipo === 'postit' || tipo === 'region');
+  const mostrarTamaño = (tipo === 'postit' || tipo === 'texto');
   const swatches = PALETA_COLORES_FONDO.map(function (hex) {
     return '<span class="nota-menu-swatch' + (hex.toUpperCase() === String(nota.color || '').toUpperCase() ? ' activo' : '') +
       '" style="background:' + hex + '" onclick="notaCambiarColor_(\'' + nota.id + '\',\'' + hex + '\')"></span>';
@@ -3662,10 +4007,8 @@ function renderNotaMenuHtml_(nota) {
   }).join('');
   return '' +
     '<div class="nota-menu-autor">' + escaparHtml(notaFechaTexto_(nota)) + '</div>' +
-    '<div class="nota-menu-seccion-label">Color</div>' +
-    '<div class="nota-menu-swatches">' + swatches + '</div>' +
-    '<div class="nota-menu-seccion-label">Tamaño</div>' +
-    '<div class="nota-menu-tamaños">' + tamaños + '</div>' +
+    (mostrarColor ? '<div class="nota-menu-seccion-label">Color</div><div class="nota-menu-swatches">' + swatches + '</div>' : '') +
+    (mostrarTamaño ? '<div class="nota-menu-seccion-label">Tamaño</div><div class="nota-menu-tamaños">' + tamaños + '</div>' : '') +
     '<div class="nota-menu-sep"></div>' +
     '<button class="nota-menu-item" onclick="notaDuplicar_(\'' + nota.id + '\')"><i class="ti ti-copy"></i> Duplicar</button>' +
     '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'frente\')"><i class="ti ti-stack-front"></i> Traer al frente</button>' +
@@ -3698,7 +4041,9 @@ function notaDuplicar_(id) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
   if (!nota) return;
   notaCerrarMenu_();
-  notaCrear_(nota.x + 24, nota.y + 24, { texto: nota.texto, color: nota.color, tamaño: nota.tamaño });
+  // NUEVO v6.2.0 — propaga tipo/ancho/alto (si es región, el duplicado
+  // nace con el mismo tamaño y también atrás de todo, por el branch de zIndex de notaCrear_)
+  notaCrear_(nota.x + 24, nota.y + 24, { tipo: nota.tipo, texto: nota.texto, color: nota.color, tamaño: nota.tamaño, ancho: nota.ancho, alto: nota.alto });
 }
 
 function notaZOrden_(id, direccion) {
