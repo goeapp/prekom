@@ -191,12 +191,13 @@ input { font-family: inherit; }
 ───────────────────────────────────────────────── */
 #app { display: none; flex-direction: column; min-height: 100vh; }
 #app-header {
-  height       : var(--header-h);
+  min-height   : var(--header-h);
   background   : var(--accent2);
   display      : flex;
   align-items  : center;
-  padding      : 0 18px;
-  gap          : 12px;
+  flex-wrap    : wrap;
+  padding      : 8px 18px;
+  gap          : 8px 12px;
   flex-shrink  : 0;
   border-bottom: 1px solid rgba(255,255,255,.06);
   position     : sticky;
@@ -693,6 +694,11 @@ input { font-family: inherit; }
   width: 100%; height: 100%; outline: none; overflow: hidden;
   font-family: 'DM Sans', sans-serif; font-weight: 500; color: #1e293b;
   line-height: 1.35; word-break: break-word; white-space: pre-wrap;
+  /* NUEVO v6.1.0 — tip 4: texto centrado horizontal y vertical (antes
+     quedaba arriba a la izquierda). El autoajuste de tamaño de fuente
+     ya existente (notaAutoajustarTexto_) sigue funcionando igual: mide
+     scrollHeight vs clientHeight, no depende del alineado del texto. */
+  display: flex; align-items: center; justify-content: center; text-align: center;
 }
 #notas-menu-contextual {
   position: fixed; z-index: 500; background: var(--surface); border: 1px solid var(--border);
@@ -1220,7 +1226,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v6.0.0';
+const APP_VERSION = 'v6.1.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1674,8 +1680,29 @@ function cambiarObra() {
 // ── BOOT ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', boot);
 
+// NUEVO v6.1.0 — el alto real del header ya no se asume fijo en
+// --header-h (52px hardcodeado): con el header ahora en flex-wrap
+// (puede pasar a 2 líneas en pantallas angostas), se mide su alto
+// real con ResizeObserver y se actualiza la variable CSS en vivo.
+// De esto depende el cálculo de .view-notas (100vh - header-h) para
+// no dejar scroll de página de sobra.
+function iniciarMedicionHeader_() {
+  const header = document.getElementById('app-header');
+  if (!header) return;
+  function medir() {
+    document.documentElement.style.setProperty('--header-h', header.getBoundingClientRect().height + 'px');
+  }
+  medir();
+  if (window.ResizeObserver) {
+    new ResizeObserver(medir).observe(header);
+  } else {
+    window.addEventListener('resize', medir);
+  }
+}
+
 function boot() {
   document.addEventListener('keydown', onKeydownGlobal);
+  iniciarMedicionHeader_();
 
   const sesion = leerSesion();
   if (!sesion || sesionVencidaLocalmente(sesion)) {
@@ -1726,8 +1753,13 @@ function mostrarPantalla(id) {
   document.getElementById('app').style.display = 'none';
   if (id === 'app') {
     document.getElementById('app').style.display = 'flex';
+    // NUEVO v6.1.0 — red de seguridad del fix de scroll en Notas: cada
+    // vista maneja su propio scroll interno, la página en sí nunca
+    // debería necesitar scrollear mientras la app está montada.
+    document.body.style.overflow = 'hidden';
   } else {
     document.getElementById(id).classList.add('visible');
+    document.body.style.overflow = '';
   }
 }
 
@@ -3298,9 +3330,21 @@ function notasCentrarVista() {
   });
   const centroX = (minX + maxX) / 2;
   const centroY = (minY + maxY) / 2;
-  notasView.zoom = 1;
-  notasView.panX = rect.width / 2 - centroX;
-  notasView.panY = rect.height / 2 - centroY;
+  // NUEVO v6.1.0 — "Centrar" ahora hace fit-all: ajusta el zoom para
+  // que entren todas las notas, no solo centra a zoom fijo. Deja un
+  // margen (padding) alrededor del bounding box real, y nunca baja del
+  // mismo piso de zoom permitido en el zoom manual (rueda/pinch/
+  // botones, ver notasAplicarZoom_) — si con ese piso no entran todas,
+  // quedan algunas afuera en vez de romper el límite mínimo. Tampoco
+  // zoomea IN más allá de 100%: si las notas ya entran cómodas, se
+  // queda en zoom 1 en vez de acercar de más.
+  const PADDING_FIT = 60;
+  const anchoContenido = Math.max(1, (maxX - minX) + PADDING_FIT * 2);
+  const altoContenido = Math.max(1, (maxY - minY) + PADDING_FIT * 2);
+  const zoomQueEntraTodo = Math.min(rect.width / anchoContenido, rect.height / altoContenido);
+  notasView.zoom = Math.min(1, Math.max(0.3, zoomQueEntraTodo));
+  notasView.panX = rect.width / 2 - centroX * notasView.zoom;
+  notasView.panY = rect.height / 2 - centroY * notasView.zoom;
   aplicarTransformNotas_();
 }
 
@@ -3384,7 +3428,7 @@ function notasOnDblClick_(e) {
   const rect = e.currentTarget.getBoundingClientRect();
   const canvasX = (e.clientX - rect.left - notasView.panX) / notasView.zoom;
   const canvasY = (e.clientY - rect.top - notasView.panY) / notasView.zoom;
-  notaCrear_(canvasX - 100, canvasY - 100); // centra la nota (tamaño M=200) en el punto clickeado
+  notaCrear_(canvasX - 70, canvasY - 70); // NUEVO v6.1.0 — centra la nota (default S=140) en el punto clickeado
 }
 
 function notaCrearEnCentro_() {
@@ -3392,7 +3436,7 @@ function notaCrearEnCentro_() {
   const rect = board.getBoundingClientRect();
   const canvasX = (rect.width / 2 - notasView.panX) / notasView.zoom;
   const canvasY = (rect.height / 2 - notasView.panY) / notasView.zoom;
-  notaCrear_(canvasX - 100, canvasY - 100);
+  notaCrear_(canvasX - 70, canvasY - 70); // NUEVO v6.1.0 — centra la nota (default S=140) en el centro del tablero
 }
 
 function notasMaxZIndex_() {
@@ -3414,7 +3458,7 @@ async function notaCrear_(x, y, opts) {
   opts = opts || {};
   const id = notaGenerarId_(); // NUEVO v5.1.3 — este ID ya es el definitivo, no se reemplaza después
   const notaOptimista = {
-    id: id, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'M',
+    id: id, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'S', // NUEVO v6.1.0 — tip 3: default S en vez de M
     x: Math.round(x), y: Math.round(y), zIndex: notasMaxZIndex_() + 1, fijada: false, usuario: emailActual
   };
   notas.push(notaOptimista);
