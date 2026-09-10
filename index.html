@@ -1220,7 +1220,7 @@ input { font-family: inherit; }
 // ============================================================
 
 // ── CONFIG ──────────────────────────────────────────────────
-const APP_VERSION = 'v5.1.3';
+const APP_VERSION = 'v6.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1931,30 +1931,29 @@ async function mostrarApp() {
   document.getElementById('btn-nav-notas').disabled = true;
 
   try {
-    const [resArbol, resLinks, resConfig, resListas, resGrupos, resValores, resFavoritos, resPermisos, resComentariosContenido] = await Promise.all([
-      llamarBackend('leerArbolContenido', { obraId: obraActual.obraId }),
-      llamarBackend('leerLinks', { obraId: obraActual.obraId }),
-      llamarBackend('leerConfigObra', { obraId: obraActual.obraId }),
-      llamarBackend('listarListas', { obraId: obraActual.obraId }),
-      llamarBackend('listarGrupos', { obraId: obraActual.obraId }),
-      llamarBackend('leerListaValores', { obraId: obraActual.obraId }),
-      llamarBackend('leerFavoritos', { obraId: obraActual.obraId, email: emailActual }),
-      llamarBackend('verificarPermisosObra', { obraId: obraActual.obraId, email: emailActual }),
-      // NUEVO v4.0.0 (batch 3) — precarga completa para badges de comentarios + búsqueda (a)/(c)
-      llamarBackend('leerComentariosContenidoObra', { obraId: obraActual.obraId })
-    ]);
+    // NUEVO v6.0.0 — antes eran 9 llamadas simultáneas por Promise.all
+    // (leerArbolContenido/leerLinks/leerConfigObra/listarListas/
+    // listarGrupos/leerListaValores/leerFavoritos/
+    // verificarPermisosObra/leerComentariosContenidoObra), cada una
+    // reabriendo el Maestro y el Sheet de la obra desde cero en el
+    // backend: si UNA sola fallaba o tardaba, las 9 caían juntas acá
+    // abajo y se veía el mismo cartel genérico (parecía aleatorio).
+    // Fix de raíz: una sola llamada a 'inicializarObra', que abre el
+    // Maestro y el Sheet de obra una única vez del lado del backend.
+    const res = await llamarBackend('inicializarObra', { obraId: obraActual.obraId, email: emailActual });
+    if (!res.ok) throw new Error(res.error || 'inicializarObra falló');
 
-    arbol = (resArbol.ok && resArbol.arbol) ? resArbol.arbol : [];
-    comentariosContenido = (resComentariosContenido.ok && resComentariosContenido.comentarios) ? resComentariosContenido.comentarios : [];
-    links = (resLinks.ok && resLinks.links) ? resLinks.links : [];
-    configObra = (resConfig.ok && resConfig.config) ? resConfig.config : null;
-    listasIndex = (resListas.ok && resListas.listas) ? resListas.listas : [];
-    gruposIndex = (resGrupos.ok && resGrupos.grupos) ? resGrupos.grupos : []; // NUEVO v3.1.0
-    valoresListas = (resValores.ok && resValores.valores) ? resValores.valores : [];
-    favoritosActuales = (resFavoritos.ok && resFavoritos.favoritos) ? resFavoritos.favoritos : [];
+    arbol = res.arbol || [];
+    comentariosContenido = res.comentariosContenido || [];
+    links = res.links || [];
+    configObra = res.config || null;
+    listasIndex = res.listas || [];
+    gruposIndex = res.grupos || []; // NUEVO v3.1.0
+    valoresListas = res.valores || [];
+    favoritosActuales = res.favoritos || [];
     // v2.02 — permisos de ESTA obra puntual, no un flag global
-    puedeEditarContenido = !!(resPermisos.ok && resPermisos.permisos && resPermisos.permisos.puedeEditarContenido);
-    puedeEditarListas = !!(resPermisos.ok && resPermisos.permisos && resPermisos.permisos.puedeEditarListas);
+    puedeEditarContenido = !!(res.permisos && res.permisos.puedeEditarContenido);
+    puedeEditarListas = !!(res.permisos && res.permisos.puedeEditarListas);
 
     document.getElementById('hdr-obra-nombre').textContent =
       (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
