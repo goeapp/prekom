@@ -51,6 +51,12 @@ body {
   font-size  : 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* FIX v7.1.1 — la app nunca tuvo scroll horizontal de página como
+     funcionalidad real, en ninguna vista; declarado acá de forma
+     permanente en vez de depender de que cada vista no desborde por su
+     cuenta. El overflow:hidden de marcarNavActiva() (acotado a Notas)
+     sigue aparte, para el scroll vertical. */
+  overflow-x: hidden;
 }
 button { font-family: inherit; cursor: pointer; }
 a { color: inherit; }
@@ -1287,7 +1293,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.0';
+const APP_VERSION = 'v7.1.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2580,7 +2586,7 @@ async function onDragEndListaGrupo_(evt) {
 // Devuelve true/false (éxito) — los llamados de rollback existentes lo
 // ignoran a propósito (se quedan con el último estado conocido en
 // silencio), el botón Actualizar sí lo usa para avisar si falló.
-async function recargarListasYGrupos_() {
+async function recargarListasYGrupos_(reintentando) {
   try {
     const [resListas, resGrupos, resFavoritos] = await Promise.all([
       llamarBackend('listarListas', { obraId: obraActual.obraId }),
@@ -2592,7 +2598,14 @@ async function recargarListasYGrupos_() {
     favoritosActuales = (resFavoritos.ok && resFavoritos.favoritos) ? resFavoritos.favoritos : favoritosActuales;
     return true;
   } catch (err) {
-    return false; // si falla también la recarga, se queda con el último estado conocido
+    // FIX v7.1.1 — la misma latencia intermitente de Apps Script que ya
+    // se vio (y se resolvió) en la carga inicial de la obra afecta acá
+    // también, porque esta función sigue haciendo 3 llamadas en
+    // paralelo en vez de 1 consolidada. Mientras tanto, 1 reintento
+    // automático antes de reportar falla (reportado por Ale: un
+    // reintento manual solía andar).
+    if (!reintentando) return recargarListasYGrupos_(true);
+    return false; // si falla también el reintento, se queda con el último estado conocido
   }
 }
 
@@ -3297,7 +3310,11 @@ async function renderNotasHub() {
   wireNotasBoard_();
   aplicarTransformNotas_();
   await cargarNotas();
-  notasCentrarVista(); // NUEVO v7.1.0 — fit-all automático al entrar a la vista, sin esperar clic manual en "Centrar"
+  // FIX v7.1.1 — antes llamaba a notasCentrarVista() sin chequear si el
+  // usuario ya había navegado a otra vista mientras cargaba (Contenido/
+  // Listas); en ese caso #notas-board ya no existe en el DOM y explotaba
+  // como "Cannot read properties of null" (reportado por Ale).
+  if (vistaActual === 'notas') notasCentrarVista();
 }
 
 function renderNotasEsqueleto_() {
@@ -3492,6 +3509,7 @@ function notaDimensiones_(n) {
 
 function notasCentrarVista() {
   const board = document.getElementById('notas-board');
+  if (!board) return; // FIX v7.1.1 — red de seguridad extra si se llama sin la vista Notas montada
   const rect = board.getBoundingClientRect();
   if (notas.length === 0) {
     notasView = { panX: 0, panY: 0, zoom: 1 };
