@@ -491,14 +491,17 @@ input { font-family: inherit; }
 .hdr-nav-btn:disabled { opacity: .4; cursor: not-allowed; }
 .hdr-nav-btn:disabled:hover { border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.6); }
 
-/* Favoritos — franja fija arriba del todo del Home de Listas */
-.favoritos-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+/* NUEVO v7.1.0 — wrapper del botón Actualizar + franja de favoritos del
+   Home de Listas; el borde/margen inferior que antes tenía cada uno por
+   separado ahora vive acá, una sola vez para la fila completa. */
+.listas-toolbar { display: flex; align-items: center; gap: 16px; padding-bottom: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.favoritos-strip { display: flex; gap: 8px; overflow-x: auto; flex: 1; min-width: 0; }
 .favorito-chip {
   display: flex; align-items: center; gap: 6px; background: var(--tag-bg); border: 1.5px solid var(--accent-border);
   color: var(--tag-fg); border-radius: 99px; padding: 6px 14px; font-size: .78rem; font-weight: 700; white-space: nowrap; cursor: pointer;
 }
 .favorito-chip:hover { background: #fde9c2; }
-.favoritos-vacio { font-size: .78rem; color: var(--muted); padding: 6px 0 14px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+.favoritos-vacio { font-size: .78rem; color: var(--muted); flex: 1; }
 
 /* Cards de lista (reutiliza .cards-grid / .card del Home de Módulo 1) */
 .card-lista { position: relative; }
@@ -769,9 +772,11 @@ input { font-family: inherit; }
 .nota-menu-danger { color: var(--danger); }
 .nota-menu-autor { font-size: .68rem; color: var(--muted); line-height: 1.4; margin-bottom: 8px; } /* NUEVO v5.1.1 */
 
-/* NUEVO v5.1.1 — spinner en botones de la toolbar de Notas mientras cargan */
+/* NUEVO v5.1.1 — spinner en botones de toolbar mientras cargan.
+   Generalizado en v7.1.0 (antes solo .notas-toolbar) para reusarlo en
+   el botón Actualizar de Listas. */
 @keyframes notas-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.notas-toolbar button.cargando i { display: inline-block; animation: notas-spin .8s linear infinite; }
+.btn-toolbar.cargando i { display: inline-block; animation: notas-spin .8s linear infinite; }
 .btn-toolbar:disabled { opacity: .55; cursor: not-allowed; }
 .btn-toolbar:disabled:hover { border-color: var(--border); color: inherit; }
 .contenido-buscador-limpiar {
@@ -1282,7 +1287,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.0.0';
+const APP_VERSION = 'v7.1.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1813,10 +1818,11 @@ function mostrarPantalla(id) {
   document.getElementById('app').style.display = 'none';
   if (id === 'app') {
     document.getElementById('app').style.display = 'flex';
-    // NUEVO v6.1.0 — red de seguridad del fix de scroll en Notas: cada
-    // vista maneja su propio scroll interno, la página en sí nunca
-    // debería necesitar scrollear mientras la app está montada.
-    document.body.style.overflow = 'hidden';
+    // v6.1.0 aplicaba acá un overflow:hidden global "de red de
+    // seguridad" pensado solo para Notas, pero corría para las 4
+    // vistas y le sacaba el scroll de página a Contenido/Listas (que
+    // sí lo necesitan, no tienen alto propio). Movido a
+    // marcarNavActiva() en v7.1.0, acotado a la vista Notas.
   } else {
     document.getElementById(id).classList.add('visible');
     document.body.style.overflow = '';
@@ -2010,6 +2016,11 @@ function marcarNavActiva(vista) {
   // desactiva acá para que cualquier navegación de salida lo saque.
   document.getElementById('main-view').classList.toggle('view-notas', vista === 'notas');
   if (vista !== 'notas') { notaCerrarMenu_(); notaSeleccionadaId = null; } // NUEVO v5.1.1 — no arrastrar selección entre vistas
+  // NUEVO v7.1.0 — red de seguridad del fix de scroll de Notas (v6.1.0),
+  // reubicada acá y acotada a la vista Notas: antes corría para toda la
+  // app (ver mostrarPantalla) y le sacaba el scroll de página a
+  // Contenido/Listas, que sí lo necesitan.
+  document.body.style.overflow = (vista === 'notas') ? 'hidden' : '';
 }
 
 function destruirTablaSiExiste() {
@@ -2389,24 +2400,31 @@ function renderListasHub() {
   destruirTablaSiExiste();
   destruirSortablesListasHub_();
 
-  if (!listasIndex.length) {
-    document.getElementById('main-view').innerHTML = '<div class="estado-vacio">Todavía no hay listas creadas para esta obra.<br>Creá una desde el menú "PreKOM Admin" del Sheet ("Crear nueva lista").</div>';
-    return;
-  }
-
   let html = '';
 
-  // Franja de favoritos — siempre visible arriba de todo, en el
-  // orden guardado (favoritosActuales ya viene ordenado del backend)
+  // NUEVO v7.1.0 — toolbar con el botón Actualizar + franja de
+  // favoritos, envueltos juntos en .listas-toolbar. Se pinta SIEMPRE,
+  // incluso sin listas todavía, para poder refrescar si se cargó una
+  // lista nueva directo en el Sheet (antes el early-return de abajo
+  // dejaba a la obra sin forma de refrescar desde la PWA).
   const favoritas = favoritosActuales
     .map(function (nt) { return listasIndex.find(function (l) { return l.nombreTab === nt; }); })
     .filter(Boolean);
+  html += '<div class="listas-toolbar">';
+  html += '<button class="btn-toolbar" id="btn-listas-actualizar" onclick="actualizarListasHub_()"><i class="ti ti-refresh"></i> Actualizar</button>';
   if (favoritas.length) {
     html += '<div class="favoritos-strip" id="favoritos-strip">' + favoritas.map(function (l) {
       return '<span class="favorito-chip" data-nombretab="' + l.nombreTab + '" onclick="abrirLista(\'' + l.nombreTab + '\')">★ ' + escaparHtml(l.nombreVisible) + '</span>';
     }).join('') + '</div>';
   } else {
     html += '<div class="favoritos-vacio" id="favoritos-strip">Todavía no marcaste ninguna lista como favorita.</div>';
+  }
+  html += '</div>';
+
+  if (!listasIndex.length) {
+    html += '<div class="estado-vacio">Todavía no hay listas creadas para esta obra.<br>Creá una desde el menú "PreKOM Admin" del Sheet ("Crear nueva lista").</div>';
+    document.getElementById('main-view').innerHTML = html;
+    return;
   }
 
   // Grupos: SIEMPRE se pintan todos los del catálogo _ListasGrupos —
@@ -2557,7 +2575,11 @@ async function onDragEndListaGrupo_(evt) {
 
 // Recarga listasIndex/gruposIndex/favoritosActuales desde el backend
 // — usado para volver a un estado consistente si un drag falla
-// (permiso denegado a mitad de sesión, red caída, etc.)
+// (permiso denegado a mitad de sesión, red caída, etc.) y, desde
+// v7.1.0, también por el botón Actualizar de Listas.
+// Devuelve true/false (éxito) — los llamados de rollback existentes lo
+// ignoran a propósito (se quedan con el último estado conocido en
+// silencio), el botón Actualizar sí lo usa para avisar si falló.
 async function recargarListasYGrupos_() {
   try {
     const [resListas, resGrupos, resFavoritos] = await Promise.all([
@@ -2568,7 +2590,21 @@ async function recargarListasYGrupos_() {
     listasIndex = (resListas.ok && resListas.listas) ? resListas.listas : listasIndex;
     gruposIndex = (resGrupos.ok && resGrupos.grupos) ? resGrupos.grupos : gruposIndex;
     favoritosActuales = (resFavoritos.ok && resFavoritos.favoritos) ? resFavoritos.favoritos : favoritosActuales;
-  } catch (err) { /* si falla también la recarga, se queda con el último estado conocido */ }
+    return true;
+  } catch (err) {
+    return false; // si falla también la recarga, se queda con el último estado conocido
+  }
+}
+
+// NUEVO v7.1.0 — handler del botón Actualizar del Home de Listas:
+// releer listas+grupos+favoritos (mismo criterio que la carga inicial
+// de esta vista) y re-renderizar.
+async function actualizarListasHub_() {
+  const btn = document.getElementById('btn-listas-actualizar');
+  if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
+  const ok = await recargarListasYGrupos_();
+  renderListasHub(); // repinta con lo nuevo (o lo último conocido si falló) — esto ya reconstruye el botón en estado normal
+  if (!ok) mostrarToast('No se pudo actualizar Listas');
 }
 
 async function toggleFavorito(nombreTab) {
@@ -3261,6 +3297,7 @@ async function renderNotasHub() {
   wireNotasBoard_();
   aplicarTransformNotas_();
   await cargarNotas();
+  notasCentrarVista(); // NUEVO v7.1.0 — fit-all automático al entrar a la vista, sin esperar clic manual en "Centrar"
 }
 
 function renderNotasEsqueleto_() {
