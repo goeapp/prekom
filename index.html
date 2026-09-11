@@ -912,6 +912,14 @@ input { font-family: inherit; }
 </div>
 
 <!-- ═══════════════ MODAL — Editar Resumen (Quill) ═══════════════ -->
+<!-- DECISIÓN DE DISEÑO v8.0.0 (confirmada con Ale): este overlay NO
+     lleva onclick de cierre por click afuera, a diferencia de
+     dialogo-overlay/comentarios-overlay más abajo. Es intencional:
+     mientras el guardado está en vuelo, un cierre accidental por click
+     afuera no debe interrumpir ni "abortar" nada. Cerrar solo por la X
+     o por Cancelar. Si en el futuro se agrega backdrop-click a algún
+     modal del stack, este (y modal-color/modal-links) quedan afuera a
+     propósito. -->
 <div class="modal-overlay hidden" id="modal-editar">
   <div class="modal-box wide">
     <div class="modal-head">
@@ -929,6 +937,8 @@ input { font-family: inherit; }
 </div>
 
 <!-- ═══════════════ MODAL — Color de fondo del nodo (v2.00) ═══════════════ -->
+<!-- DECISIÓN DE DISEÑO v8.0.0: sin cierre por click afuera, a propósito
+     — ver comentario igual en modal-editar más arriba. -->
 <div class="modal-overlay hidden" id="modal-color">
   <div class="modal-box">
     <div class="modal-head">
@@ -958,6 +968,8 @@ input { font-family: inherit; }
 <div id="toast" class="toast"></div>
 
 <!-- ═══════════════ MODAL — Links de la obra ═══════════════ -->
+<!-- DECISIÓN DE DISEÑO v8.0.0: sin cierre por click afuera, a propósito
+     — ver comentario igual en modal-editar más arriba. -->
 <div class="modal-overlay hidden" id="modal-links">
   <div class="modal-box">
     <div class="modal-head">
@@ -1283,7 +1295,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.7';
+const APP_VERSION = 'v8.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2405,12 +2417,20 @@ document.getElementById('btn-cancelar-editar').addEventListener('click', cerrarE
 document.getElementById('btn-guardar-editar').addEventListener('click', async function () {
   if (!puntoEnEdicion) return;
   const html = quill.root.innerHTML;
+  // FIX v8.0.0 — se captura el punto en una variable local ANTES del
+  // await. Si el usuario cierra el modal con la X mientras el guardado
+  // sigue en vuelo, cerrarEditor() pone la variable global
+  // puntoEnEdicion en null; sin esta captura, el guardado en el
+  // backend terminaba OK pero la actualización del árbol en memoria
+  // se perdía (buscaba el nodo con punto===null y no lo encontraba),
+  // dejando el cambio visible recién en el próximo refresh.
+  const puntoGuardado = puntoEnEdicion;
 
   this.disabled = true;
   try {
     const res = await llamarBackend('guardarResumen', {
       obraId: obraActual.obraId,
-      punto: puntoEnEdicion,
+      punto: puntoGuardado,
       resumen: html,
       email: emailActual
     });
@@ -2419,10 +2439,13 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
       this.disabled = false;
       return;
     }
-    const nodo = arbol.find(function (n) { return n.punto === puntoEnEdicion; });
+    const nodo = arbol.find(function (n) { return n.punto === puntoGuardado; });
     if (nodo) nodo.resumen = html;
-    cerrarEditor();
-    renderNodo(nodo);
+    // Si el modal ya se cerró (X durante el guardado), no lo volvemos a
+    // abrir ni tocamos su estado — solo actualizamos el árbol en memoria
+    // y, si el nodo sigue siendo el que se está mostrando, su card.
+    if (puntoEnEdicion === puntoGuardado) cerrarEditor();
+    if (nodo) renderNodo(nodo);
   } catch (err) {
     mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
@@ -2651,15 +2674,13 @@ async function recargarListasYGrupos_() {
     favoritosActuales = (resFavoritos.ok && resFavoritos.favoritos) ? resFavoritos.favoritos : favoritosActuales;
     return true;
   } catch (err) {
-    // NUEVO v7.1.7 — se saca el reintento propio de v7.1.1 (llamarse a
-    // sí misma), que quedó redundante desde que llamarBackend() (v7.1.5)
-    // ya reintenta internamente listarListas/listarGrupos/leerFavoritos
-    // una por una. Mantener los dos niveles apilaba hasta 12 pedidos al
-    // backend por un solo click (3 en paralelo × reintento interno × el
-    // reintento de esta función repitiendo las 3 de nuevo) — carga
-    // autoinfligida que BDC, sin ningún reintento propio en el
-    // frontend, nunca genera.
-    return false; // se queda con el último estado conocido
+    // FIX v7.1.7 — se saca el reintento propio (llamarse a sí misma) que
+    // tenía esta función desde v7.1.1: quedó redundante porque
+    // llamarBackend() (v7.1.5) ya reintenta cada una de las 3 llamadas
+    // individualmente. Repetirlas Y ADEMÁS reintentar el conjunto entero
+    // apilaba hasta 12 POST por un solo click. Ahora: 1 solo intento del
+    // conjunto (cada llamada ya protegida por dentro).
+    return false; // si falla, se queda con el último estado conocido
   }
 }
 
@@ -2787,11 +2808,10 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
     destruirTablaSiExiste();
     montarTabulator(nombreTab, schemaListaAbierta, datos);
   } catch (err) {
-    // NUEVO v7.1.7 — se saca el reintento propio de v7.1.2 (llamarse a
-    // sí misma), redundante desde que llamarBackend() (v7.1.5) ya
-    // reintenta internamente leerListaSchema/leerListaDatos una por
-    // una. Mismo motivo que recargarListasYGrupos_ — evita apilar dos
-    // niveles de reintento sobre las mismas 2 llamadas en paralelo.
+    // FIX v7.1.7 — se saca el reintento propio (llamarse a sí misma) que
+    // tenía esta función desde v7.1.2, redundante desde que
+    // llamarBackend() (v7.1.5) ya reintenta cada una de las 2 llamadas
+    // individualmente. Ahora: 1 solo intento del conjunto.
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
     } else {
