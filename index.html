@@ -1283,7 +1283,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.4';
+const APP_VERSION = 'v7.1.5';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1679,18 +1679,38 @@ function mostrarToast(mensaje) {
 }
 
 // ── HELPERS DE FETCH ────────────────────────────────────────
-// NUEVO v7.1.4 — antes era un fetch pelado, sin timeout, y el error
-// real se perdía en cada catch (nunca se logueaba). El único síntoma
-// visible era un cartel genérico "revisá tu conexión", aunque la causa
-// real fuera un timeout del backend, un HTTP de error, o JSON inválido
-// — imposible de diagnosticar después. Ahora: 1) si no hay conexión
-// real, se detecta antes de salir a la red; 2) timeout explícito
-// (20s) en vez de depender del timeout (larguísimo) del navegador;
-// 3) cada causa tiene su propio mensaje para el usuario; 4) el error
-// real queda siempre en consola con la action y los params.
+// v7.1.4 — timeout explícito (20s) + navigator.onLine + mensaje
+// diferenciado por causa + console.error siempre con action+params.
+// NUEVO v7.1.5 — dos cambios más, tras comparar contra BDC (que
+// nunca mostró este síntoma) y varias fallas reales documentadas en
+// Ejecuciones de Apps Script (doGet colándose donde se esperaba
+// doPost — comportamiento intermitente conocido de la plataforma,
+// no de este código):
+// 1) Content-Type explícito 'text/plain;charset=utf-8' — mismo
+//    criterio que BDC (evita depender del default implícito del
+//    navegador, aunque en teoría da el mismo valor en la práctica).
+// 2) 1 reintento automático y silencioso, pero SOLO para acciones
+//    seguras de repetir (lecturas + sobrescrituras — mismo resultado
+//    final si se repiten). Deja afuera a propósito lo que "agrega"
+//    (comentarios, filas nuevas de Listas: un retry ciego podría
+//    duplicar si el pedido original sí había llegado a guardarse) y
+//    el login (solicitarPIN/validarPIN: no se reintentan solos para
+//    no gastar intentos fallidos ni reenviar un PIN sin que el
+//    usuario lo sepa). crearNota/actualizarNota ya tienen su propio
+//    reintento dedicado vía notaLlamarGuardado_, sin cambios acá.
+const ACCIONES_SEGURAS_REINTENTO = new Set([
+  'inicializarObra', 'listarObras', 'listarGrupos', 'listarListas',
+  'leerListaSchema', 'leerListaDatos', 'leerListaValores', 'leerFavoritos',
+  'leerComentarios', 'leerComentariosContenidoObra', 'leerNotas',
+  'validarSesion', 'guardarResumen', 'guardarColorFondo',
+  'moverListaAGrupo', 'ocultarComentario', 'ocultarComentarioContenido',
+  'ocultarNota', 'marcarFavorito', 'desmarcarFavorito',
+  'reordenarFavoritos', 'reordenarListasEnGrupo'
+]);
+
 const LLAMAR_BACKEND_TIMEOUT_MS = 20000;
 
-async function llamarBackend(action, params) {
+async function llamarBackend(action, params, reintentando) {
   const body = Object.assign({ action: action }, params || {});
 
   if (!navigator.onLine) {
@@ -1702,28 +1722,42 @@ async function llamarBackend(action, params) {
   const timeoutId = setTimeout(function () { controller.abort(); }, LLAMAR_BACKEND_TIMEOUT_MS);
   let resp;
   try {
-    resp = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body), signal: controller.signal });
+    resp = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS — mismo criterio que BDC
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
   } catch (fetchErr) {
     clearTimeout(timeoutId);
-    if (fetchErr.name === 'AbortError') {
-      console.error('[llamarBackend]', action, params, '— timeout tras', LLAMAR_BACKEND_TIMEOUT_MS, 'ms');
-      throw new Error('El backend tardó demasiado en responder (más de ' + (LLAMAR_BACKEND_TIMEOUT_MS / 1000) + 's). Probá de nuevo.');
-    }
-    console.error('[llamarBackend]', action, params, fetchErr);
-    throw new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.');
+    const err = fetchErr.name === 'AbortError'
+      ? new Error('El backend tardó demasiado en responder (más de ' + (LLAMAR_BACKEND_TIMEOUT_MS / 1000) + 's). Probá de nuevo.')
+      : new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.');
+    return llamarBackendManejarFallo_(action, params, reintentando, err);
   }
   clearTimeout(timeoutId);
 
   if (!resp.ok) {
-    console.error('[llamarBackend]', action, params, '— HTTP', resp.status);
-    throw new Error('El backend respondió con un error (HTTP ' + resp.status + ').');
+    return llamarBackendManejarFallo_(action, params, reintentando, new Error('El backend respondió con un error (HTTP ' + resp.status + ').'));
   }
   try {
     return await resp.json();
   } catch (parseErr) {
-    console.error('[llamarBackend]', action, params, parseErr);
-    throw new Error('El backend devolvió una respuesta inválida.');
+    return llamarBackendManejarFallo_(action, params, reintentando, new Error('El backend devolvió una respuesta inválida.'));
   }
+}
+
+// NUEVO v7.1.5 — punto único de manejo de fallas de llamarBackend():
+// loguea siempre, y si la action es segura de repetir y todavía no
+// reintentamos, espera un instante y reintenta 1 sola vez antes de
+// propagar el error al llamador.
+async function llamarBackendManejarFallo_(action, params, reintentando, errorClasificado) {
+  console.error('[llamarBackend]', action, params, '—', errorClasificado.message);
+  if (!reintentando && ACCIONES_SEGURAS_REINTENTO.has(action)) {
+    await new Promise(function (r) { setTimeout(r, 700); });
+    return llamarBackend(action, params, true);
+  }
+  throw errorClasificado;
 }
 
 // ── SESIÓN (localStorage) — mismo patrón que BDC ────────────
