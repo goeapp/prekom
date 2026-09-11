@@ -12,10 +12,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/css/tabulator_simple.min.css" rel="stylesheet">
+<!-- v8.1.0 — Tabulator sale de Listas (CRUD pasa a modal, la tabla queda
+     de solo lectura); entra DataTables, mismo patrón/versión que ya usan
+     LibroObra y PdTT en el stack (jQuery + DOM-sourced). -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.11/css/jquery.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.11/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.1/dist/js/tabulator.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
 /* ─────────────────────────────────────────────────
@@ -390,7 +394,8 @@ input { font-family: inherit; }
 /* Modales de edición y links (propios de PreKOM) */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
 .modal-box { background: var(--surface); border-radius: 14px; width: 100%; max-width: 420px; box-shadow: var(--shadow-md); overflow: hidden; }
-.modal-box.wide { max-width: min(1100px, 92vw); }
+.modal-box.wide { max-width: min(1100px, 92vw); max-height: 88vh; display: flex; flex-direction: column; }
+.modal-box.wide .modal-body { overflow-y: auto; }
 
 /* v3.0.0 — modal genérico (mostrarConfirm/mostrarAviso) y toast
    (mostrarToast), portados tal cual de index_bdc_v6_0_0.html —
@@ -556,39 +561,55 @@ input { font-family: inherit; }
 .btn-toolbar.principal { background: var(--accent); border-color: var(--accent-border); color: #fff; }
 .btn-toolbar.principal:hover { background: #b45309; color: #fff; }
 
-/* Tabulator — retema para calzar con los tokens del stack */
-.tabulator { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; box-shadow: var(--shadow); }
-.tabulator .tabulator-header { background: transparent !important; border-bottom: none; }
-/* v3.0.1 — el header sticky vía CSS (v3.0.0) chocaba con el cálculo
-   interno de posiciones de Tabulator y rompía la grilla (fila 1
-   tapada). Revertido: el header sticky ahora se logra 100% nativo,
-   dándole altura fija a la tabla (ver montarTabulator) — Tabulator
-   ya resuelve el fijado de header + scroll interno del body solo con
-   eso, sin ningún truco de CSS. */
-.tabulator .tabulator-header { background: transparent !important; border-bottom: none; }
-.tabulator .tabulator-col { background: var(--accent2) !important; border-right: 1px solid rgba(255,255,255,.08); }
-.tabulator .tabulator-col-title,
-.tabulator .tabulator-col-title-holder,
-.tabulator .tabulator-col-content { color: #fff !important; background: transparent !important; padding: 5px 10px !important; }
-.tabulator .tabulator-header-filter { padding: 0 6px 6px !important; }
-.tabulator .tabulator-header-filter input, .tabulator .tabulator-header-filter select {
-  width: 100%; border: 1px solid rgba(255,255,255,.3); border-radius: 4px; padding: 3px 6px;
-  font-size: 11px; background: #1e293b; color: #fff;
+/* DataTables — retema para calzar con los tokens del stack (v8.1.0,
+   mismo patrón que LibroObra/PdTT: tabla de solo lectura, sin edición
+   inline — el CRUD vive en la modal de alta/edición más abajo). */
+.tabla-lista-wrap { margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 14px 14px; }
+.dataTables_wrapper { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); }
+table.dataTable { width: 100% !important; border-collapse: collapse !important; }
+table.dataTable thead th {
+  background: var(--accent2) !important; color: #fff !important; font-weight: 600 !important;
+  font-size: 12px; padding: 7px 10px !important; border-bottom: none !important; white-space: nowrap;
 }
-.tabulator .tabulator-header-filter select option { color: var(--text); background: var(--surface); }
-.tabulator .tabulator-col-title { font-weight: 600 !important; font-size: 12px; }
-.tabulator .tabulator-col.tabulator-sortable:hover { background: #1e293b !important; }
-.tabulator-row { background: var(--surface); border-bottom: 1px solid var(--border); }
-.tabulator-row.tabulator-row-even { background: #fafbfc; }
-.tabulator-row:hover { background: #fffbeb; }
-.tabulator .tabulator-cell { border-right: 1px solid var(--border); padding: 7px 10px; }
-.tabulator-row .tabulator-cell.tabulator-editing input,
-.tabulator-row .tabulator-cell.tabulator-editing textarea,
-.tabulator-row .tabulator-cell.tabulator-editing select { border: 1.5px solid var(--accent); border-radius: 4px; font-family: inherit; }
+table.dataTable thead th.sorting:hover { background: #1e293b !important; }
+table.dataTable tbody tr { background: var(--surface); }
+table.dataTable tbody tr.odd { background: #fafbfc; }
+table.dataTable tbody tr:hover td { background: #fffbeb !important; }
+table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; padding: 7px 10px !important; }
+.dataTables_wrapper .dataTables_length select {
+  border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 12px; margin: 0 4px;
+}
+.dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { font-size: .75rem; color: var(--muted); margin-top: 10px; }
+.dataTables_wrapper .dataTables_paginate .paginate_button { border-radius: var(--radius-sm) !important; font-size: .78rem !important; padding: 3px 8px !important; }
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+  background: var(--accent) !important; border-color: var(--accent-border) !important; color: #fff !important;
+}
+/* Fila de filtros por columna (listaValores_*), segunda fila del thead */
+.dt-filtros-fila th { background: var(--surface) !important; padding: 4px 8px !important; }
+.dt-filtro-col { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 3px 4px; font-size: 11px; color: var(--text); background: var(--surface); }
 .tag-valor { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; }
-.btn-borrar-fila { background: none; border: none; color: #dc2626; font-size: 15px; padding: 0 4px; }
+.btn-fila-accion { background: none; border: none; font-size: 14px; padding: 0 5px; cursor: pointer; }
+.btn-editar-fila { color: var(--accent); }
+.btn-editar-fila:hover { color: #b45309; }
+.btn-borrar-fila { color: #dc2626; }
 .btn-borrar-fila:hover { color: #991b1b; }
-.tabulator-wrap { margin-top: 4px; }
+
+/* Modal de alta/edición de fila (Listas, v8.1.0) — formulario armado
+   dinámicamente desde el schema de cada lista. modal-body ya trae
+   scroll propio (ver .modal-body en la base del stack); acá solo el
+   contenido interno del formulario. */
+.form-campo { margin-bottom: 14px; }
+.form-campo label { display: block; font-size: .78rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.form-campo .req-marca { color: #dc2626; margin-left: 2px; }
+.form-campo input, .form-campo select, .form-campo textarea {
+  width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  padding: 8px 10px; font-size: .85rem; font-family: inherit; color: var(--text);
+}
+.form-campo input:focus, .form-campo select:focus, .form-campo textarea:focus { outline: none; border-color: var(--accent); }
+.form-campo textarea { min-height: 70px; resize: vertical; }
+.form-campo input:disabled, .form-campo select:disabled { background: #f1f5f9; color: var(--muted); cursor: not-allowed; }
+.form-campo.con-error input, .form-campo.con-error select, .form-campo.con-error textarea { border-color: #dc2626; }
+.form-campo-error { color: #dc2626; font-size: .72rem; margin-top: 3px; }
 .buscador-wrap { position: relative; display: inline-block; }
 .input-buscador-inline {
   width: 200px; padding: 7px 26px 7px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
@@ -982,6 +1003,28 @@ input { font-family: inherit; }
   </div>
 </div>
 
+<!-- ═══════════════ MODAL — Alta/Edición de fila (Listas, v8.1.0) ═══════════════ -->
+<!-- DECISIÓN DE DISEÑO v8.0.0/v8.1.0: sin cierre por click afuera, a
+     propósito — ver comentario igual en modal-editar más arriba.
+     Además: mientras el guardado está en vuelo, TODO el modal queda
+     bloqueado (X/Cancelar incluidos) — no solo el botón Guardar. Ver
+     bloquearModalFilaLista_(). -->
+<div class="modal-overlay hidden" id="modal-fila-lista">
+  <div class="modal-box wide">
+    <div class="modal-head">
+      <h3 id="fila-lista-titulo">Agregar fila</h3>
+      <button class="modal-close" id="btn-cerrar-fila-lista">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="fila-lista-form"></div>
+      <div class="modal-actions">
+        <button class="btn-secundario" style="width:auto" id="btn-cancelar-fila-lista">Cancelar</button>
+        <button class="btn-accion" style="width:auto" id="btn-guardar-fila-lista">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ MÓDULO 2 — Panel lateral de Comentarios ═══════════════ -->
 <div id="comentarios-overlay" onclick="cerrarComentarios()"></div>
 <aside id="comentarios-panel">
@@ -1295,7 +1338,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.0.0';
+const APP_VERSION = 'v8.1.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1594,7 +1637,9 @@ let favoritosActuales = [];      // [nombreTab] del usuario logueado, en orden
 let sortablesListasHub = [];     // NUEVO v3.1.0 — instancias Sortable activas en el Home de Listas (se destruyen en cada render)
 let listaAbierta = null;         // nombreTab de la lista abierta en detalle
 let schemaListaAbierta = [];     // schema de la lista abierta
-let tablaListaTabulator = null;  // instancia Tabulator activa
+let datosListaAbierta = [];      // NUEVO v8.1.0 — filas de la lista abierta, fuente de verdad en memoria (DataTables se redibuja desde acá, no al revés)
+let tablaListaDT = null;         // NUEVO v8.1.0 — instancia DataTables activa (reemplaza tablaListaTabulator)
+let filaEnEdicionId = null;      // NUEVO v8.1.0 — id de la fila en edición en el modal de alta/edición; null = modal en modo alta
 let comentariosListaAbierta = null; // nombreTab con el panel de Comentarios abierto
 let comentariosContenidoAbierto = null; // NUEVO v4.0.0 (batch 3) — punto del Árbol con el panel de Comentarios abierto
 
@@ -2089,9 +2134,13 @@ function marcarNavActiva(vista) {
 }
 
 function destruirTablaSiExiste() {
-  if (tablaListaTabulator) {
-    tablaListaTabulator.destroy();
-    tablaListaTabulator = null;
+  // NUEVO v8.1.0 — DataTables en vez de Tabulator. destroy() saca los
+  // wrappers/listeners que arma DataTables alrededor de la tabla; el
+  // remove() del elemento original lo hacemos aparte, al reconstruir
+  // el HTML de #tabla-lista-contenedor en cada abrirLista()/montarTablaLista().
+  if (tablaListaDT) {
+    tablaListaDT.destroy();
+    tablaListaDT = null;
   }
 }
 
@@ -2386,6 +2435,7 @@ function abrirEditor(punto) {
 
   document.getElementById('editar-titulo').textContent = 'Editar — ' + nodo.titulo;
   document.getElementById('modal-editar').classList.remove('hidden');
+  bloquearModalEditar_(false);
 
   if (!quill) {
     quill = new Quill('#quill-editor', {
@@ -2411,22 +2461,27 @@ function cerrarEditor() {
   document.getElementById('modal-editar').classList.add('hidden');
   puntoEnEdicion = null;
 }
+// FIX v8.1.0 — reemplaza el fix de v8.0.0 (capturar puntoGuardado para
+// blindar un cierre-en-vuelo). Ale marcó el criterio real del stack:
+// mientras un guardado está en curso, NADA debe poder interferir —
+// ni la X ni Cancelar. Con el modal totalmente bloqueado durante el
+// guardado, el cierre-en-vuelo que el fix anterior blindaba ya no
+// puede ocurrir; se simplifica en vez de mantener las dos capas.
 document.getElementById('btn-cerrar-editar').addEventListener('click', cerrarEditor);
 document.getElementById('btn-cancelar-editar').addEventListener('click', cerrarEditor);
+
+function bloquearModalEditar_(bloqueado) {
+  document.getElementById('btn-cerrar-editar').disabled = bloqueado;
+  document.getElementById('btn-cancelar-editar').disabled = bloqueado;
+  document.getElementById('btn-guardar-editar').disabled = bloqueado;
+}
 
 document.getElementById('btn-guardar-editar').addEventListener('click', async function () {
   if (!puntoEnEdicion) return;
   const html = quill.root.innerHTML;
-  // FIX v8.0.0 — se captura el punto en una variable local ANTES del
-  // await. Si el usuario cierra el modal con la X mientras el guardado
-  // sigue en vuelo, cerrarEditor() pone la variable global
-  // puntoEnEdicion en null; sin esta captura, el guardado en el
-  // backend terminaba OK pero la actualización del árbol en memoria
-  // se perdía (buscaba el nodo con punto===null y no lo encontraba),
-  // dejando el cambio visible recién en el próximo refresh.
   const puntoGuardado = puntoEnEdicion;
 
-  this.disabled = true;
+  bloquearModalEditar_(true);
   try {
     const res = await llamarBackend('guardarResumen', {
       obraId: obraActual.obraId,
@@ -2436,20 +2491,17 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
     });
     if (!res.ok) {
       mostrarAviso(res.error || 'No se pudo guardar.');
-      this.disabled = false;
+      bloquearModalEditar_(false);
       return;
     }
     const nodo = arbol.find(function (n) { return n.punto === puntoGuardado; });
     if (nodo) nodo.resumen = html;
-    // Si el modal ya se cerró (X durante el guardado), no lo volvemos a
-    // abrir ni tocamos su estado — solo actualizamos el árbol en memoria
-    // y, si el nodo sigue siendo el que se está mostrando, su card.
-    if (puntoEnEdicion === puntoGuardado) cerrarEditor();
+    cerrarEditor();
     if (nodo) renderNodo(nodo);
   } catch (err) {
     mostrarAviso(err.message || 'No se pudo conectar con el backend.');
+    bloquearModalEditar_(false);
   }
-  this.disabled = false;
 });
 
 // ── MODAL — Links de la obra ──────────────────────────────────
@@ -2753,28 +2805,32 @@ async function abrirLista(nombreTab) {
       '</div>' +
     '</div>' +
     '<div class="estado-vacio" id="lista-cargando"><div class="spinner"></div>Cargando…</div>' +
-    '<div id="paginador-arriba" class="paginador-arriba"></div>' +
-    '<div class="tabulator-wrap" id="tabulator-contenedor"></div>';
+    '<div class="tabla-lista-wrap" id="tabla-lista-contenedor"></div>';
 
   terminoBusquedaLista = '';
   const inputBuscador = document.getElementById('lista-buscador');
   const btnLimpiarBuscador = document.getElementById('btn-limpiar-buscador');
   inputBuscador.addEventListener('input', function () {
-    terminoBusquedaLista = this.value.trim().toLowerCase();
+    terminoBusquedaLista = this.value.trim();
     btnLimpiarBuscador.classList.toggle('hidden', this.value === '');
-    if (tablaListaTabulator) tablaListaTabulator.refreshFilter();
+    if (tablaListaDT) tablaListaDT.search(terminoBusquedaLista).draw();
   });
   btnLimpiarBuscador.addEventListener('click', function () {
     inputBuscador.value = '';
     terminoBusquedaLista = '';
     btnLimpiarBuscador.classList.add('hidden');
     inputBuscador.focus();
-    if (tablaListaTabulator) tablaListaTabulator.refreshFilter();
+    if (tablaListaDT) tablaListaDT.search('').draw();
   });
 
   const btnAgregarFila = document.getElementById('btn-agregar-fila');
   if (btnAgregarFila) {
-    btnAgregarFila.addEventListener('click', function () { agregarFilaLista(nombreTab); });
+    // NUEVO v8.1.0 — "+ Agregar fila" ya no crea una fila vacía en el
+    // Sheet al tocar el botón (eso era guardado dinámico prematuro,
+    // exactamente lo que veníamos a sacar). Ahora abre el modal en
+    // modo alta; recién se llama a guardarFilaLista al confirmar, con
+    // la fila completa.
+    btnAgregarFila.addEventListener('click', function () { abrirModalFilaLista(nombreTab, null); });
   }
   document.getElementById('btn-actualizar-lista').addEventListener('click', function () { actualizarListaActual(); });
 
@@ -2799,14 +2855,14 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
     // datos buenos.
     if (!resSchema.ok || !resDatos.ok) throw new Error(resSchema.error || resDatos.error || 'no se pudo leer la lista');
     schemaListaAbierta = resSchema.schema || [];
-    const datos = resDatos.datos || [];
-    document.getElementById('contador-filas').textContent = datos.length + (datos.length === 1 ? ' fila' : ' filas');
+    datosListaAbierta = resDatos.datos || []; // NUEVO v8.1.0 — hoisted a global, fuente de verdad en memoria (antes era local a esta función)
+    document.getElementById('contador-filas').textContent = datosListaAbierta.length + (datosListaAbierta.length === 1 ? ' fila' : ' filas');
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').classList.add('hidden');
       document.getElementById('lista-header-acciones').classList.remove('hidden');
     }
     destruirTablaSiExiste();
-    montarTabulator(nombreTab, schemaListaAbierta, datos);
+    montarTablaLista(nombreTab, schemaListaAbierta, datosListaAbierta);
   } catch (err) {
     // FIX v7.1.7 — se saca el reintento propio (llamarse a sí misma) que
     // tenía esta función desde v7.1.2, redundante desde que
@@ -2848,182 +2904,263 @@ function valoresParaTipo(tipoCampo) {
   return valoresListas.filter(function (v) { return v.lista === tipoCampo; });
 }
 
-function columnaTabulator(col) {
-  // Columna ID — visible pero nunca editable, congelada (frozen) para
-  // que se mantenga visible con scroll horizontal en listas con
-  // muchas columnas
-  if (col.campo === 'id') {
-    return { title: col.etiqueta || 'ID', field: 'id', width: 70, widthGrow: 0, editable: false, headerSort: true, frozen: true };
-  }
+// NUEVO v8.1.0 — reglas fijas de bloqueo, acordadas con Ale: ID nunca
+// se edita (ni en alta ni en edición — el backend lo autonumera y
+// "nunca se pisa por este camino", guardarFilaLista_ dixit); Item
+// identifica la fila y se puede escribir libremente al crearla, pero
+// una vez creada queda fijo — no depende de ninguna fila de schema
+// nueva, es una regla de código, igual para las 2 columnas.
+function campoBloqueado_(col, esEdicion) {
+  if (col.campo === 'id') return true;
+  if (col.campo === 'item') return esEdicion;
+  return false;
+}
 
-  // 'item' es el campo técnico universal que identifica lo principal
-  // de cualquier lista (mismo campo que usará la vista Calendario) —
-  // es el único que crece para absorber el espacio sobrante; el resto
-  // queda en un ancho fijo y razonable según su tipo. También queda
-  // congelada (frozen), junto con ID, para scroll horizontal.
-  const esItem = col.campo === 'item';
-  const base = {
-    title: col.etiqueta || col.campo, field: col.campo, headerSort: true, editable: puedeEditarListas,
-    widthGrow: esItem ? 5 : 0,
-    frozen: esItem
-  };
-  if (esItem) { base.minWidth = 220; } else { base.width = 130; }
+// Valor mostrado/editado en el input de fecha (yyyy-mm-dd) a partir
+// de lo que venga del backend (string ISO o vacío) — mismo criterio
+// que ya usaba el editor 'date' de Tabulator, ahora como <input type=date>.
+function valorFechaInput_(v) {
+  if (!v) return '';
+  const d = new Date(v);
+  if (isNaN(d)) return '';
+  return d.toISOString().slice(0, 10);
+}
 
-  if (col.tipoCampo === 'numerico') {
-    return Object.assign(base, { editor: 'number', hozAlign: 'right' });
-  }
+function formatoCeldaLista_(col, valor) {
+  if (valor === undefined || valor === null || valor === '') return '';
   if (col.tipoCampo === 'fecha') {
-    return Object.assign(base, {
-      editor: 'date',
-      formatter: function (cell) {
-        const v = cell.getValue();
-        if (!v) return '';
-        const d = new Date(v);
-        return isNaN(d) ? escaparHtml(String(v)) : d.toLocaleDateString('es-AR');
-      }
-    });
-  }
-  if (col.tipoCampo === 'texto_largo') {
-    if (!esItem) base.width = 220;
-    return Object.assign(base, { editor: 'textarea', formatter: 'textarea' });
+    const d = new Date(valor);
+    return isNaN(d) ? escaparHtml(String(valor)) : d.toLocaleDateString('es-AR');
   }
   if (col.tipoCampo.indexOf('listaValores_') === 0) {
-    // Filtro de columna por selección — acá SÍ aplica, porque el
-    // campo ya tiene una lista de valores fija (las mismas opciones
-    // del editor de celda, no una búsqueda de valores existentes).
     const opciones = valoresParaTipo(col.tipoCampo);
-    const valuesMap = {};
-    opciones.forEach(function (o) { valuesMap[o.valor] = o.valor; });
-    return Object.assign(base, {
-      editor: 'list',
-      editorParams: { values: valuesMap },
-      headerFilter: 'list',
-      headerFilterParams: {
-        values: valuesMap,
-        clearable: true,
-        // v3.0.0 — las opciones del desplegable de filtro se ven con
-        // el mismo badge de color que ya usan las celdas (colorTag/
-        // COLOR_MAP), en vez de texto plano.
-        itemFormatter: function (label, value, item, element) {
-          const opcion = opciones.find(function (o) { return o.valor === value; });
-          const bg = opcion ? colorTag(opcion.color) : 'var(--muted)';
-          return '<span class="tag-valor" style="background:' + bg + '">' + escaparHtml(label) + '</span>';
-        }
-      },
-      formatter: function (cell) {
-        const v = cell.getValue();
-        if (!v) return '';
-        const opcion = opciones.find(function (o) { return o.valor === v; });
-        const bg = opcion ? colorTag(opcion.color) : 'var(--muted)';
-        return '<span class="tag-valor" style="background:' + bg + '">' + escaparHtml(v) + '</span>';
-      }
-    });
+    const opcion = opciones.find(function (o) { return o.valor === valor; });
+    const bg = opcion ? colorTag(opcion.color) : 'var(--muted)';
+    return '<span class="tag-valor" style="background:' + bg + '">' + escaparHtml(String(valor)) + '</span>';
   }
-  // 'texto_corto' y cualquier otro tipo no contemplado → input simple
-  return Object.assign(base, { editor: 'input' });
+  if (col.tipoCampo === 'texto_largo') {
+    const plano = String(valor);
+    return escaparHtml(plano.length > 140 ? plano.slice(0, 140) + '…' : plano);
+  }
+  return escaparHtml(String(valor));
 }
 
-function montarTabulator(nombreTab, schema, datos) {
-  const columnas = schema.map(columnaTabulator);
-  // v2.02 — columna de borrado solo si hay permiso de editar Listas
-  if (puedeEditarListas) {
-    columnas.push({
-      title: '', field: '_acciones', width: 50, widthGrow: 0, headerSort: false, hozAlign: 'center',
-      formatter: function () { return '<button class="btn-borrar-fila" title="Borrar fila">🗑</button>'; },
-      cellClick: function (e, cell) { confirmarBorrarFila(nombreTab, cell.getRow().getData()); }
-    });
+function _dtLangListas_() {
+  return {
+    search: 'Buscar:', lengthMenu: 'Mostrar _MENU_ filas',
+    info: 'Mostrando _START_ a _END_ de _TOTAL_', infoEmpty: 'Sin filas',
+    infoFiltered: '(filtrado de _MAX_)', zeroRecords: 'Sin coincidencias.',
+    paginate: { first: '«', previous: '‹', next: '›', last: '»' }
+  };
+}
+
+/**
+ * Construye y monta la tabla de solo lectura (DataTables, patrón
+ * DOM-sourced — mismo criterio que LibroObra/PdTT): arma el HTML del
+ * thead/tbody a mano desde `schema`+`datos`, lo inserta, y recién
+ * ahí instancia $().DataTable() sobre la tabla ya poblada. Reemplaza
+ * a montarTabulator() — la edición inline sale de la tabla, ahora es
+ * pura vista (sort/filtro/paginación/badges) + columna de acciones.
+ */
+function montarTablaLista(nombreTab, schema, datos) {
+  const cont = document.getElementById('tabla-lista-contenedor');
+  const colsConFiltro = schema.filter(function (c) { return c.tipoCampo.indexOf('listaValores_') === 0; });
+
+  let theadHtml = '<tr>' + schema.map(function (col) {
+    return '<th>' + escaparHtml(col.etiqueta || col.campo) + '</th>';
+  }).join('') + (puedeEditarListas ? '<th></th>' : '') + '</tr>';
+
+  // Segunda fila del thead: 1 <select> de filtro por columna, solo
+  // para las de tipo listaValores_* (mismo criterio que el
+  // headerFilter con badges que tenía Tabulator) — el resto de las
+  // columnas usa el buscador global de arriba, no filtro propio.
+  if (colsConFiltro.length) {
+    theadHtml += '<tr class="dt-filtros-fila">' + schema.map(function (col, i) {
+      if (col.tipoCampo.indexOf('listaValores_') !== 0) return '<th></th>';
+      const opciones = valoresParaTipo(col.tipoCampo);
+      const options = '<option value="">Todos</option>' + opciones.map(function (o) {
+        return '<option value="' + escaparHtml(o.valor) + '">' + escaparHtml(o.valor) + '</option>';
+      }).join('');
+      return '<th><select class="dt-filtro-col" data-col="' + i + '">' + options + '</select></th>';
+    }).join('') + (puedeEditarListas ? '<th></th>' : '') + '</tr>';
   }
 
-  tablaListaTabulator = new Tabulator('#tabulator-contenedor', {
-    data: datos,
-    layout: 'fitColumns',
-    // v3.0.1 — altura fija: forma nativa de Tabulator para header
-    // fijo + scroll interno del body (reemplaza el hack de sticky
-    // CSS de v3.0.0, que rompía el posicionamiento de filas).
-    height: 'calc(100vh - 260px)',
-    index: 'id',
-    columns: columnas,
-    placeholder: 'Todavía no hay filas cargadas en esta lista.',
-    pagination: true,
-    paginationSize: 10,
-    paginationSizeSelector: [10, 20, 50],
-    paginationCounter: 'rows',
-    paginationElement: document.getElementById('paginador-arriba'),
-    locale: 'es-ar',
-    langs: {
-      'es-ar': {
-        pagination: {
-          page_size: 'Filas por página',
-          first: 'Primera',
-          first_title: 'Primera página',
-          last: 'Última',
-          last_title: 'Última página',
-          prev: 'Anterior',
-          prev_title: 'Página anterior',
-          next: 'Siguiente',
-          next_title: 'Página siguiente',
-          all: 'Todas',
-          counter: { showing: 'Mostrando', of: 'de', rows: 'filas', pages: 'páginas' }
-        }
-      }
+  const tbodyHtml = datos.map(function (fila) {
+    const celdas = schema.map(function (col) {
+      return '<td>' + formatoCeldaLista_(col, fila[col.campo]) + '</td>';
+    }).join('');
+    const acciones = puedeEditarListas
+      ? '<td style="white-space:nowrap;text-align:center">' +
+          '<button class="btn-fila-accion btn-editar-fila" title="Editar" onclick="abrirModalFilaLista(\'' + nombreTab + '\', \'' + fila.id + '\')">✎</button>' +
+          '<button class="btn-fila-accion btn-borrar-fila" title="Borrar" onclick="confirmarBorrarFila(\'' + nombreTab + '\', \'' + fila.id + '\')">🗑</button>' +
+        '</td>'
+      : '';
+    return '<tr>' + celdas + acciones + '</tr>';
+  }).join('');
+
+  cont.innerHTML = '<table id="tabla-lista" class="display" style="width:100%"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + '</tbody></table>';
+
+  tablaListaDT = $('#tabla-lista').DataTable({
+    language: _dtLangListas_(),
+    pageLength: 10,
+    lengthMenu: [10, 20, 50],
+    order: [],
+    dom: '<"dt-top"l>rt<"dt-bot"ip>', // sin 'f' — el buscador global propio de la app reemplaza al de DataTables
+    columnDefs: puedeEditarListas ? [{ targets: -1, orderable: false }] : [],
+    orderCellsTop: colsConFiltro.length > 0 // si hay fila de filtros, ordenar clickeando la fila de títulos (la 1ª), no la de filtros
+  });
+
+  if (terminoBusquedaLista) tablaListaDT.search(terminoBusquedaLista).draw();
+
+  $('.dt-filtro-col').off('change').on('change', function () {
+    const col = $(this).data('col');
+    tablaListaDT.column(col).search(this.value ? '^' + $.fn.dataTable.util.escapeRegex(this.value) + '$' : '', true, false).draw();
+  });
+}
+
+/**
+ * Modal única de alta/edición — arma el formulario dinámicamente
+ * desde `schemaListaAbierta`. filaId null → modo alta (formulario
+ * vacío, sin columna ID — el backend la autonumera al guardar). Con
+ * filaId → modo edición (formulario precargado desde datosListaAbierta,
+ * ID e Item bloqueados).
+ */
+function abrirModalFilaLista(nombreTab, filaId) {
+  filaEnEdicionId = filaId;
+  const esEdicion = filaId !== null;
+  const fila = esEdicion ? (datosListaAbierta.find(function (f) { return String(f.id) === String(filaId); }) || {}) : {};
+
+  document.getElementById('fila-lista-titulo').textContent = esEdicion ? 'Editar fila' : 'Agregar fila';
+
+  const formHtml = schemaListaAbierta.map(function (col) {
+    if (col.campo === 'id' && !esEdicion) return ''; // en alta, ID ni se muestra — todavía no existe
+    const bloqueado = campoBloqueado_(col, esEdicion);
+    const requerido = col.condicion === 'requerido' && !bloqueado;
+    const valor = fila[col.campo];
+    const idInput = 'campo-fila-' + col.campo;
+    const disabledAttr = bloqueado ? ' disabled' : '';
+    const requiredMarca = requerido ? '<span class="req-marca">*</span>' : '';
+
+    let inputHtml;
+    if (col.tipoCampo === 'numerico') {
+      inputHtml = '<input type="number" id="' + idInput + '" value="' + (valor !== undefined && valor !== null ? escaparHtml(String(valor)) : '') + '"' + disabledAttr + '>';
+    } else if (col.tipoCampo === 'fecha') {
+      inputHtml = '<input type="date" id="' + idInput + '" value="' + valorFechaInput_(valor) + '"' + disabledAttr + '>';
+    } else if (col.tipoCampo === 'texto_largo') {
+      inputHtml = '<textarea id="' + idInput + '"' + disabledAttr + '>' + (valor ? escaparHtml(String(valor)) : '') + '</textarea>';
+    } else if (col.tipoCampo.indexOf('listaValores_') === 0) {
+      const opciones = valoresParaTipo(col.tipoCampo);
+      const options = '<option value=""></option>' + opciones.map(function (o) {
+        return '<option value="' + escaparHtml(o.valor) + '"' + (valor === o.valor ? ' selected' : '') + '>' + escaparHtml(o.valor) + '</option>';
+      }).join('');
+      inputHtml = '<select id="' + idInput + '"' + disabledAttr + '>' + options + '</select>';
+    } else {
+      inputHtml = '<input type="text" id="' + idInput + '" value="' + (valor ? escaparHtml(String(valor)) : '') + '"' + disabledAttr + '>';
+    }
+
+    return '<div class="form-campo" data-campo="' + col.campo + '" data-requerido="' + requerido + '">' +
+      '<label for="' + idInput + '">' + escaparHtml(col.etiqueta || col.campo) + requiredMarca + '</label>' +
+      inputHtml +
+      '<div class="form-campo-error hidden"></div>' +
+    '</div>';
+  }).join('');
+
+  document.getElementById('fila-lista-form').innerHTML = formHtml;
+  bloquearModalFilaLista_(false);
+  document.getElementById('modal-fila-lista').classList.remove('hidden');
+}
+
+function cerrarModalFilaLista_() {
+  document.getElementById('modal-fila-lista').classList.add('hidden');
+  filaEnEdicionId = null;
+}
+
+function bloquearModalFilaLista_(bloqueado) {
+  document.getElementById('btn-cerrar-fila-lista').disabled = bloqueado;
+  document.getElementById('btn-cancelar-fila-lista').disabled = bloqueado;
+  document.getElementById('btn-guardar-fila-lista').disabled = bloqueado;
+}
+
+document.getElementById('btn-cerrar-fila-lista').addEventListener('click', cerrarModalFilaLista_);
+document.getElementById('btn-cancelar-fila-lista').addEventListener('click', cerrarModalFilaLista_);
+
+document.getElementById('btn-guardar-fila-lista').addEventListener('click', async function () {
+  const esEdicion = filaEnEdicionId !== null;
+  const nombreTab = listaAbierta;
+
+  // Validación de obligatorios — recorre solo los campos realmente
+  // presentes en el formulario (en alta, ID no está; los bloqueados
+  // ya vienen marcados como no-requeridos desde abrirModalFilaLista).
+  let primerCampoConError = null;
+  document.querySelectorAll('#fila-lista-form .form-campo').forEach(function (div) {
+    const requerido = div.dataset.requerido === 'true';
+    const input = div.querySelector('input, select, textarea');
+    const errorDiv = div.querySelector('.form-campo-error');
+    const vacio = !input.value || !input.value.trim();
+    if (requerido && vacio) {
+      div.classList.add('con-error');
+      errorDiv.textContent = 'Este campo es obligatorio.';
+      errorDiv.classList.remove('hidden');
+      if (!primerCampoConError) primerCampoConError = input;
+    } else {
+      div.classList.remove('con-error');
+      errorDiv.classList.add('hidden');
     }
   });
+  if (primerCampoConError) { primerCampoConError.focus(); return; }
 
-  tablaListaTabulator.setFilter(filtroBusquedaGlobal);
-
-  // Tabulator 5.x: "cellEdited" es un EVENTO (se registra con .on()),
-  // no una opción del constructor — puesto ahí no tira error, pero
-  // tampoco se dispara nunca. Esta fue la causa real de que las
-  // ediciones de celda nunca llegaran al backend en v1.00/v1.01/v1.02.
-  tablaListaTabulator.on('cellEdited', function (cell) {
-    guardarCeldaEditada(nombreTab, cell).catch(function (err) {
-      mostrarAviso('Error inesperado al guardar la celda: ' + (err && err.message ? err.message : err));
-      cell.restoreOldValue();
-    });
+  // Arma la fila a enviar — un solo POST con todo junto, sea alta o
+  // edición. Los campos bloqueados (ID siempre; Item solo en edición)
+  // no se mandan: no cambiaron, y en el caso de ID directamente no
+  // tiene sentido (guardarFilaLista_ nunca lo pisa por este camino).
+  const filaAEnviar = {};
+  if (esEdicion) filaAEnviar.id = filaEnEdicionId;
+  document.querySelectorAll('#fila-lista-form .form-campo').forEach(function (div) {
+    const campo = div.dataset.campo;
+    const input = div.querySelector('input, select, textarea');
+    if (input.disabled) return;
+    filaAEnviar[campo] = input.value;
   });
-}
 
-async function guardarCeldaEditada(nombreTab, cell) {
-  const fila = cell.getRow().getData();
-  const campo = cell.getField();
-  const valorAnterior = cell.getOldValue();
-
-  const filaAEnviar = { id: fila.id };
-  filaAEnviar[campo] = fila[campo];
-
+  bloquearModalFilaLista_(true);
+  const btnGuardar = document.getElementById('btn-guardar-fila-lista');
+  const textoOriginal = btnGuardar.textContent;
+  btnGuardar.textContent = 'Guardando…';
   try {
     const res = await llamarBackend('guardarFilaLista', {
       obraId: obraActual.obraId, nombreLista: nombreTab, fila: filaAEnviar, email: emailActual
     });
     if (!res.ok) {
-      mostrarAviso(res.error || 'No se pudo guardar el cambio.');
-      cell.restoreOldValue();
+      mostrarAviso(res.error || 'No se pudo guardar la fila.');
+      bloquearModalFilaLista_(false);
+      btnGuardar.textContent = textoOriginal;
+      return;
     }
-  } catch (err) {
-    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
-    cell.restoreOldValue();
-  }
-}
-
-async function agregarFilaLista(nombreTab) {
-  try {
-    const res = await llamarBackend('guardarFilaLista', {
-      obraId: obraActual.obraId, nombreLista: nombreTab, fila: {}, email: emailActual
-    });
-    if (!res.ok) { mostrarAviso(res.error || 'No se pudo crear la fila.'); return; }
-    const filaNueva = { id: res.id };
-    schemaListaAbierta.forEach(function (col) { if (col.campo !== 'id' && !(col.campo in filaNueva)) filaNueva[col.campo] = ''; });
-    await tablaListaTabulator.addRow(filaNueva, false);
+    if (esEdicion) {
+      const filaExistente = datosListaAbierta.find(function (f) { return String(f.id) === String(filaEnEdicionId); });
+      if (filaExistente) Object.assign(filaExistente, filaAEnviar);
+    } else {
+      const filaNueva = { id: res.id };
+      schemaListaAbierta.forEach(function (col) { if (!(col.campo in filaNueva)) filaNueva[col.campo] = filaAEnviar[col.campo] || ''; });
+      datosListaAbierta.push(filaNueva);
+    }
+    cerrarModalFilaLista_();
+    destruirTablaSiExiste();
+    montarTablaLista(nombreTab, schemaListaAbierta, datosListaAbierta);
     actualizarContadorFilas();
   } catch (err) {
     mostrarAviso(err.message || 'No se pudo conectar con el backend.');
+    bloquearModalFilaLista_(false);
+    btnGuardar.textContent = textoOriginal;
+    return;
   }
-}
+  btnGuardar.textContent = textoOriginal;
+});
 
-async function confirmarBorrarFila(nombreTab, fila) {
-  const ok = await mostrarConfirm('Borrar fila', '¿Borrar esta fila (id=' + fila.id + ')? No se puede deshacer.', { danger: true, textoAceptar: 'Borrar' });
+async function confirmarBorrarFila(nombreTab, filaId) {
+  const ok = await mostrarConfirm('Borrar fila', '¿Borrar esta fila (id=' + filaId + ')? No se puede deshacer.', { danger: true, textoAceptar: 'Borrar' });
   if (!ok) return;
-  borrarFilaListaFrontend(nombreTab, fila.id);
+  borrarFilaListaFrontend(nombreTab, filaId);
 }
 
 async function borrarFilaListaFrontend(nombreTab, filaId) {
@@ -3032,7 +3169,9 @@ async function borrarFilaListaFrontend(nombreTab, filaId) {
       obraId: obraActual.obraId, nombreLista: nombreTab, filaId: filaId, email: emailActual
     });
     if (!res.ok) { mostrarAviso(res.error || 'No se pudo borrar la fila.'); return; }
-    tablaListaTabulator.deleteRow(filaId);
+    datosListaAbierta = datosListaAbierta.filter(function (f) { return String(f.id) !== String(filaId); });
+    destruirTablaSiExiste();
+    montarTablaLista(nombreTab, schemaListaAbierta, datosListaAbierta);
     actualizarContadorFilas();
   } catch (err) {
     mostrarAviso(err.message || 'No se pudo conectar con el backend.');
@@ -3041,9 +3180,8 @@ async function borrarFilaListaFrontend(nombreTab, filaId) {
 
 function actualizarContadorFilas() {
   const el = document.getElementById('contador-filas');
-  if (!el || !tablaListaTabulator) return;
-  const n = tablaListaTabulator.getDataCount();
-  el.textContent = n + (n === 1 ? ' fila' : ' filas');
+  if (!el) return;
+  el.textContent = datosListaAbierta.length + (datosListaAbierta.length === 1 ? ' fila' : ' filas');
 }
 
 // ── PANEL LATERAL DE COMENTARIOS ──────────────────────────────
