@@ -1283,7 +1283,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.3';
+const APP_VERSION = 'v7.1.4';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1679,11 +1679,51 @@ function mostrarToast(mensaje) {
 }
 
 // ── HELPERS DE FETCH ────────────────────────────────────────
+// NUEVO v7.1.4 — antes era un fetch pelado, sin timeout, y el error
+// real se perdía en cada catch (nunca se logueaba). El único síntoma
+// visible era un cartel genérico "revisá tu conexión", aunque la causa
+// real fuera un timeout del backend, un HTTP de error, o JSON inválido
+// — imposible de diagnosticar después. Ahora: 1) si no hay conexión
+// real, se detecta antes de salir a la red; 2) timeout explícito
+// (20s) en vez de depender del timeout (larguísimo) del navegador;
+// 3) cada causa tiene su propio mensaje para el usuario; 4) el error
+// real queda siempre en consola con la action y los params.
+const LLAMAR_BACKEND_TIMEOUT_MS = 20000;
+
 async function llamarBackend(action, params) {
   const body = Object.assign({ action: action }, params || {});
-  const resp = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return resp.json();
+
+  if (!navigator.onLine) {
+    console.error('[llamarBackend]', action, '— sin conexión (navigator.onLine=false)', params);
+    throw new Error('Estás sin conexión a internet. Revisá tu conexión y volvé a intentar.');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(function () { controller.abort(); }, LLAMAR_BACKEND_TIMEOUT_MS);
+  let resp;
+  try {
+    resp = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body), signal: controller.signal });
+  } catch (fetchErr) {
+    clearTimeout(timeoutId);
+    if (fetchErr.name === 'AbortError') {
+      console.error('[llamarBackend]', action, params, '— timeout tras', LLAMAR_BACKEND_TIMEOUT_MS, 'ms');
+      throw new Error('El backend tardó demasiado en responder (más de ' + (LLAMAR_BACKEND_TIMEOUT_MS / 1000) + 's). Probá de nuevo.');
+    }
+    console.error('[llamarBackend]', action, params, fetchErr);
+    throw new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.');
+  }
+  clearTimeout(timeoutId);
+
+  if (!resp.ok) {
+    console.error('[llamarBackend]', action, params, '— HTTP', resp.status);
+    throw new Error('El backend respondió con un error (HTTP ' + resp.status + ').');
+  }
+  try {
+    return await resp.json();
+  } catch (parseErr) {
+    console.error('[llamarBackend]', action, params, parseErr);
+    throw new Error('El backend devolvió una respuesta inválida.');
+  }
 }
 
 // ── SESIÓN (localStorage) — mismo patrón que BDC ────────────
@@ -2076,8 +2116,14 @@ async function mostrarApp() {
     vistaActual = 'arbol';
     renderHome();
   } catch (err) {
+    // NUEVO v7.1.4 — antes: cartel mudo, sin reintentar y sin loguear
+    // el error real (err se descartaba). Ahora: mensaje ya diferenciado
+    // por llamarBackend() (sin conexión / timeout / error de backend) +
+    // botón Reintentar, mismo criterio que paso-sin-conexion del login.
+    console.error('[mostrarApp] inicializarObra', err);
     document.getElementById('main-view').innerHTML =
-      '<div class="estado-vacio">No se pudo conectar con el backend. Revisá tu conexión y recargá la página.</div>';
+      '<div class="estado-vacio">' + escaparHtml(err.message || 'No se pudo conectar con el backend.') +
+      '<br><br><button class="btn-accion" onclick="mostrarApp()">Reintentar</button></div>';
   }
 }
 
@@ -2299,7 +2345,7 @@ async function elegirColorFondo(hex) {
     cerrarSelectorColor();
     if (nodo) renderNodo(nodo);
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
 }
 
@@ -2361,7 +2407,7 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
     cerrarEditor();
     renderNodo(nodo);
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
   this.disabled = false;
 });
@@ -2916,7 +2962,7 @@ async function guardarCeldaEditada(nombreTab, cell) {
       cell.restoreOldValue();
     }
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
     cell.restoreOldValue();
   }
 }
@@ -2932,7 +2978,7 @@ async function agregarFilaLista(nombreTab) {
     await tablaListaTabulator.addRow(filaNueva, false);
     actualizarContadorFilas();
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
 }
 
@@ -2951,7 +2997,7 @@ async function borrarFilaListaFrontend(nombreTab, filaId) {
     tablaListaTabulator.deleteRow(filaId);
     actualizarContadorFilas();
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
 }
 
@@ -3041,7 +3087,7 @@ document.getElementById('btn-agregar-comentario').addEventListener('click', asyn
       mostrarToast('¡Ya guardado!'); // NUEVO v4.0.1
     }
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
   this.disabled = false;
 });
@@ -3052,7 +3098,7 @@ async function ocultarComentarioFrontend(comentarioId) {
     if (!res.ok) { mostrarAviso(res.motivo === 'no_autorizado' ? 'Solo el autor puede ocultar su propio comentario.' : (res.error || 'No se pudo ocultar.')); return; }
     await cargarComentarios();
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
 }
 
@@ -3123,7 +3169,7 @@ async function ocultarComentarioContenidoFrontend(comentarioId) {
     renderComentariosNodo();
     refrescarVistaContenidoActual_();
   } catch (err) {
-    mostrarAviso('No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
   }
 }
 
