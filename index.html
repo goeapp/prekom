@@ -1283,7 +1283,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.2';
+const APP_VERSION = 'v7.1.3';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2707,8 +2707,14 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga, reintentando) {
       llamarBackend('leerListaSchema', { obraId: obraActual.obraId, nombreLista: nombreTab }),
       llamarBackend('leerListaDatos', { obraId: obraActual.obraId, nombreLista: nombreTab })
     ]);
-    schemaListaAbierta = (resSchema.ok && resSchema.schema) ? resSchema.schema : [];
-    const datos = (resDatos.ok && resDatos.datos) ? resDatos.datos : [];
+    // FIX v7.1.3 — mismo criterio que Notas: un ok:false del backend
+    // ahora se trata como falla real, en vez de vaciar schema/datos en
+    // silencio y remontar la tabla vacía. En un refresh (esPrimeraCarga
+    // false) esto además evita pisar la tabla que ya estaba mostrando
+    // datos buenos.
+    if (!resSchema.ok || !resDatos.ok) throw new Error(resSchema.error || resDatos.error || 'no se pudo leer la lista');
+    schemaListaAbierta = resSchema.schema || [];
+    const datos = resDatos.datos || [];
     document.getElementById('contador-filas').textContent = datos.length + (datos.length === 1 ? ' fila' : ' filas');
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').classList.add('hidden');
@@ -2725,7 +2731,7 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga, reintentando) {
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
     } else {
-      mostrarAviso('No se pudo actualizar la lista.');
+      mostrarAviso('No se pudo actualizar la lista — se mantienen los últimos datos cargados.');
     }
   }
 }
@@ -3338,15 +3344,22 @@ function renderNotasEsqueleto_() {
     '</div>';
 }
 
-async function cargarNotas() {
+async function cargarNotas(reintentando) {
   const btn = document.getElementById('btn-notas-actualizar'); // NUEVO v5.1.1 — spinner mientras carga
   if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
   try {
     const res = await llamarBackend('leerNotas', { obraId: obraActual.obraId });
-    notas = (res.ok && res.notas) ? res.notas : [];
+    // FIX v7.1.3 — reportado por Ale ("desaparecen"): antes, un
+    // ok:false del backend (falla manejada, sin tirar excepción)
+    // pisaba `notas` con un array vacío y lo pintaba así, sin ningún
+    // aviso — el catch de abajo nunca se disparaba porque no hubo
+    // excepción. Ahora un ok:false SÍ se trata como falla real.
+    if (!res.ok) throw new Error(res.error || 'leerNotas falló');
+    notas = res.notas || [];
     pintarNotasCanvas();
   } catch (err) {
-    mostrarToast('No se pudo cargar Notas');
+    if (!reintentando) { await cargarNotas(true); return; } // 1 reintento automático antes de rendirse
+    mostrarToast('No se pudo actualizar Notas — se mantienen las últimas cargadas'); // ya NO vacía `notas`
   } finally {
     if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
   }
@@ -3771,6 +3784,21 @@ function notaGenerarId_() {
 }
 
 // ── Crear / duplicar (optimista) ─────────────────────────────
+// NUEVO v7.1.3 — reintento automático para guardados de Notas (crear/
+// actualizar), pedido por Ale ("si no pudo guardar, que no borre, que
+// intente"): antes de asumir que falló, reintenta 1 vez — mismo
+// criterio que ya se usa para las lecturas de Listas (v7.1.1/v7.1.2).
+async function notaLlamarGuardado_(action, params, reintentando) {
+  try {
+    const res = await llamarBackend(action, params);
+    if (!res.ok) throw new Error(res.error || (action + ' falló'));
+    return res;
+  } catch (err) {
+    if (!reintentando) return notaLlamarGuardado_(action, params, true);
+    throw err;
+  }
+}
+
 async function notaCrear_(x, y, opts) {
   opts = opts || {};
   const tipo = opts.tipo || 'postit'; // NUEVO v6.2.0
@@ -3797,12 +3825,11 @@ async function notaCrear_(x, y, opts) {
     notaEnfocarTexto_(id); // una región recién dibujada no roba el foco — no tiene sentido ahí
   }
   try {
-    const res = await llamarBackend('crearNota', {
+    const res = await notaLlamarGuardado_('crearNota', {
       obraId: obraActual.obraId, id: id, texto: notaOptimista.texto, color: notaOptimista.color, tamaño: notaOptimista.tamaño,
       x: notaOptimista.x, y: notaOptimista.y, email: emailActual,
       tipo: notaOptimista.tipo, ancho: notaOptimista.ancho, alto: notaOptimista.alto // NUEVO v6.2.0
     });
-    if (!res.ok) throw new Error(res.error || 'crearNota falló');
     const nota = notas.find(function (n) { return n.id === id; });
     if (nota) {
       nota.zIndex = res.zIndex;
@@ -4017,8 +4044,7 @@ function actualizarNotaBackend_(id, cambios) {
 
 async function actualizarNotaBackendReal_(id, cambios) {
   try {
-    const res = await llamarBackend('actualizarNota', { obraId: obraActual.obraId, notaId: id, cambios: cambios, email: emailActual });
-    if (!res.ok) throw new Error(res.error || 'actualizarNota falló');
+    await notaLlamarGuardado_('actualizarNota', { obraId: obraActual.obraId, notaId: id, cambios: cambios, email: emailActual });
   } catch (err) {
     mostrarToast('No se pudo guardar el cambio — probá Actualizar');
   }
