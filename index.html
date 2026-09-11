@@ -1283,7 +1283,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.5';
+const APP_VERSION = 'v7.1.6';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1679,25 +1679,18 @@ function mostrarToast(mensaje) {
 }
 
 // ── HELPERS DE FETCH ────────────────────────────────────────
-// v7.1.4 — timeout explícito (20s) + navigator.onLine + mensaje
-// diferenciado por causa + console.error siempre con action+params.
-// NUEVO v7.1.5 — dos cambios más, tras comparar contra BDC (que
-// nunca mostró este síntoma) y varias fallas reales documentadas en
-// Ejecuciones de Apps Script (doGet colándose donde se esperaba
-// doPost — comportamiento intermitente conocido de la plataforma,
-// no de este código):
-// 1) Content-Type explícito 'text/plain;charset=utf-8' — mismo
-//    criterio que BDC (evita depender del default implícito del
-//    navegador, aunque en teoría da el mismo valor en la práctica).
-// 2) 1 reintento automático y silencioso, pero SOLO para acciones
-//    seguras de repetir (lecturas + sobrescrituras — mismo resultado
-//    final si se repiten). Deja afuera a propósito lo que "agrega"
-//    (comentarios, filas nuevas de Listas: un retry ciego podría
-//    duplicar si el pedido original sí había llegado a guardarse) y
-//    el login (solicitarPIN/validarPIN: no se reintentan solos para
-//    no gastar intentos fallidos ni reenviar un PIN sin que el
-//    usuario lo sepa). crearNota/actualizarNota ya tienen su propio
-//    reintento dedicado vía notaLlamarGuardado_, sin cambios acá.
+// v7.1.4 — navigator.onLine + mensaje diferenciado por causa +
+// console.error siempre con action+params.
+// v7.1.5 — Content-Type explícito + 1 reintento automático acotado a
+// acciones seguras (ver ACCIONES_SEGURAS_REINTENTO abajo).
+// NUEVO v7.1.6 — se saca el timeout propio de 20s (AbortController)
+// que se había agregado en v7.1.4. Motivo: fue una decisión nueva,
+// no probada, que terminó convirtiendo pedidos simplemente lentos
+// (nunca antes tratados como error, ni en PreKOM antes de v7.1.4 ni
+// en BDC nunca) en errores mostrados al usuario — BDC nunca tuvo
+// límite propio y nunca mostró este síntoma. Se vuelve al mismo
+// criterio probado: esperar lo que haga falta, sin cortar nosotros
+// mismos un pedido que capaz iba a responder bien un poco más tarde.
 const ACCIONES_SEGURAS_REINTENTO = new Set([
   'inicializarObra', 'listarObras', 'listarGrupos', 'listarListas',
   'leerListaSchema', 'leerListaDatos', 'leerListaValores', 'leerFavoritos',
@@ -1708,8 +1701,6 @@ const ACCIONES_SEGURAS_REINTENTO = new Set([
   'reordenarFavoritos', 'reordenarListasEnGrupo'
 ]);
 
-const LLAMAR_BACKEND_TIMEOUT_MS = 20000;
-
 async function llamarBackend(action, params, reintentando) {
   const body = Object.assign({ action: action }, params || {});
 
@@ -1718,24 +1709,16 @@ async function llamarBackend(action, params, reintentando) {
     throw new Error('Estás sin conexión a internet. Revisá tu conexión y volvé a intentar.');
   }
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(function () { controller.abort(); }, LLAMAR_BACKEND_TIMEOUT_MS);
   let resp;
   try {
     resp = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS — mismo criterio que BDC
-      body: JSON.stringify(body),
-      signal: controller.signal
+      body: JSON.stringify(body)
     });
   } catch (fetchErr) {
-    clearTimeout(timeoutId);
-    const err = fetchErr.name === 'AbortError'
-      ? new Error('El backend tardó demasiado en responder (más de ' + (LLAMAR_BACKEND_TIMEOUT_MS / 1000) + 's). Probá de nuevo.')
-      : new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.');
-    return llamarBackendManejarFallo_(action, params, reintentando, err);
+    return llamarBackendManejarFallo_(action, params, reintentando, new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.'));
   }
-  clearTimeout(timeoutId);
 
   if (!resp.ok) {
     return llamarBackendManejarFallo_(action, params, reintentando, new Error('El backend respondió con un error (HTTP ' + resp.status + ').'));
