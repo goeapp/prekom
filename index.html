@@ -1283,7 +1283,7 @@ input { font-family: inherit; }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v7.1.6';
+const APP_VERSION = 'v7.1.7';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2639,7 +2639,7 @@ async function onDragEndListaGrupo_(evt) {
 // Devuelve true/false (éxito) — los llamados de rollback existentes lo
 // ignoran a propósito (se quedan con el último estado conocido en
 // silencio), el botón Actualizar sí lo usa para avisar si falló.
-async function recargarListasYGrupos_(reintentando) {
+async function recargarListasYGrupos_() {
   try {
     const [resListas, resGrupos, resFavoritos] = await Promise.all([
       llamarBackend('listarListas', { obraId: obraActual.obraId }),
@@ -2651,14 +2651,15 @@ async function recargarListasYGrupos_(reintentando) {
     favoritosActuales = (resFavoritos.ok && resFavoritos.favoritos) ? resFavoritos.favoritos : favoritosActuales;
     return true;
   } catch (err) {
-    // FIX v7.1.1 — la misma latencia intermitente de Apps Script que ya
-    // se vio (y se resolvió) en la carga inicial de la obra afecta acá
-    // también, porque esta función sigue haciendo 3 llamadas en
-    // paralelo en vez de 1 consolidada. Mientras tanto, 1 reintento
-    // automático antes de reportar falla (reportado por Ale: un
-    // reintento manual solía andar).
-    if (!reintentando) return recargarListasYGrupos_(true);
-    return false; // si falla también el reintento, se queda con el último estado conocido
+    // NUEVO v7.1.7 — se saca el reintento propio de v7.1.1 (llamarse a
+    // sí misma), que quedó redundante desde que llamarBackend() (v7.1.5)
+    // ya reintenta internamente listarListas/listarGrupos/leerFavoritos
+    // una por una. Mantener los dos niveles apilaba hasta 12 pedidos al
+    // backend por un solo click (3 en paralelo × reintento interno × el
+    // reintento de esta función repitiendo las 3 de nuevo) — carga
+    // autoinfligida que BDC, sin ningún reintento propio en el
+    // frontend, nunca genera.
+    return false; // se queda con el último estado conocido
   }
 }
 
@@ -2764,7 +2765,7 @@ async function abrirLista(nombreTab) {
  * grilla. `esPrimeraCarga` controla el estado visual de "Cargando…"
  * (solo se muestra la primera vez que se abre la lista).
  */
-async function cargarYMontarLista(nombreTab, esPrimeraCarga, reintentando) {
+async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
   try {
     const [resSchema, resDatos] = await Promise.all([
       llamarBackend('leerListaSchema', { obraId: obraActual.obraId, nombreLista: nombreTab }),
@@ -2786,11 +2787,11 @@ async function cargarYMontarLista(nombreTab, esPrimeraCarga, reintentando) {
     destruirTablaSiExiste();
     montarTabulator(nombreTab, schemaListaAbierta, datos);
   } catch (err) {
-    // FIX v7.1.2 — mismo mitigador que recargarListasYGrupos_ (v7.1.1):
-    // 1 reintento automático antes de mostrar el error, para los blips
-    // de red puntuales (confirmado con Ale vía el panel de Ejecuciones
-    // de Apps Script: el backend en sí no tiene errores).
-    if (!reintentando) { await cargarYMontarLista(nombreTab, esPrimeraCarga, true); return; }
+    // NUEVO v7.1.7 — se saca el reintento propio de v7.1.2 (llamarse a
+    // sí misma), redundante desde que llamarBackend() (v7.1.5) ya
+    // reintenta internamente leerListaSchema/leerListaDatos una por
+    // una. Mismo motivo que recargarListasYGrupos_ — evita apilar dos
+    // niveles de reintento sobre las mismas 2 llamadas en paralelo.
     if (esPrimeraCarga) {
       document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
     } else {
