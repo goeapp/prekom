@@ -53,7 +53,20 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { min-height: 100%; }
+/* FIX v8.4.4 — el scroll de página "fantasma" que reportó Ale
+   aparecía en TODA la app (Contenido, Hub de Listas, detalle de
+   Lista) y desaparecía con solo cambiar el zoom del navegador — esa
+   combinación es la firma clásica de `100vh`: en varios navegadores
+   el cálculo de `vh` redondea una fracción de píxel distinto al alto
+   real de la ventana, y esa fracción de más alcanza para mostrar la
+   barra de scroll en cualquier vista, sea cual sea su contenido. No
+   tenía nada que ver con el cálculo de alto de la tabla de Listas
+   (eso era una pista falsa — el síntoma se repetía en vistas que ni
+   tocan ese código). Se cambia `100vh` por `height: 100%` en toda la
+   cadena (html → body → #app), que no tiene ese problema de redondeo
+   porque se resuelve contra la caja real del padre, no contra una
+   métrica de viewport aparte. */
+html, body { height: 100%; min-height: 100%; }
 body {
   background : var(--bg);
   color      : var(--text);
@@ -205,7 +218,7 @@ input { font-family: inherit; }
 /* ─────────────────────────────────────────────────
    APP — HEADER — de BDC
 ───────────────────────────────────────────────── */
-#app { display: none; flex-direction: column; min-height: 100vh; }
+#app { display: none; flex-direction: column; min-height: 100%; }
 #app-header {
   min-height   : var(--header-h);
   background   : var(--accent2);
@@ -602,6 +615,18 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
    alcanza — ver esa función para el porqué de medirlo por JS y no con
    un vh fijo). */
 .tabla-lista-scroll { overflow: auto; }
+/* FIX v8.4.3 — el bug del texto de otras columnas "pasando por
+   detrás" de las fijas (reportado por Ale) tenía una 2da causa además
+   del border-collapse ya corregido en v8.4.2: sin `table-layout:
+   fixed`, el navegador recalcula el ancho de cada columna según su
+   contenido (`table-layout: auto`, el default) — así que el ancho
+   real de ID/Tarea/Acciones podía terminar siendo distinto al que
+   asumen sus `left` de sticky (0/48/248), y esa diferencia es
+   justo el "agujero" por donde asomaba la columna siguiente. Con
+   `fixed`, el navegador respeta al pie de la letra los anchos que le
+   damos por CSS (ver nth-child de abajo) — ahí sí `left` y ancho real
+   coinciden siempre. */
+.tabla-lista-scroll table.dataTable { table-layout: fixed; }
 /* Header pegado arriba del propio contenedor con scroll (no de la
    página) — mismo mecanismo que .app-header, aplicado acá al thead. */
 .tabla-lista-scroll table.dataTable thead th { position: sticky; top: 0; z-index: 3; }
@@ -1446,7 +1471,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.2';
+const APP_VERSION = 'v8.4.4';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -3200,14 +3225,32 @@ function ajustarAltoTablaLista_() {
   // FIX v8.4.1 — el margen real no es el padding-bottom de .view (60px)
   // solo: hay que sumarle el padding-bottom + borde de .tabla-lista-wrap
   // (14px + 1px) que quedan DEBAJO de este mismo div, dentro de la
-  // página. Total 75px — antes decía 24px por error de cuenta mía, y
-  // esos ~50px de diferencia eran justo el motivo del scroll de página
-  // que reportó Ale (la caja quedaba más alta de lo que entraba en
-  // pantalla, aunque a simple vista no se viera nada de más abajo).
+  // página. Total 75px.
   const margenInferior = 75;
   const top = scrollBox.getBoundingClientRect().top;
-  const alto = window.innerHeight - top - margenInferior;
-  scrollBox.style.maxHeight = Math.max(alto, 220) + 'px'; // piso de 220px por si el cálculo da chico en pantallas bajas
+  let alto = window.innerHeight - top - margenInferior;
+  scrollBox.style.maxHeight = Math.max(alto, 220) + 'px';
+
+  // FIX v8.4.3 — red de seguridad: los 75px de v8.4.1 seguían dejando
+  // un resto de scroll de página en la prueba real (Ale) — algo no
+  // contemplado en la cuenta a mano (candidato más probable: la
+  // tipografía terminando de cargar después de esta medición, que
+  // corre muy temprano). En vez de perseguir el número exacto a mano
+  // de nuevo, se mide el sobrante REAL de la página ya con el
+  // max-height de arriba aplicado, y si todavía sobra algo, se le
+  // resta a la tabla — autocorregible pase lo que pase debajo.
+  const sobrante = document.documentElement.scrollHeight - window.innerHeight;
+  if (sobrante > 0) {
+    scrollBox.style.maxHeight = Math.max(alto - sobrante, 220) + 'px';
+  }
+}
+// FIX v8.4.3 — si la tipografía (DM Sans) todavía no había terminado
+// de cargar en el primer cálculo, puede correr el alto de filas/header
+// un poco después y dejar un resto de scroll que la corrección de
+// arriba no llegó a ver. Se re-mide una vez más cuando las fuentes
+// terminan de cargar, sea cual sea la lista abierta en ese momento.
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(function () { ajustarAltoTablaLista_(); });
 }
 window.addEventListener('resize', ajustarAltoTablaLista_);
 
