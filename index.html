@@ -575,7 +575,15 @@ input { font-family: inherit; }
    inline — el CRUD vive en la modal de alta/edición más abajo). */
 .tabla-lista-wrap { margin-top: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px 14px 14px; }
 .dataTables_wrapper { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); }
-table.dataTable { width: 100% !important; border-collapse: collapse !important; }
+/* FIX v8.4.2 — `border-collapse: collapse` + `position: sticky` en
+   celdas es una combinación con bugs de renderizado conocidos (el
+   fondo de la celda fija no termina de tapar del todo lo que scrollea
+   atrás — es justo lo que reportó Ale: texto de columnas no-fijas
+   asomando detrás de ID/Tarea/Acciones). `border-spacing: 0` +
+   `separate` da el mismo resultado visual acá porque cada celda ya
+   define su propio borde de un solo lado (border-bottom, ver abajo),
+   sin depender del colapsado para no duplicar líneas. */
+table.dataTable { width: 100% !important; border-collapse: separate !important; border-spacing: 0 !important; }
 table.dataTable thead th {
   background: var(--accent2) !important; color: #fff !important; font-weight: 600 !important;
   font-size: 12px; padding: 7px 10px !important; border-bottom: none !important; white-space: nowrap;
@@ -1438,7 +1446,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.0';
+const APP_VERSION = 'v8.4.2';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -3189,7 +3197,14 @@ function montarTablaLista(nombreTab, schema, datos) {
 function ajustarAltoTablaLista_() {
   const scrollBox = document.querySelector('#tabla-lista-contenedor .tabla-lista-scroll');
   if (!scrollBox) return;
-  const margenInferior = 24; // mismo margen que .view usa de padding-bottom
+  // FIX v8.4.1 — el margen real no es el padding-bottom de .view (60px)
+  // solo: hay que sumarle el padding-bottom + borde de .tabla-lista-wrap
+  // (14px + 1px) que quedan DEBAJO de este mismo div, dentro de la
+  // página. Total 75px — antes decía 24px por error de cuenta mía, y
+  // esos ~50px de diferencia eran justo el motivo del scroll de página
+  // que reportó Ale (la caja quedaba más alta de lo que entraba en
+  // pantalla, aunque a simple vista no se viera nada de más abajo).
+  const margenInferior = 75;
   const top = scrollBox.getBoundingClientRect().top;
   const alto = window.innerHeight - top - margenInferior;
   scrollBox.style.maxHeight = Math.max(alto, 220) + 'px'; // piso de 220px por si el cálculo da chico en pantallas bajas
