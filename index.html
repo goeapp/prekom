@@ -16,8 +16,15 @@
      de solo lectura); entra DataTables, mismo patrón/versión que ya usan
      LibroObra y PdTT en el stack (jQuery + DOM-sourced). -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.11/css/jquery.dataTables.min.css">
+<!-- NUEVO v8.1.1 — FixedHeader (header fijo al scroll vertical) y
+     FixedColumns (2 primeras columnas fijas al scroll horizontal),
+     extensiones oficiales de DataTables, mismo CDN que el core. -->
+<link rel="stylesheet" href="https://cdn.datatables.net/fixedheader/3.4.0/css/fixedHeader.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.3.0/css/fixedColumns.dataTables.min.css">
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.11/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/fixedheader/3.4.0/js/dataTables.fixedHeader.min.js"></script>
+<script src="https://cdn.datatables.net/fixedcolumns/4.3.0/js/dataTables.fixedColumns.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -395,7 +402,7 @@ input { font-family: inherit; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 100; }
 .modal-box { background: var(--surface); border-radius: 14px; width: 100%; max-width: 420px; box-shadow: var(--shadow-md); overflow: hidden; }
 .modal-box.wide { max-width: min(1100px, 92vw); max-height: 88vh; display: flex; flex-direction: column; }
-.modal-box.wide .modal-body { overflow-y: auto; }
+.modal-box.wide .modal-body { overflow-y: auto; flex: 1; min-height: 0; }
 
 /* v3.0.0 — modal genérico (mostrarConfirm/mostrarAviso) y toast
    (mostrarToast), portados tal cual de index_bdc_v6_0_0.html —
@@ -457,6 +464,9 @@ input { font-family: inherit; }
 .modal-close:hover { color: #fff; }
 .modal-body { padding: 22px 20px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+/* NUEVO v8.1.1 — footer fijo del modal de fila (Listas), fuera del
+   área con scroll (.modal-body), mismo criterio visual que modal-head. */
+.modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
 
 .links-lista { display: flex; flex-direction: column; gap: 8px; }
 .links-lista a { display: block; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px; color: var(--text); text-decoration: none; }
@@ -579,11 +589,25 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 .dataTables_wrapper .dataTables_length select {
   border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 12px; margin: 0 4px;
 }
-.dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { font-size: .75rem; color: var(--muted); margin-top: 10px; }
+/* FIX v8.1.1 — length+info+paginado en un solo bloque arriba (dt-top),
+   en vez de length arriba e info/paginado sueltos al pie sin caja
+   (dt-bot, sacado del dom). Mismo criterio que .paginador-arriba. */
+.dt-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { font-size: .75rem; color: var(--muted); margin: 0; }
 .dataTables_wrapper .dataTables_paginate .paginate_button { border-radius: var(--radius-sm) !important; font-size: .78rem !important; padding: 3px 8px !important; }
 .dataTables_wrapper .dataTables_paginate .paginate_button.current {
   background: var(--accent) !important; border-color: var(--accent-border) !important; color: #fff !important;
 }
+/* FIX v8.1.1 — celdas de texto libre (texto_corto/texto_largo):
+   truncado a 1 línea con ellipsis, texto completo en el title
+   (tooltip nativo). Ancho tope para que la columna no crezca de más
+   con scrollX activo. */
+.celda-truncada { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* NUEVO v8.1.1 — FixedHeader/FixedColumns retemados a los tokens del
+   stack (por defecto vienen con su propio look genérico). */
+table.dataTable.fixedHeader-floating { box-shadow: var(--shadow-md); }
+.DTFC_LeftBodyLiner, .DTFC_LeftHeadWrapper table, .DTFC_LeftFootWrapper table { background: var(--surface); }
+.dtfc-fixed-left { background: var(--surface); }
 /* Fila de filtros por columna (listaValores_*), segunda fila del thead */
 .dt-filtros-fila th { background: var(--surface) !important; padding: 4px 8px !important; }
 .dt-filtro-col { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 3px 4px; font-size: 11px; color: var(--text); background: var(--surface); }
@@ -598,7 +622,12 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
    dinámicamente desde el schema de cada lista. modal-body ya trae
    scroll propio (ver .modal-body en la base del stack); acá solo el
    contenido interno del formulario. */
+/* FIX v8.1.1 — grilla de 2 columnas para aprovechar el ancho del modal
+   wide; texto_largo (.campo-full) ocupa la fila completa. */
+#fila-lista-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 20px; align-items: start; }
 .form-campo { margin-bottom: 14px; }
+.form-campo.campo-full { grid-column: 1 / -1; }
+@media (max-width: 640px) { #fila-lista-form { grid-template-columns: 1fr; } }
 .form-campo label { display: block; font-size: .78rem; font-weight: 600; color: var(--text); margin-bottom: 4px; }
 .form-campo .req-marca { color: #dc2626; margin-left: 2px; }
 .form-campo input, .form-campo select, .form-campo textarea {
@@ -1017,10 +1046,13 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
     </div>
     <div class="modal-body">
       <div id="fila-lista-form"></div>
-      <div class="modal-actions">
-        <button class="btn-secundario" style="width:auto" id="btn-cancelar-fila-lista">Cancelar</button>
-        <button class="btn-accion" style="width:auto" id="btn-guardar-fila-lista">Guardar</button>
-      </div>
+    </div>
+    <!-- FIX v8.1.1 — Cancelar/Guardar salen del modal-body con scroll
+         propio y pasan a un footer fijo, siempre visibles sin importar
+         cuánto se scrollee el formulario. -->
+    <div class="modal-footer">
+      <button class="btn-secundario" style="width:auto" id="btn-cancelar-fila-lista">Cancelar</button>
+      <button class="btn-accion" style="width:auto" id="btn-guardar-fila-lista">Guardar</button>
     </div>
   </div>
 </div>
@@ -1338,7 +1370,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.1.0';
+const APP_VERSION = 'v8.1.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2805,7 +2837,7 @@ async function abrirLista(nombreTab) {
       '</div>' +
     '</div>' +
     '<div class="estado-vacio" id="lista-cargando"><div class="spinner"></div>Cargando…</div>' +
-    '<div class="tabla-lista-wrap" id="tabla-lista-contenedor"></div>';
+    '<div class="tabla-lista-wrap hidden" id="tabla-lista-contenedor"></div>';
 
   terminoBusquedaLista = '';
   const inputBuscador = document.getElementById('lista-buscador');
@@ -2938,11 +2970,18 @@ function formatoCeldaLista_(col, valor) {
     const bg = opcion ? colorTag(opcion.color) : 'var(--muted)';
     return '<span class="tag-valor" style="background:' + bg + '">' + escaparHtml(String(valor)) + '</span>';
   }
-  if (col.tipoCampo === 'texto_largo') {
-    const plano = String(valor);
-    return escaparHtml(plano.length > 140 ? plano.slice(0, 140) + '…' : plano);
-  }
+  // FIX v8.1.1 — el corte a 140 caracteres en JS se saca: el truncado
+  // ahora es visual (CSS, 1 línea + ellipsis, ver .celda-truncada) y el
+  // texto completo se ve en el title (tooltip nativo) que arma
+  // montarTablaLista() por celda — acá siempre se devuelve completo.
   return escaparHtml(String(valor));
+}
+
+// FIX v8.1.1 — columnas de texto libre (sin tipo fijo de una lista de
+// valores) son las que pueden desbordar a 2da línea y estirar la fila;
+// numerico/fecha/listaValores_* son siempre cortos, no lo necesitan.
+function celdaEsTruncable_(col) {
+  return col.tipoCampo === 'texto_largo' || col.tipoCampo === 'texto_corto';
 }
 
 function _dtLangListas_() {
@@ -2978,8 +3017,11 @@ function montarTablaLista(nombreTab, schema, datos) {
     theadHtml += '<tr class="dt-filtros-fila">' + schema.map(function (col, i) {
       if (col.tipoCampo.indexOf('listaValores_') !== 0) return '<th></th>';
       const opciones = valoresParaTipo(col.tipoCampo);
+      // FIX v8.1.1 — el <option> de cada valor lleva el mismo color de
+      // fondo que su badge en la celda (colorTag), portado del
+      // headerFilter con badges que tenía Tabulator.
       const options = '<option value="">Todos</option>' + opciones.map(function (o) {
-        return '<option value="' + escaparHtml(o.valor) + '">' + escaparHtml(o.valor) + '</option>';
+        return '<option value="' + escaparHtml(o.valor) + '" style="background:' + colorTag(o.color) + ';color:#fff">' + escaparHtml(o.valor) + '</option>';
       }).join('');
       return '<th><select class="dt-filtro-col" data-col="' + i + '">' + options + '</select></th>';
     }).join('') + (puedeEditarListas ? '<th></th>' : '') + '</tr>';
@@ -2987,7 +3029,14 @@ function montarTablaLista(nombreTab, schema, datos) {
 
   const tbodyHtml = datos.map(function (fila) {
     const celdas = schema.map(function (col) {
-      return '<td>' + formatoCeldaLista_(col, fila[col.campo]) + '</td>';
+      const valor = fila[col.campo];
+      // FIX v8.1.1 — celdas de texto libre truncan a 1 línea (CSS) y
+      // llevan el texto completo en el title (tooltip nativo al pasar
+      // el mouse); el resto de los tipos queda igual que antes.
+      if (celdaEsTruncable_(col) && valor !== undefined && valor !== null && valor !== '') {
+        return '<td class="celda-truncada" title="' + escaparHtml(String(valor)) + '">' + formatoCeldaLista_(col, valor) + '</td>';
+      }
+      return '<td>' + formatoCeldaLista_(col, valor) + '</td>';
     }).join('');
     const acciones = puedeEditarListas
       ? '<td style="white-space:nowrap;text-align:center">' +
@@ -2998,17 +3047,31 @@ function montarTablaLista(nombreTab, schema, datos) {
     return '<tr>' + celdas + acciones + '</tr>';
   }).join('');
 
+  // FIX v8.1.1 — el contenedor nace oculto (`hidden` agregado en abrirLista())
+  // para no mostrar la caja vacía con fondo/borde/sombra mientras carga; recién
+  // se muestra acá, junto con la tabla ya armada.
+  cont.classList.remove('hidden');
   cont.innerHTML = '<table id="tabla-lista" class="display" style="width:100%"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + '</tbody></table>';
 
+  // FIX v8.1.1 — paginado+info suben al mismo bloque superior que el
+  // length ("Mostrar _ filas"), en vez de quedar sueltos al pie de la
+  // tabla sin la caja que los contenga (criterio histórico del stack:
+  // el paginador siempre vive arriba, ver .paginador-arriba). FixedHeader
+  // (vertical) + FixedColumns (2 primeras columnas, con scrollX) se
+  // agregan sobre esta misma instancia — ver comentario más abajo.
   tablaListaDT = $('#tabla-lista').DataTable({
     language: _dtLangListas_(),
     pageLength: 10,
     lengthMenu: [10, 20, 50],
     order: [],
-    dom: '<"dt-top"l>rt<"dt-bot"ip>', // sin 'f' — el buscador global propio de la app reemplaza al de DataTables
+    dom: '<"dt-top"lip>rt', // sin 'f' (buscador global propio) y sin dt-bot — todo el bloque de controles arriba
+    scrollX: true,
+    fixedColumns: { left: 2 },
     columnDefs: puedeEditarListas ? [{ targets: -1, orderable: false }] : [],
     orderCellsTop: colsConFiltro.length > 0 // si hay fila de filtros, ordenar clickeando la fila de títulos (la 1ª), no la de filtros
   });
+
+  new $.fn.dataTable.FixedHeader(tablaListaDT);
 
   if (terminoBusquedaLista) tablaListaDT.search(terminoBusquedaLista).draw();
 
@@ -3058,7 +3121,12 @@ function abrirModalFilaLista(nombreTab, filaId) {
       inputHtml = '<input type="text" id="' + idInput + '" value="' + (valor ? escaparHtml(String(valor)) : '') + '"' + disabledAttr + '>';
     }
 
-    return '<div class="form-campo" data-campo="' + col.campo + '" data-requerido="' + requerido + '">' +
+    // FIX v8.1.1 — grilla de 2 columnas: texto_largo ocupa la fila
+    // completa (campo-full), el resto comparte fila de a 2 para
+    // aprovechar el ancho del modal wide.
+    const claseAncho = col.tipoCampo === 'texto_largo' ? ' campo-full' : '';
+
+    return '<div class="form-campo' + claseAncho + '" data-campo="' + col.campo + '" data-requerido="' + requerido + '">' +
       '<label for="' + idInput + '">' + escaparHtml(col.etiqueta || col.campo) + requiredMarca + '</label>' +
       inputHtml +
       '<div class="form-campo-error hidden"></div>' +
