@@ -1370,7 +1370,7 @@ table.dataTable.fixedHeader-floating { box-shadow: var(--shadow-md); }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.2.0';
+const APP_VERSION = 'v8.3.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1791,8 +1791,38 @@ const ACCIONES_SEGURAS_REINTENTO = new Set([
   'reordenarFavoritos', 'reordenarListasEnGrupo'
 ]);
 
+// NUEVO v8.3.0 — mismo alcance que el ACCIONES_GET del .gs: estas
+// acciones se mandan por GET (parámetros en la URL) en vez de POST con
+// body JSON. Migración motivada por la investigación de esta sesión:
+// con la misma implementación, mismos parámetros, el mecanismo GET
+// mostró una tasa de 404 varias veces menor que POST contra el hop de
+// redirect propio de los Web Apps de Apps Script. Las escrituras con
+// contenido potencialmente largo (guardarResumen, actualizarNota,
+// crearNota, guardarFilaLista, agregarComentario,
+// agregarComentarioContenido) y validarPIN (lleva el código PIN) se
+// quedan en POST a propósito — ver comentario en el .gs.
+const ACCIONES_GET = new Set([
+  'inicializarObra', 'listarObras', 'leerListaCompleta', 'recargarListasHome',
+  'leerListaValores', 'leerComentarios', 'leerComentariosContenidoObra', 'leerNotas',
+  'verificarAdmin', 'verificarPermisosObra',
+  'marcarFavorito', 'desmarcarFavorito', 'reordenarFavoritos', 'reordenarListasEnGrupo',
+  'moverListaAGrupo', 'ocultarComentario', 'ocultarComentarioContenido', 'ocultarNota',
+  'guardarColorFondo', 'borrarFilaLista',
+  'solicitarPIN', 'validarSesion'
+]);
+
+function armarQueryString_(action, params) {
+  const qs = new URLSearchParams();
+  qs.set('action', action);
+  Object.keys(params || {}).forEach(function (k) {
+    const v = params[k];
+    qs.set(k, (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v));
+  });
+  return qs.toString();
+}
+
 async function llamarBackend(action, params, reintentando) {
-  const body = Object.assign({ action: action }, params || {});
+  const esGet = ACCIONES_GET.has(action);
 
   if (!navigator.onLine) {
     console.error('[llamarBackend]', action, '— sin conexión (navigator.onLine=false)', params);
@@ -1801,11 +1831,15 @@ async function llamarBackend(action, params, reintentando) {
 
   let resp;
   try {
-    resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS — mismo criterio que BDC
-      body: JSON.stringify(body)
-    });
+    if (esGet) {
+      resp = await fetch(API_URL + '?' + armarQueryString_(action, params));
+    } else {
+      resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS — mismo criterio que BDC
+        body: JSON.stringify(Object.assign({ action: action }, params || {}))
+      });
+    }
   } catch (fetchErr) {
     return llamarBackendManejarFallo_(action, params, reintentando, new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.'));
   }
