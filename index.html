@@ -593,6 +593,10 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
    en vez de length arriba e info/paginado sueltos al pie sin caja
    (dt-bot, sacado del dom). Mismo criterio que .paginador-arriba. */
 .dt-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+/* FIX v8.3.1 (punto 3) — una vez reparentado dentro de
+   .lista-header-acciones (ver montarTablaLista), no necesita el
+   margen de abajo que tenía cuando vivía solo, arriba de la tabla. */
+.lista-header-acciones .dt-top { margin-bottom: 0; }
 .dataTables_wrapper .dataTables_info, .dataTables_wrapper .dataTables_paginate { font-size: .75rem; color: var(--muted); margin: 0; }
 .dataTables_wrapper .dataTables_paginate .paginate_button { border-radius: var(--radius-sm) !important; font-size: .78rem !important; padding: 3px 8px !important; }
 .dataTables_wrapper .dataTables_paginate .paginate_button.current {
@@ -608,10 +612,16 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 table.dataTable.fixedHeader-floating { box-shadow: var(--shadow-md); }
 .DTFC_LeftBodyLiner, .DTFC_LeftHeadWrapper table, .DTFC_LeftFootWrapper table { background: var(--surface); }
 .dtfc-fixed-left { background: var(--surface); }
+/* FIX v8.3.1 (puntos 1/2) — red de seguridad extra, además del cambio
+   real (fixedHeader configurado junto con fixedColumns, ver
+   montarTablaLista): oculta cualquier resto de scrollbar fantasma que
+   el propio DataTables arma para sincronizar anchos entre el header
+   flotante y el body con scroll horizontal. */
+.dataTables_scrollHead, .dataTables_scrollHeadInner { overflow: hidden !important; }
 /* Fila de filtros por columna (listaValores_*), segunda fila del thead */
 .dt-filtros-fila th { background: var(--surface) !important; padding: 4px 8px !important; }
 .dt-filtro-col { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 3px 4px; font-size: 11px; color: var(--text); background: var(--surface); }
-.tag-valor { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; }
+.tag-valor { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; } /* FIX v8.3.1 (punto 5): sin esto el badge partía el texto en 2 líneas en columnas angostas */
 .btn-fila-accion { background: none; border: none; font-size: 14px; padding: 0 5px; cursor: pointer; }
 .btn-editar-fila { color: var(--accent); }
 .btn-editar-fila:hover { color: #b45309; }
@@ -633,12 +643,20 @@ table.dataTable.fixedHeader-floating { box-shadow: var(--shadow-md); }
 .form-campo input, .form-campo select, .form-campo textarea {
   width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   padding: 8px 10px; font-size: .85rem; font-family: inherit; color: var(--text);
+  background: var(--bg); /* FIX v8.3.1 (punto 11): antes heredaban blanco, igual que el fondo de la modal — ahora cada campo se distingue del fondo */
 }
-.form-campo input:focus, .form-campo select:focus, .form-campo textarea:focus { outline: none; border-color: var(--accent); }
+.form-campo input:focus, .form-campo select:focus, .form-campo textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .form-campo textarea { min-height: 70px; resize: vertical; }
-.form-campo input:disabled, .form-campo select:disabled { background: #f1f5f9; color: var(--muted); cursor: not-allowed; }
+.form-campo input:disabled, .form-campo select:disabled { background: #e2e8f0; color: var(--muted); cursor: not-allowed; } /* FIX v8.3.1: un poco más oscuro que --bg para distinguirse también del resto de los campos habilitados */
 .form-campo.con-error input, .form-campo.con-error select, .form-campo.con-error textarea { border-color: #dc2626; }
 .form-campo-error { color: #dc2626; font-size: .72rem; margin-top: 3px; }
+/* FIX v8.3.1 (puntos 9/10) — el campo "item" (identificador de la
+   fila, la misma columna que va fija en la tabla) se saca del
+   formulario scrolleable y queda pegado debajo del título de la
+   modal, siempre visible. Reutiliza el mismo .form-campo por dentro,
+   solo cambia el contenedor. */
+.fila-lista-fijo { padding: 14px 20px 0; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+.fila-lista-fijo:empty { display: none; }
 .buscador-wrap { position: relative; display: inline-block; }
 .input-buscador-inline {
   width: 200px; padding: 7px 26px 7px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
@@ -1044,6 +1062,8 @@ table.dataTable.fixedHeader-floating { box-shadow: var(--shadow-md); }
       <h3 id="fila-lista-titulo">Agregar fila</h3>
       <button class="modal-close" id="btn-cerrar-fila-lista">&times;</button>
     </div>
+    <!-- FIX v8.3.1 (puntos 9/10): campo "item" fijo, ID ya no se muestra (va en el título) -->
+    <div class="fila-lista-fijo" id="fila-lista-campo-fijo"></div>
     <div class="modal-body">
       <div id="fila-lista-form"></div>
     </div>
@@ -1370,7 +1390,7 @@ table.dataTable.fixedHeader-floating { box-shadow: var(--shadow-md); }
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.3.0';
+const APP_VERSION = 'v8.3.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -3030,34 +3050,68 @@ function _dtLangListas_() {
  * a montarTabulator() — la edición inline sale de la tabla, ahora es
  * pura vista (sort/filtro/paginación/badges) + columna de acciones.
  */
+// FIX v8.3.1 (punto 7) — la columna Acciones (editar/borrar) pasa de
+// ir al final (obligaba a hacer scroll horizontal completo para
+// llegar) a ser la 3ra columna fija a la izquierda, junto a ID e
+// Item. `IDX_ACCIONES_` es la posición (0-indexada) donde se inserta
+// en cada fila del thead/tbody, sea cual sea el schema de la lista —
+// siempre después de ID+Item, que son las 2 columnas que ya vienen
+// fijas por convención de código (ver campoBloqueado_).
+const IDX_ACCIONES_ = 2;
+
 function montarTablaLista(nombreTab, schema, datos) {
   const cont = document.getElementById('tabla-lista-contenedor');
   const colsConFiltro = schema.filter(function (c) { return c.tipoCampo.indexOf('listaValores_') === 0; });
 
-  let theadHtml = '<tr>' + schema.map(function (col) {
+  // Inserta la celda de Acciones en la posición IDX_ACCIONES_ de un
+  // array de celdas ya armado a partir del schema (thead principal,
+  // thead de filtros, o tbody) — centraliza el único lugar donde se
+  // decide dónde va la columna, para no repetir el splice 3 veces.
+  function conAcciones_(celdas, celdaAcciones) {
+    if (!puedeEditarListas) return celdas;
+    const copia = celdas.slice();
+    copia.splice(IDX_ACCIONES_, 0, celdaAcciones);
+    return copia;
+  }
+
+  let theadHtml = '<tr>' + conAcciones_(schema.map(function (col) {
     return '<th>' + escaparHtml(col.etiqueta || col.campo) + '</th>';
-  }).join('') + (puedeEditarListas ? '<th></th>' : '') + '</tr>';
+  }), '<th>Acciones</th>').join('') + '</tr>';
 
   // Segunda fila del thead: 1 <select> de filtro por columna, solo
   // para las de tipo listaValores_* (mismo criterio que el
   // headerFilter con badges que tenía Tabulator) — el resto de las
   // columnas usa el buscador global de arriba, no filtro propio.
+  // `data-col` ya no puede ser el índice del schema tal cual: ahora
+  // que Acciones se insertó en el medio, las columnas del schema que
+  // quedan después de esa posición se corrieron 1 lugar en la tabla
+  // real de DataTables — `colDT_` traduce índice-de-schema a
+  // índice-real-de-columna.
+  function colDT_(i) {
+    return (puedeEditarListas && i >= IDX_ACCIONES_) ? i + 1 : i;
+  }
+
   if (colsConFiltro.length) {
-    theadHtml += '<tr class="dt-filtros-fila">' + schema.map(function (col, i) {
+    theadHtml += '<tr class="dt-filtros-fila">' + conAcciones_(schema.map(function (col, i) {
       if (col.tipoCampo.indexOf('listaValores_') !== 0) return '<th></th>';
       const opciones = valoresParaTipo(col.tipoCampo);
-      // FIX v8.1.1 — el <option> de cada valor lleva el mismo color de
-      // fondo que su badge en la celda (colorTag), portado del
-      // headerFilter con badges que tenía Tabulator.
+      // Punto 6 de la ronda de UX (Ale confirmó): el navegador ignora
+      // el background-color de <option> en la práctica, así que el
+      // color de fondo del badge se saca de acá — queda texto plano,
+      // el color sigue viviendo en la celda de la tabla (colorTag).
       const options = '<option value="">Todos</option>' + opciones.map(function (o) {
-        return '<option value="' + escaparHtml(o.valor) + '" style="background:' + colorTag(o.color) + ';color:#fff">' + escaparHtml(o.valor) + '</option>';
+        return '<option value="' + escaparHtml(o.valor) + '">' + escaparHtml(o.valor) + '</option>';
       }).join('');
-      return '<th><select class="dt-filtro-col" data-col="' + i + '">' + options + '</select></th>';
-    }).join('') + (puedeEditarListas ? '<th></th>' : '') + '</tr>';
+      return '<th><select class="dt-filtro-col" data-col="' + colDT_(i) + '">' + options + '</select></th>';
+    }), '<th></th>').join('') + '</tr>';
   }
 
   const tbodyHtml = datos.map(function (fila) {
-    const celdas = schema.map(function (col) {
+    const celdaAcciones = '<td style="white-space:nowrap;text-align:center">' +
+        '<button class="btn-fila-accion btn-editar-fila" title="Editar" onclick="abrirModalFilaLista(\'' + nombreTab + '\', \'' + fila.id + '\')">✎</button>' +
+        '<button class="btn-fila-accion btn-borrar-fila" title="Borrar" onclick="confirmarBorrarFila(\'' + nombreTab + '\', \'' + fila.id + '\')">🗑</button>' +
+      '</td>';
+    const celdas = conAcciones_(schema.map(function (col) {
       const valor = fila[col.campo];
       // FIX v8.1.1 — celdas de texto libre truncan a 1 línea (CSS) y
       // llevan el texto completo en el title (tooltip nativo al pasar
@@ -3066,14 +3120,8 @@ function montarTablaLista(nombreTab, schema, datos) {
         return '<td class="celda-truncada" title="' + escaparHtml(String(valor)) + '">' + formatoCeldaLista_(col, valor) + '</td>';
       }
       return '<td>' + formatoCeldaLista_(col, valor) + '</td>';
-    }).join('');
-    const acciones = puedeEditarListas
-      ? '<td style="white-space:nowrap;text-align:center">' +
-          '<button class="btn-fila-accion btn-editar-fila" title="Editar" onclick="abrirModalFilaLista(\'' + nombreTab + '\', \'' + fila.id + '\')">✎</button>' +
-          '<button class="btn-fila-accion btn-borrar-fila" title="Borrar" onclick="confirmarBorrarFila(\'' + nombreTab + '\', \'' + fila.id + '\')">🗑</button>' +
-        '</td>'
-      : '';
-    return '<tr>' + celdas + acciones + '</tr>';
+    }), celdaAcciones);
+    return '<tr>' + celdas.join('') + '</tr>';
   }).join('');
 
   // FIX v8.1.1 — el contenedor nace oculto (`hidden` agregado en abrirLista())
@@ -3095,14 +3143,31 @@ function montarTablaLista(nombreTab, schema, datos) {
     order: [],
     dom: '<"dt-top"lip>rt', // sin 'f' (buscador global propio) y sin dt-bot — todo el bloque de controles arriba
     scrollX: true,
-    fixedColumns: { left: 2 },
-    columnDefs: puedeEditarListas ? [{ targets: -1, orderable: false }] : [],
+    scrollCollapse: true,
+    // FIX v8.3.1 — FixedHeader pasa a configurarse ACÁ, como opción del
+    // propio DataTable() (patrón oficial recomendado cuando conviven
+    // scrollX + FixedColumns), en vez de instanciarse aparte con
+    // `new $.fn.dataTable.FixedHeader(...)` después de crear la tabla.
+    // El instanciado en 2 pasos dejaba a los 2 plugins calculando
+    // anchos por separado sin coordinarse entre sí — eso explica los 3
+    // síntomas reportados por Ale sobre la misma tabla: el recuadro
+    // gris fantasma repetido por columna, la línea vertical
+    // desalineada, y que el header dejara de quedar fijo al hacer
+    // scroll vertical. Con los 2 configurados en la misma llamada,
+    // DataTables sincroniza un solo cálculo de anchos entre ambos.
+    fixedHeader: true,
+    fixedColumns: { left: puedeEditarListas ? 3 : 2 },
+    columnDefs: puedeEditarListas ? [{ targets: IDX_ACCIONES_, orderable: false }] : [],
     orderCellsTop: colsConFiltro.length > 0 // si hay fila de filtros, ordenar clickeando la fila de títulos (la 1ª), no la de filtros
   });
 
-  new $.fn.dataTable.FixedHeader(tablaListaDT);
-
   if (terminoBusquedaLista) tablaListaDT.search(terminoBusquedaLista).draw();
+
+  // FIX v8.3.1 (punto 3) — el bloque "Mostrar N filas / Mostrando X de
+  // Y / paginado" (dt-top) se pasa a la misma fila que
+  // buscador/Actualizar/Comentarios/+Agregar fila, para ganar una
+  // línea de alto en vez de quedar suelto arriba de la tabla.
+  $('#lista-header-acciones').append($('#tabla-lista-contenedor .dt-top'));
 
   $('.dt-filtro-col').off('change').on('change', function () {
     const col = $(this).data('col');
@@ -3122,10 +3187,13 @@ function abrirModalFilaLista(nombreTab, filaId) {
   const esEdicion = filaId !== null;
   const fila = esEdicion ? (datosListaAbierta.find(function (f) { return String(f.id) === String(filaId); }) || {}) : {};
 
-  document.getElementById('fila-lista-titulo').textContent = esEdicion ? 'Editar fila' : 'Agregar fila';
+  // FIX v8.3.1 (punto 9): ID ya no se muestra como campo (en ningún
+  // modo) — el título lo reemplaza, "Editar fila #N".
+  document.getElementById('fila-lista-titulo').textContent = esEdicion ? ('Editar fila #' + escaparHtml(String(filaId))) : 'Agregar fila';
 
+  let htmlFijo = '';
   const formHtml = schemaListaAbierta.map(function (col) {
-    if (col.campo === 'id' && !esEdicion) return ''; // en alta, ID ni se muestra — todavía no existe
+    if (col.campo === 'id') return ''; // nunca se muestra — autonumérico, ver título
     const bloqueado = campoBloqueado_(col, esEdicion);
     const requerido = col.condicion === 'requerido' && !bloqueado;
     const valor = fila[col.campo];
@@ -3155,13 +3223,20 @@ function abrirModalFilaLista(nombreTab, filaId) {
     // aprovechar el ancho del modal wide.
     const claseAncho = col.tipoCampo === 'texto_largo' ? ' campo-full' : '';
 
-    return '<div class="form-campo' + claseAncho + '" data-campo="' + col.campo + '" data-requerido="' + requerido + '">' +
+    const divHtml = '<div class="form-campo' + claseAncho + '" data-campo="' + col.campo + '" data-requerido="' + requerido + '">' +
       '<label for="' + idInput + '">' + escaparHtml(col.etiqueta || col.campo) + requiredMarca + '</label>' +
       inputHtml +
       '<div class="form-campo-error hidden"></div>' +
     '</div>';
+
+    // FIX v8.3.1 (punto 10): el campo "item" se separa del resto —
+    // queda fijo debajo del título en vez de scrollear con el resto
+    // del formulario (misma columna que ya va fija en la tabla).
+    if (col.campo === 'item') { htmlFijo = divHtml; return ''; }
+    return divHtml;
   }).join('');
 
+  document.getElementById('fila-lista-campo-fijo').innerHTML = htmlFijo;
   document.getElementById('fila-lista-form').innerHTML = formHtml;
   bloquearModalFilaLista_(false);
   document.getElementById('modal-fila-lista').classList.remove('hidden');
@@ -3189,7 +3264,10 @@ document.getElementById('btn-guardar-fila-lista').addEventListener('click', asyn
   // presentes en el formulario (en alta, ID no está; los bloqueados
   // ya vienen marcados como no-requeridos desde abrirModalFilaLista).
   let primerCampoConError = null;
-  document.querySelectorAll('#fila-lista-form .form-campo').forEach(function (div) {
+  // FIX v8.3.1: el campo "item" vive ahora en #fila-lista-campo-fijo
+  // (fuera de #fila-lista-form, ver punto 10) — hay que barrer los 2
+  // contenedores para no dejarlo afuera de la validación.
+  document.querySelectorAll('#fila-lista-campo-fijo .form-campo, #fila-lista-form .form-campo').forEach(function (div) {
     const requerido = div.dataset.requerido === 'true';
     const input = div.querySelector('input, select, textarea');
     const errorDiv = div.querySelector('.form-campo-error');
@@ -3212,7 +3290,10 @@ document.getElementById('btn-guardar-fila-lista').addEventListener('click', asyn
   // tiene sentido (guardarFilaLista_ nunca lo pisa por este camino).
   const filaAEnviar = {};
   if (esEdicion) filaAEnviar.id = filaEnEdicionId;
-  document.querySelectorAll('#fila-lista-form .form-campo').forEach(function (div) {
+  // FIX v8.3.1: mismo motivo que la validación de arriba — el campo
+  // "item" vive en #fila-lista-campo-fijo, hay que incluirlo acá para
+  // que se siga mandando al backend.
+  document.querySelectorAll('#fila-lista-campo-fijo .form-campo, #fila-lista-form .form-campo').forEach(function (div) {
     const campo = div.dataset.campo;
     const input = div.querySelector('input, select, textarea');
     if (input.disabled) return;
