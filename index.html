@@ -1471,7 +1471,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.4';
+const APP_VERSION = 'v8.4.5';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -3161,8 +3161,24 @@ function montarTablaLista(nombreTab, schema, datos) {
     return copia;
   }
 
+  // FIX v8.4.5 — con `table-layout: fixed` (necesario para que el
+  // sticky de ID/Tarea/Acciones no se desalinee, ver v8.4.3) el
+  // navegador reparte el ancho sobrante en PARTES IGUALES entre las
+  // columnas sin ancho declarado — con muchas columnas (ej. 12
+  // "Documento") eso aplastaba Área/Estado hasta que sus badges se
+  // pisaban entre sí. Se le da un ancho de arranque a cada columna
+  // según su tipo, para que fixed tenga de dónde repartir en vez de
+  // dividir todo por igual.
+  function anchoColumna_(col) {
+    if (col.tipoCampo === 'fecha') return '95px';
+    if (col.tipoCampo === 'numerico') return '80px';
+    if (col.tipoCampo.indexOf('listaValores_') === 0) return '130px';
+    if (col.tipoCampo === 'texto_largo') return '220px';
+    return '160px'; // texto_corto y cualquier tipo no contemplado
+  }
+
   const theadHtml = '<tr>' + conAcciones_(schema.map(function (col) {
-    return '<th>' + escaparHtml(col.etiqueta || col.campo) + '</th>';
+    return '<th style="width:' + anchoColumna_(col) + '">' + escaparHtml(col.etiqueta || col.campo) + '</th>';
   }), '<th class="acciones-col">Acciones</th>').join('') + '</tr>';
 
   const tbodyHtml = datos.map(function (fila) {
