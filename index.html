@@ -1471,7 +1471,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.5';
+const APP_VERSION = 'v8.4.6';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1533,6 +1533,21 @@ function lapizInit(){
 function lapizSyncCanvasSize(){
   const canvas = document.getElementById('lpz-canvas');
   if(!canvas) return;
+  // FIX v8.4.6 — causa real del scroll de página "fantasma" que se
+  // venía arrastrando hace varias entregas (confirmado con el
+  // diagnóstico que corrió Ale por consola): este canvas es
+  // `position:absolute`, así que su propio alto cuenta para
+  // scrollHeight — y esta función usaba scrollHeight (que ya incluía
+  // el alto ANTERIOR del canvas) para decidir el alto NUEVO del
+  // canvas. Una vez que el canvas quedaba grande una sola vez (una
+  // vista larga, un estado transitorio), se retroalimentaba a sí
+  // mismo para siempre: por más que el contenido real volviera a ser
+  // corto, scrollHeight seguía "viendo" el alto viejo del canvas y
+  // se lo volvía a aplicar. Se lo achica a 0 ANTES de medir, para que
+  // su propio tamaño anterior no contamine la medición del contenido
+  // real.
+  canvas.width = 0;
+  canvas.height = 0;
   canvas.width = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth, window.innerWidth);
   canvas.height = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight, window.innerHeight);
 }
