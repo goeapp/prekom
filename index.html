@@ -16,16 +16,14 @@
      de solo lectura); entra DataTables, mismo patrón/versión que ya usan
      LibroObra y PdTT en el stack (jQuery + DOM-sourced). -->
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.11/css/jquery.dataTables.min.css">
-<!-- NUEVO v8.1.1 — FixedColumns (2 primeras columnas fijas al scroll
-     horizontal), extensión oficial de DataTables, mismo CDN que el
-     core. FixedHeader se sacó en v8.3.2 (ver comentario en
-     montarTablaLista): no es compatible con scrollX, esa combinación
-     era la causa real del recuadro fantasma y de que el header nunca
-     terminara de quedar fijo. -->
-<link rel="stylesheet" href="https://cdn.datatables.net/fixedcolumns/4.3.0/css/fixedColumns.dataTables.min.css">
+<!-- FIX v8.4.0 — se saca FixedColumns por completo: "columnas fijas" y
+     "header fijo" se resuelven con `position: sticky` de CSS puro
+     sobre la tabla real (ver montarTablaLista + CSS de
+     .tabla-lista-scroll), reemplazando el rol que tenían FixedHeader
+     (sacado en v8.3.2) y FixedColumns. Menos plugins, menos casos
+     borde de la librería peleando entre sí. -->
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.11/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/fixedcolumns/4.3.0/js/dataTables.fixedColumns.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
@@ -587,6 +585,41 @@ table.dataTable tbody tr { background: var(--surface); }
 table.dataTable tbody tr.odd { background: #fafbfc; }
 table.dataTable tbody tr:hover td { background: #fffbeb !important; }
 table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; padding: 7px 10px !important; }
+/* FIX v8.4.0 — reemplaza scrollX/scrollY/FixedColumns de DataTables
+   (3 entregas peleando contra esa combinación de la librería) por
+   `position: sticky` de CSS puro sobre una tabla común. El `dom` de
+   DataTables (ver montarTablaLista) envuelve la tabla en este div —
+   acá vive el scroll real (horizontal siempre; vertical solo si
+   `max-height`, que se setea por JS en ajustarAltoTablaLista_, no
+   alcanza — ver esa función para el porqué de medirlo por JS y no con
+   un vh fijo). */
+.tabla-lista-scroll { overflow: auto; }
+/* Header pegado arriba del propio contenedor con scroll (no de la
+   página) — mismo mecanismo que .app-header, aplicado acá al thead. */
+.tabla-lista-scroll table.dataTable thead th { position: sticky; top: 0; z-index: 3; }
+/* Columnas fijas a la izquierda (ID, Item, Acciones — siempre las 3
+   primeras columnas reales de la tabla cuando puedeEditarListas, ver
+   IDX_ACCIONES_): anchos explícitos para poder calcular el `left` de
+   cada una, más `position: sticky`. Reemplaza al plugin FixedColumns
+   por completo — nada que instanciar ni destruir, es CSS puro sobre
+   la tabla real. */
+.tabla-lista-scroll table.dataTable th:nth-child(1), .tabla-lista-scroll table.dataTable td:nth-child(1) {
+  position: sticky; left: 0; z-index: 2; width: 48px; max-width: 48px; background: var(--surface);
+}
+.tabla-lista-scroll table.dataTable th:nth-child(2), .tabla-lista-scroll table.dataTable td:nth-child(2) {
+  position: sticky; left: 48px; z-index: 2; width: 200px; max-width: 200px; background: var(--surface);
+}
+/* 3ra columna fija (Acciones, solo si puedeEditarListas — ver
+   IDX_ACCIONES_ en montarTablaLista) — mismo mecanismo, left
+   acumulado sobre las 2 anteriores (48px + 200px). Si esta lista no
+   tiene columna de Acciones, el selector simplemente no matchea nada. */
+.tabla-lista-scroll table.dataTable th:nth-child(3).acciones-col, .tabla-lista-scroll table.dataTable td:nth-child(3).acciones-col {
+  position: sticky; left: 248px; z-index: 2; width: 74px; max-width: 74px; background: var(--surface);
+  box-shadow: 2px 0 4px rgba(0,0,0,.06); /* la sombra que marca el límite de la zona fija pasa a la última columna fija real */
+}
+.tabla-lista-scroll table.dataTable thead th:nth-child(3).acciones-col { z-index: 4; background: var(--accent2); }
+.tabla-lista-scroll table.dataTable thead th:nth-child(1),
+.tabla-lista-scroll table.dataTable thead th:nth-child(2) { z-index: 4; background: var(--accent2); } /* esquina: fija en ambos ejes a la vez */
 .dataTables_wrapper .dataTables_length select {
   border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 12px; margin: 0 4px;
 }
@@ -601,30 +634,12 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 }
 /* FIX v8.1.1 — celdas de texto libre (texto_corto/texto_largo):
    truncado a 1 línea con ellipsis, texto completo en el title
-   (tooltip nativo). Ancho tope para que la columna no crezca de más
-   con scrollX activo. */
+   (tooltip nativo). */
 .celda-truncada { max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* NUEVO v8.1.1 — FixedColumns retemado a los tokens del stack (por
-   defecto viene con su propio look genérico). */
-.DTFC_LeftBodyLiner, .DTFC_LeftHeadWrapper table, .DTFC_LeftFootWrapper table { background: var(--surface); }
-.dtfc-fixed-left { background: var(--surface); }
-/* Fila de filtros por columna (listaValores_*), segunda fila del thead */
-.dt-filtros-fila th { background: var(--surface) !important; padding: 4px 8px !important; }
-/* FIX v8.3.3 — el "recuadro fantasma" que reportó Ale: DataTables mete
-   una copia oculta del <thead> dentro de .dataTables_scrollBody (para
-   sincronizar anchos de columna entre el header visible y el body con
-   scroll) — la librería la oculta con un <div> interno de height:0,
-   pero el <th> que lo contiene sigue heredando NUESTRO padding/fondo
-   de más arriba (7px+7px = exactamente los 14px de alto que se veían
-   en la consola). Acá se lo devolvemos a cero, con un selector más
-   específico que gana por sobre la regla general de thead th. */
-.dataTables_scrollBody table.dataTable thead th,
-.dataTables_scrollBody table.dataTable thead td {
-  padding: 0 !important; border: none !important; background: transparent !important;
-  height: 0 !important; line-height: 0 !important; overflow: hidden !important;
-}
-.dataTables_scrollBody table.dataTable thead tr { height: 0 !important; }
-.dt-filtro-col { width: 100%; border: 1px solid var(--border); border-radius: 4px; padding: 3px 4px; font-size: 11px; color: var(--text); background: var(--surface); }
+/* FIX v8.4.0 — bolita naranja sobre "Filtros" cuando hay algún filtro
+   activo (ver actualizarBadgeFiltrosLista_), para que no quede un
+   filtro aplicado invisible para Ale. */
+.btn-filtros-badge { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--surface); }
 .tag-valor { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; } /* FIX v8.3.1 (punto 5): sin esto el badge partía el texto en 2 líneas en columnas angostas */
 .btn-fila-accion { background: none; border: none; font-size: 14px; padding: 0 5px; cursor: pointer; }
 .btn-editar-fila { color: var(--accent); }
@@ -701,6 +716,17 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
   display: flex; flex-direction: column; transition: right .25s ease;
 }
 #comentarios-panel.abierto { right: 0; }
+/* FIX v8.4.0 — panel de Filtros de Listas, mismo mecanismo que el de
+   Comentarios de arriba (overlay + <aside> deslizando desde la
+   derecha), con sus propios ids para poder abrirse independiente. */
+#filtros-lista-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.35); z-index: 140; display: none; }
+#filtros-lista-overlay.visible { display: block; }
+#filtros-lista-panel {
+  position: fixed; top: 0; right: -380px; width: 360px; max-width: 92vw; height: 100vh;
+  background: var(--surface); box-shadow: -6px 0 24px rgba(0,0,0,.16); z-index: 150;
+  display: flex; flex-direction: column; transition: right .25s ease;
+}
+#filtros-lista-panel.abierto { right: 0; }
 .comentarios-head { background: var(--accent2); color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
 .comentarios-head h3 { font-size: 16px; font-weight: 600; }
 .comentarios-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
@@ -1097,6 +1123,24 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
   </div>
 </aside>
 
+<!-- FIX v8.4.0 — panel de Filtros de Listas, mismo patrón de overlay +
+     <aside> deslizando desde la derecha que ya usa Comentarios (arriba).
+     Reemplaza al <select> de filtro que vivía dentro del thead de la
+     tabla, que se rompía visualmente al combinarse con scroll
+     horizontal + columnas fijas. -->
+<div id="filtros-lista-overlay" onclick="cerrarPanelFiltrosLista()"></div>
+<aside id="filtros-lista-panel">
+  <div class="comentarios-head">
+    <h3>Filtros</h3>
+    <button class="modal-close" onclick="cerrarPanelFiltrosLista()">&times;</button>
+  </div>
+  <div class="comentarios-body" id="filtros-lista-body"></div>
+  <div class="comentario-form" style="flex-direction:row">
+    <button class="btn-secundario" style="width:auto" onclick="quitarFiltrosLista()">Quitar filtros</button>
+    <button class="btn-accion" style="width:auto;margin-left:auto" onclick="aplicarFiltrosLista()">Aplicar</button>
+  </div>
+</aside>
+
 <!-- ═══════════════ NOTAS — menú contextual (batch 1) ═══════════════ -->
 <div id="notas-menu-contextual" class="hidden"></div>
 
@@ -1394,7 +1438,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.3.3';
+const APP_VERSION = 'v8.4.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2888,6 +2932,7 @@ async function abrirLista(nombreTab) {
           '<button class="btn-limpiar-buscador hidden" id="btn-limpiar-buscador" title="Borrar búsqueda">&times;</button>' +
         '</div>' +
         '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
+        '<button class="btn-toolbar" style="position:relative" onclick="abrirPanelFiltrosLista()">Filtros<span class="btn-filtros-badge hidden" id="btn-filtros-lista-badge"></span></button>' +
         '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
         (puedeEditarListas ? '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' : '') +
       '</div>' +
@@ -3066,11 +3111,16 @@ const IDX_ACCIONES_ = 2;
 function montarTablaLista(nombreTab, schema, datos) {
   const cont = document.getElementById('tabla-lista-contenedor');
   const colsConFiltro = schema.filter(function (c) { return c.tipoCampo.indexOf('listaValores_') === 0; });
+  // FIX v8.4.0 — se resetean los filtros del panel lateral cada vez
+  // que se abre/recarga una lista (los índices de columna no
+  // significan lo mismo de una lista a otra).
+  schemaListaFiltrable_ = colsConFiltro;
+  filtrosListaActivos_ = {};
 
   // Inserta la celda de Acciones en la posición IDX_ACCIONES_ de un
-  // array de celdas ya armado a partir del schema (thead principal,
-  // thead de filtros, o tbody) — centraliza el único lugar donde se
-  // decide dónde va la columna, para no repetir el splice 3 veces.
+  // array de celdas ya armado a partir del schema (thead principal o
+  // tbody) — centraliza el único lugar donde se decide dónde va la
+  // columna, para no repetir el splice 2 veces.
   function conAcciones_(celdas, celdaAcciones) {
     if (!puedeEditarListas) return celdas;
     const copia = celdas.slice();
@@ -3078,40 +3128,12 @@ function montarTablaLista(nombreTab, schema, datos) {
     return copia;
   }
 
-  let theadHtml = '<tr>' + conAcciones_(schema.map(function (col) {
+  const theadHtml = '<tr>' + conAcciones_(schema.map(function (col) {
     return '<th>' + escaparHtml(col.etiqueta || col.campo) + '</th>';
-  }), '<th>Acciones</th>').join('') + '</tr>';
-
-  // Segunda fila del thead: 1 <select> de filtro por columna, solo
-  // para las de tipo listaValores_* (mismo criterio que el
-  // headerFilter con badges que tenía Tabulator) — el resto de las
-  // columnas usa el buscador global de arriba, no filtro propio.
-  // `data-col` ya no puede ser el índice del schema tal cual: ahora
-  // que Acciones se insertó en el medio, las columnas del schema que
-  // quedan después de esa posición se corrieron 1 lugar en la tabla
-  // real de DataTables — `colDT_` traduce índice-de-schema a
-  // índice-real-de-columna.
-  function colDT_(i) {
-    return (puedeEditarListas && i >= IDX_ACCIONES_) ? i + 1 : i;
-  }
-
-  if (colsConFiltro.length) {
-    theadHtml += '<tr class="dt-filtros-fila">' + conAcciones_(schema.map(function (col, i) {
-      if (col.tipoCampo.indexOf('listaValores_') !== 0) return '<th></th>';
-      const opciones = valoresParaTipo(col.tipoCampo);
-      // Punto 6 de la ronda de UX (Ale confirmó): el navegador ignora
-      // el background-color de <option> en la práctica, así que el
-      // color de fondo del badge se saca de acá — queda texto plano,
-      // el color sigue viviendo en la celda de la tabla (colorTag).
-      const options = '<option value="">Todos</option>' + opciones.map(function (o) {
-        return '<option value="' + escaparHtml(o.valor) + '">' + escaparHtml(o.valor) + '</option>';
-      }).join('');
-      return '<th><select class="dt-filtro-col" data-col="' + colDT_(i) + '">' + options + '</select></th>';
-    }), '<th></th>').join('') + '</tr>';
-  }
+  }), '<th class="acciones-col">Acciones</th>').join('') + '</tr>';
 
   const tbodyHtml = datos.map(function (fila) {
-    const celdaAcciones = '<td style="white-space:nowrap;text-align:center">' +
+    const celdaAcciones = '<td class="acciones-col" style="white-space:nowrap;text-align:center">' +
         '<button class="btn-fila-accion btn-editar-fila" title="Editar" onclick="abrirModalFilaLista(\'' + nombreTab + '\', \'' + fila.id + '\')">✎</button>' +
         '<button class="btn-fila-accion btn-borrar-fila" title="Borrar" onclick="confirmarBorrarFila(\'' + nombreTab + '\', \'' + fila.id + '\')">🗑</button>' +
       '</td>';
@@ -3134,42 +3156,112 @@ function montarTablaLista(nombreTab, schema, datos) {
   cont.classList.remove('hidden');
   cont.innerHTML = '<table id="tabla-lista" class="display" style="width:100%"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + '</tbody></table>';
 
-  // FIX v8.3.2 — el paginador siempre vive arriba, ver .paginador-arriba
-  // (dt-top). FixedColumns (columnas fijas, con scrollX) se agrega
-  // sobre esta misma instancia — ver comentario más abajo sobre por
-  // qué el header fijo se resuelve con scrollY y no con FixedHeader.
+  // FIX v8.4.0 — se saca scrollX/scrollY/fixedColumns de DataTables por
+  // completo (ver Handoff_PreKOM_v8_4_0.md para el porqué: 3 entregas
+  // peleando contra esa combinación de la librería, con PdTT como
+  // referencia de que ni scrollX ni FixedColumns hacen falta). La tabla
+  // vuelve a ser una tabla común — "columnas fijas" y "header fijo" se
+  // resuelven con `position: sticky` de CSS puro sobre la tabla real
+  // (ver .tabla-lista-scroll y las reglas de thead th / nth-child más
+  // abajo), y el `dom` envuelve la tabla en un div propio
+  // (".tabla-lista-scroll") para poder acotarle un alto máximo por JS
+  // (ver ajustarAltoTablaLista_) sin depender del scrollY de DataTables.
   tablaListaDT = $('#tabla-lista').DataTable({
     language: _dtLangListas_(),
     pageLength: 10,
     lengthMenu: [10, 20, 50],
     order: [],
-    dom: '<"dt-top"lip>rt', // sin 'f' (buscador global propio) y sin dt-bot — todo el bloque de controles arriba
-    scrollX: true,
-    // FIX v8.3.2 — se saca `fixedHeader` (y el plugin FixedHeader
-    // entero, ver <head>): no es compatible con `scrollX` — esa
-    // combinación era la causa real del recuadro fantasma por columna
-    // y de que el header nunca terminara de quedar fijo al scrollear
-    // (ni con la instanciación en 2 pasos de v8.1.1, ni configurado
-    // junto con fixedColumns en v8.3.1). En su lugar, `scrollY` le da
-    // a la tabla su propio scroll vertical interno (alto acotado) con
-    // el header pegado arriba de esa caja — combinación oficialmente
-    // soportada junto con scrollX+fixedColumns, sin plugins extra.
-    // Cambia el comportamiento: la tabla larga ya no scrollea con toda
-    // la página, tiene su propia barra de scroll interna. Alto elegido
-    // (55vh) es ajustable si no queda cómodo en la prueba real.
-    scrollY: '55vh',
-    scrollCollapse: true,
-    fixedColumns: { left: puedeEditarListas ? 3 : 2 },
-    columnDefs: puedeEditarListas ? [{ targets: IDX_ACCIONES_, orderable: false }] : [],
-    orderCellsTop: colsConFiltro.length > 0 // si hay fila de filtros, ordenar clickeando la fila de títulos (la 1ª), no la de filtros
+    dom: '<"dt-top"lip><"tabla-lista-scroll"t>', // sin 'f' (buscador global propio) y sin dt-bot — todo el bloque de controles arriba
+    columnDefs: puedeEditarListas ? [{ targets: IDX_ACCIONES_, orderable: false }] : []
   });
 
   if (terminoBusquedaLista) tablaListaDT.search(terminoBusquedaLista).draw();
+  ajustarAltoTablaLista_();
+}
 
-  $('.dt-filtro-col').off('change').on('change', function () {
-    const col = $(this).data('col');
-    tablaListaDT.column(col).search(this.value ? '^' + $.fn.dataTable.util.escapeRegex(this.value) + '$' : '', true, false).draw();
+// FIX v8.4.0 — reemplaza al `scrollY` fijo de DataTables: mide en vivo
+// cuánto espacio libre queda desde el borde superior de la tabla hasta
+// el fondo de la ventana, y se lo pone como `max-height` al wrapper
+// que arma el propio `dom` de DataTables (".tabla-lista-scroll"). Con
+// `max-height` en vez de un alto fijo, una lista chica (6 filas) no
+// genera ningún scroll de más — el mismo criterio de "alto real
+// medido por JS" que ya usa iniciarMedicionHeader_() para --header-h.
+function ajustarAltoTablaLista_() {
+  const scrollBox = document.querySelector('#tabla-lista-contenedor .tabla-lista-scroll');
+  if (!scrollBox) return;
+  const margenInferior = 24; // mismo margen que .view usa de padding-bottom
+  const top = scrollBox.getBoundingClientRect().top;
+  const alto = window.innerHeight - top - margenInferior;
+  scrollBox.style.maxHeight = Math.max(alto, 220) + 'px'; // piso de 220px por si el cálculo da chico en pantallas bajas
+}
+window.addEventListener('resize', ajustarAltoTablaLista_);
+
+// ── Panel lateral de Filtros (Listas) ───────────────────────
+// FIX v8.4.0 (reemplaza el <select> por columna que vivía dentro del
+// thead, ver punto reportado por Ale: se rompía visualmente al
+// combinar sticky + scroll horizontal). Reutiliza el mismo patrón de
+// panel lateral que ya usa Comentarios (overlay + <aside>
+// deslizando desde la derecha, ver #comentarios-panel).
+let schemaListaFiltrable_ = [];
+let filtrosListaActivos_ = {}; // { campo: valor }
+
+function abrirPanelFiltrosLista() {
+  const body = document.getElementById('filtros-lista-body');
+  if (!schemaListaFiltrable_.length) {
+    body.innerHTML = '<div class="comentarios-vacio">Esta lista no tiene columnas filtrables.</div>';
+  } else {
+    body.innerHTML = schemaListaFiltrable_.map(function (col) {
+      const opciones = valoresParaTipo(col.tipoCampo);
+      const valorActivo = filtrosListaActivos_[col.campo] || '';
+      const options = '<option value="">Todos</option>' + opciones.map(function (o) {
+        const sel = (o.valor === valorActivo) ? ' selected' : '';
+        return '<option value="' + escaparHtml(o.valor) + '"' + sel + '>' + escaparHtml(o.valor) + '</option>';
+      }).join('');
+      return '<div class="form-campo" data-campo-filtro="' + col.campo + '">' +
+        '<label>' + escaparHtml(col.etiqueta || col.campo) + '</label>' +
+        '<select class="filtro-panel-select" data-campo="' + col.campo + '">' + options + '</select>' +
+      '</div>';
+    }).join('');
+  }
+  document.getElementById('filtros-lista-overlay').classList.add('visible');
+  document.getElementById('filtros-lista-panel').classList.add('abierto');
+}
+
+function cerrarPanelFiltrosLista() {
+  document.getElementById('filtros-lista-overlay').classList.remove('visible');
+  document.getElementById('filtros-lista-panel').classList.remove('abierto');
+}
+
+function aplicarFiltrosLista() {
+  filtrosListaActivos_ = {};
+  document.querySelectorAll('#filtros-lista-body .filtro-panel-select').forEach(function (sel) {
+    if (sel.value) filtrosListaActivos_[sel.dataset.campo] = sel.value;
   });
+  schemaListaFiltrable_.forEach(function (col) {
+    const idxSchema = schemaListaAbierta.indexOf(col);
+    const idxDT = (puedeEditarListas && idxSchema >= IDX_ACCIONES_) ? idxSchema + 1 : idxSchema;
+    const valor = filtrosListaActivos_[col.campo];
+    tablaListaDT.column(idxDT).search(valor ? '^' + $.fn.dataTable.util.escapeRegex(valor) + '$' : '', true, false);
+  });
+  tablaListaDT.draw();
+  actualizarBadgeFiltrosLista_();
+  cerrarPanelFiltrosLista();
+}
+
+function quitarFiltrosLista() {
+  filtrosListaActivos_ = {};
+  document.querySelectorAll('#filtros-lista-body .filtro-panel-select').forEach(function (sel) { sel.value = ''; });
+  tablaListaDT.columns().search('').draw();
+  actualizarBadgeFiltrosLista_();
+}
+
+// Bolita naranja sobre el botón "Filtros" cuando hay algún filtro
+// activo — para que no quede un filtro aplicado "invisible" para Ale.
+function actualizarBadgeFiltrosLista_() {
+  const badge = document.getElementById('btn-filtros-lista-badge');
+  if (!badge) return;
+  const hayActivos = Object.keys(filtrosListaActivos_).length > 0;
+  badge.classList.toggle('hidden', !hayActivos);
 }
 
 /**
