@@ -844,6 +844,8 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
   cursor: move; transform: rotate(var(--nota-rot, 0deg)); touch-action: none; overflow: hidden;
 }
 .nota-postit.fijada { cursor: default; }
+.nota-postit.nota-ajena { cursor: default; opacity: .82; } /* FIX v8.5.0 — pública de otro usuario, solo vista */
+.nota-postit.nota-ajena .nota-texto { cursor: default; }
 .nota-postit.seleccionada { outline: 3px solid var(--accent); outline-offset: 2px; } /* NUEVO v5.1.1 */
 .nota-postit.tam-S { width: 140px; height: 140px; }
 .nota-postit.tam-M { width: 200px; height: 200px; }
@@ -1480,7 +1482,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.8';
+const APP_VERSION = 'v8.5.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1770,6 +1772,12 @@ window.addEventListener('unhandledrejection', function (e) {
   console.error('Promesa rechazada sin capturar:', e.reason);
   mostrarAviso('Ocurrió un error inesperado: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
 });
+// NUEVO v8.5.0 — flush best-effort de Notas al cerrar/recargar la
+// pestaña: no bloquea el cierre (no hay forma de esperar una promesa
+// acá), es solo un intento de no perder cambios de último momento.
+window.addEventListener('beforeunload', function () {
+  if (notasSinGuardar && !notasGuardando) notasGuardarCambios_(true);
+});
 
 // ── ESTADO EN MEMORIA ───────────────────────────────────────
 let emailActual = '';
@@ -1809,8 +1817,15 @@ let notasPinchStart = null;
 let notaDragState = null;                // arrastre de UNA nota puntual (distinto del pan del tablero)
 let notaMenuAbiertoId = null;
 let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de la nota activa
-let notasCambiosPendientes = new Map();  // NUEVO v5.1.2 — id → cambios acumulados mientras esa nota todavía no está confirmada en el Sheet
-let notasPendientesCreacion = new Set(); // NUEVO v5.1.3 — ids con crearNota en vuelo (reemplaza el chequeo por prefijo 'tmp')
+// FIX v8.5.0 — guardado explícito (pizarrón por usuario): todo el
+// trabajo (crear/mover/editar/ocultar/toggle público) vive en memoria,
+// sin ningún POST intermedio — `notasCambiosPendientes`/
+// `notasPendientesCreacion` (buffer para la condición de carrera del
+// ID temporal, v5.1.2/v5.1.3) ya no hacen falta: sin round-trip por
+// acción, no hay ID temporal que blindar.
+let notasSinGuardar = false;             // true si hay cambios locales sin persistir
+let notasGuardando = false;              // guard contra doble click en Guardar
+let notasAvisoTimerId = null;            // setInterval del recordatorio cada 5 min
 let notasModoDibujo = null;              // NUEVO v6.2.0 — 'region' mientras se está dibujando una región nueva (arrastre estilo Lápiz)
 let notasDibujoRegion = null;            // NUEVO v6.2.0 — {pointerId,x0,y0} del arrastre en curso
 let notaResizeState = null;              // NUEVO v6.2.0 — resize de región (distinto del arrastre de mover)
@@ -1906,14 +1921,16 @@ function mostrarToast(mensaje) {
 // criterio probado: esperar lo que haga falta, sin cortar nosotros
 // mismos un pedido que capaz iba a responder bien un poco más tarde.
 const ACCIONES_SEGURAS_REINTENTO = new Set([
-  'inicializarObra', 'listarObras', 'listarGrupos', 'listarListas',
+  'inicializarObraLiviana', 'inicializarObraPesada', // FIX v8.5.0 — reemplazan a 'inicializarObra'
+  'listarObras', 'listarGrupos', 'listarListas',
   'leerListaSchema', 'leerListaDatos', 'leerListaValores', 'leerFavoritos',
   'leerListaCompleta', 'recargarListasHome', // NUEVO v8.2.0
   'leerComentarios', 'leerComentariosContenidoObra', 'leerNotas',
   'validarSesion', 'guardarResumen', 'guardarColorFondo',
   'moverListaAGrupo', 'ocultarComentario', 'ocultarComentarioContenido',
   'ocultarNota', 'marcarFavorito', 'desmarcarFavorito',
-  'reordenarFavoritos', 'reordenarListasEnGrupo'
+  'reordenarFavoritos', 'reordenarListasEnGrupo',
+  'guardarTableroPropio' // NUEVO v8.5.0 — idempotente: reenvía el mismo array completo, no duplica nada
 ]);
 
 // NUEVO v8.3.0 — mismo alcance que el ACCIONES_GET del .gs: estas
@@ -1927,7 +1944,8 @@ const ACCIONES_SEGURAS_REINTENTO = new Set([
 // agregarComentarioContenido) y validarPIN (lleva el código PIN) se
 // quedan en POST a propósito — ver comentario en el .gs.
 const ACCIONES_GET = new Set([
-  'inicializarObra', 'listarObras', 'leerListaCompleta', 'recargarListasHome',
+  'inicializarObraLiviana', 'inicializarObraPesada', // FIX v8.5.0 — reemplazan a 'inicializarObra'
+  'listarObras', 'leerListaCompleta', 'recargarListasHome',
   'leerListaValores', 'leerComentarios', 'leerComentariosContenidoObra', 'leerNotas',
   'verificarAdmin', 'verificarPermisosObra',
   'marcarFavorito', 'desmarcarFavorito', 'reordenarFavoritos', 'reordenarListasEnGrupo',
@@ -2329,7 +2347,7 @@ function marcarNavActiva(vista) {
   // propio (sin el padding/max-width de .view normal); se activa/
   // desactiva acá para que cualquier navegación de salida lo saque.
   document.getElementById('main-view').classList.toggle('view-notas', vista === 'notas');
-  if (vista !== 'notas') { notaCerrarMenu_(); notaSeleccionadaId = null; } // NUEVO v5.1.1 — no arrastrar selección entre vistas
+  if (vista !== 'notas') { notaCerrarMenu_(); notaSeleccionadaId = null; notasFlushAlSalir_(); } // NUEVO v5.1.1 — no arrastrar selección entre vistas; FIX v8.5.0 — flush best-effort al salir
   // NUEVO v7.1.0 — red de seguridad del fix de scroll de Notas (v6.1.0),
   // reubicada acá y acotada a la vista Notas: antes corría para toda la
   // app (ver mostrarPantalla) y le sacaba el scroll de página a
@@ -2358,17 +2376,26 @@ async function mostrarApp() {
   document.getElementById('btn-nav-notas').disabled = true;
 
   try {
-    // NUEVO v6.0.0 — antes eran 9 llamadas simultáneas por Promise.all
-    // (leerArbolContenido/leerLinks/leerConfigObra/listarListas/
-    // listarGrupos/leerListaValores/leerFavoritos/
-    // verificarPermisosObra/leerComentariosContenidoObra), cada una
-    // reabriendo el Maestro y el Sheet de la obra desde cero en el
-    // backend: si UNA sola fallaba o tardaba, las 9 caían juntas acá
-    // abajo y se veía el mismo cartel genérico (parecía aleatorio).
-    // Fix de raíz: una sola llamada a 'inicializarObra', que abre el
-    // Maestro y el Sheet de obra una única vez del lado del backend.
-    const res = await llamarBackend('inicializarObra', { obraId: obraActual.obraId, email: emailActual });
-    if (!res.ok) throw new Error(res.error || 'inicializarObra falló');
+    // FIX v8.5.0 — 'inicializarObra' (1 sola llamada, desde v6.0.0) se
+    // separa en liviana+pesada (investigación del 404 intermitente,
+    // ver Handoff v8.5.0): la liviana abre solo el Maestro (permisos +
+    // sheetIdDedicado) y responde rápido; la pesada abre recién el
+    // Sheet de la obra. Se llaman en SECUENCIA (no en paralelo — no
+    // reintroduce el problema de las 9 llamadas simultáneas de
+    // v6.0.0), cada una más corta que la 'inicializarObra' original,
+    // con menos ventana de exposición al 404 por llamada. El spinner
+    // de pantalla completa sigue igual que siempre, con un mensaje
+    // distinto por paso (a pedido de Ale) en vez de un texto fijo.
+    document.getElementById('main-view').innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Verificando permisos…</div>';
+    const resLiviana = await llamarBackend('inicializarObraLiviana', { obraId: obraActual.obraId, email: emailActual });
+    if (!resLiviana.ok) throw new Error(resLiviana.error || 'inicializarObraLiviana falló');
+
+    puedeEditarContenido = !!(resLiviana.permisos && resLiviana.permisos.puedeEditarContenido);
+    puedeEditarListas = !!(resLiviana.permisos && resLiviana.permisos.puedeEditarListas);
+
+    document.getElementById('main-view').innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Cargando árbol y listas…</div>';
+    const res = await llamarBackend('inicializarObraPesada', { obraId: obraActual.obraId, email: emailActual, sheetIdDedicado: resLiviana.sheetIdDedicado });
+    if (!res.ok) throw new Error(res.error || 'inicializarObraPesada falló');
 
     arbol = res.arbol || [];
     comentariosContenido = res.comentariosContenido || [];
@@ -2378,9 +2405,8 @@ async function mostrarApp() {
     gruposIndex = res.grupos || []; // NUEVO v3.1.0
     valoresListas = res.valores || [];
     favoritosActuales = res.favoritos || [];
-    // v2.02 — permisos de ESTA obra puntual, no un flag global
-    puedeEditarContenido = !!(res.permisos && res.permisos.puedeEditarContenido);
-    puedeEditarListas = !!(res.permisos && res.permisos.puedeEditarListas);
+    // FIX v8.5.0 — permisos ya vienen de inicializarObraLiviana (arriba);
+    // inicializarObraPesada ya no los devuelve.
 
     document.getElementById('hdr-obra-nombre').textContent =
       (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
@@ -3936,6 +3962,7 @@ async function renderNotasHub() {
   document.getElementById('main-view').innerHTML = renderNotasEsqueleto_();
   wireNotasBoard_();
   aplicarTransformNotas_();
+  notasIniciarAvisoPeriodico_(); // NUEVO v8.5.0 — arranca 1 sola vez, sigue corriendo aunque se navegue afuera
   await cargarNotas();
   // FIX v7.1.1 — antes llamaba a notasCentrarVista() sin chequear si el
   // usuario ya había navegado a otra vista mientras cargaba (Contenido/
@@ -3963,6 +3990,9 @@ function renderNotasEsqueleto_() {
       // NUEVO v7.1.2 — toggle de grilla de fondo (confirmado por Ale)
       '<button class="btn-toolbar" id="btn-notas-grilla" onclick="notasToggleGrilla_()"><i class="ti ti-grid-dots"></i> Grilla</button>' +
       '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
+      // NUEVO v8.5.0 — guardado explícito: activo solo con cambios sin
+      // guardar (ver notasMarcarSinGuardar_/notasMarcarGuardado_)
+      '<button class="btn-toolbar principal" id="btn-notas-guardar" onclick="notasGuardarCambios_()" disabled><i class="ti ti-device-floppy"></i> Guardar</button>' +
       '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
     '</div>' +
     '<div class="notas-board' + (notasGrillaVisible ? ' grilla-visible' : '') + '" id="notas-board">' +
@@ -3970,11 +4000,21 @@ function renderNotasEsqueleto_() {
     '</div>';
 }
 
+// FIX v8.5.0 — antes del refetch (que pisa `notas` entero), si hay
+// cambios locales sin guardar hay que confirmar el descarte — si no,
+// "Actualizar" borraría en silencio trabajo que el usuario todavía no
+// persistió. `reintentando` es el reintento automático interno, nunca
+// pasa por acá una segunda vez (ya se confirmó, o nunca hubo nada que
+// confirmar en el primer intento).
 async function cargarNotas(reintentando) {
+  if (!reintentando && notasSinGuardar) {
+    const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
+    if (!ok) return;
+  }
   const btn = document.getElementById('btn-notas-actualizar'); // NUEVO v5.1.1 — spinner mientras carga
   if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
   try {
-    const res = await llamarBackend('leerNotas', { obraId: obraActual.obraId });
+    const res = await llamarBackend('leerNotas', { obraId: obraActual.obraId, email: emailActual }); // FIX v8.5.0 — email obligatorio (propias+públicas)
     // FIX v7.1.3 — reportado por Ale ("desaparecen"): antes, un
     // ok:false del backend (falla manejada, sin tirar excepción)
     // pisaba `notas` con un array vacío y lo pintaba así, sin ningún
@@ -3982,13 +4022,83 @@ async function cargarNotas(reintentando) {
     // excepción. Ahora un ok:false SÍ se trata como falla real.
     if (!res.ok) throw new Error(res.error || 'leerNotas falló');
     notas = res.notas || [];
+    notasMarcarGuardado_(); // FIX v8.5.0 — refetch del servidor = ya no hay nada "sin guardar"
     pintarNotasCanvas();
   } catch (err) {
     if (!reintentando) { await cargarNotas(true); return; } // 1 reintento automático antes de rendirse
-    mostrarToast('No se pudo actualizar Notas — se mantienen las últimas cargadas'); // ya NO vacía `notas`
+    mostrarToast('No se pudo actualizar Notas — se mantienen las últimas cargadas');
   } finally {
     if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
   }
+}
+
+// ── Guardado explícito (NUEVO v8.5.0) ─────────────────────────
+// Reemplaza al guardado dinámico (1 POST por acción) — todo el trabajo
+// vive en memoria hasta que el usuario aprieta Guardar (ver diseño en
+// Handoff_PreKOM_v8_5_0.md). `notasMarcarSinGuardar_` la llama
+// cualquier mutación local (crear/mover/editar/ocultar/toggle
+// público); `notasMarcarGuardado_` resetea el flag tras un guardado
+// exitoso o un refetch completo desde el servidor.
+function notasMarcarSinGuardar_() {
+  notasSinGuardar = true;
+  notasActualizarBotonGuardar_();
+}
+function notasMarcarGuardado_() {
+  notasSinGuardar = false;
+  notasActualizarBotonGuardar_();
+}
+function notasActualizarBotonGuardar_() {
+  const btn = document.getElementById('btn-notas-guardar');
+  if (btn) btn.disabled = !notasSinGuardar || notasGuardando;
+}
+
+/**
+ * Única llamada al backend del flujo normal de edición — manda el
+ * array COMPLETO de las notas propias (usuario===emailActual) tal
+ * como quedaron en memoria; guardarTableroPropio_ hace el overwrite
+ * total del lado del servidor (upsert + soft-delete de lo que ya no
+ * viene). Las notas públicas de otros usuarios, aunque se vean en
+ * pantalla, NUNCA viajan acá — no son propias, no se guardan.
+ */
+async function notasGuardarCambios_(silencioso) {
+  if (notasGuardando || !notasSinGuardar) return;
+  notasGuardando = true;
+  notasActualizarBotonGuardar_();
+  const btn = document.getElementById('btn-notas-guardar');
+  if (btn) btn.classList.add('cargando');
+  try {
+    const propias = notas.filter(function (n) { return n.usuario === emailActual; });
+    const res = await llamarBackend('guardarTableroPropio', { obraId: obraActual.obraId, email: emailActual, notas: propias });
+    if (!res.ok) throw new Error(res.error || 'guardarTableroPropio falló');
+    notasMarcarGuardado_();
+    if (!silencioso) mostrarToast('Tablero guardado');
+  } catch (err) {
+    if (!silencioso) mostrarToast('No se pudo guardar — probá de nuevo');
+    // silencioso (flush best-effort al salir/cerrar): sin toast, no
+    // hay pantalla para mostrarlo — notasSinGuardar queda true, el
+    // aviso de los 5 min y el botón Guardar lo siguen reflejando.
+  } finally {
+    notasGuardando = false;
+    if (btn) btn.classList.remove('cargando');
+    notasActualizarBotonGuardar_();
+  }
+}
+
+// Recordatorio cada 5 min si quedan cambios sin guardar (arranca una
+// sola vez, vive durante toda la sesión de la app — no solo mientras
+// se está en la vista Notas, por si el usuario se va sin guardar y
+// vuelve tarde).
+function notasIniciarAvisoPeriodico_() {
+  if (notasAvisoTimerId) return;
+  notasAvisoTimerId = setInterval(function () {
+    if (notasSinGuardar) mostrarToast('Tenés cambios sin guardar en Notas');
+  }, 5 * 60 * 1000);
+}
+
+// Flush best-effort al salir de la vista Notas (cambiar de pestaña
+// dentro de la app) — silencioso, no bloquea la navegación.
+function notasFlushAlSalir_() {
+  if (notasSinGuardar && !notasGuardando) notasGuardarCambios_(true);
 }
 
 function pintarNotasCanvas() {
@@ -4031,7 +4141,13 @@ function hexToRgba_(hex, alpha) {
 function renderNotaHtml_(n) {
   const tipo = n.tipo || 'postit';
   const pin = n.fijada ? '<span class="nota-pin" title="Posición fijada"><i class="ti ti-pin"></i></span>' : '';
-  const tooltip = escaparHtml(notaFechaTexto_(n)); // NUEVO v5.1.1
+  // FIX v8.5.0 — una nota pública de otro usuario se ve pero no se
+  // edita: contenteditable apagado, sin handle de resize, clase para
+  // el cursor/opacidad (ver CSS .nota-ajena) y aviso en el tooltip.
+  const propia = notaEsPropia_(n);
+  const editable = propia ? 'true' : 'false';
+  const claseAjena = propia ? '' : ' nota-ajena';
+  const tooltip = escaparHtml(notaFechaTexto_(n) + (propia ? '' : ' · de ' + (n.usuario || '') + ', solo vista'));
 
   // NUEVO v6.2.0 — Región/marco: tamaño libre (ancho/alto), sin
   // rotación, relleno semi-transparente + marco del color elegido,
@@ -4041,11 +4157,11 @@ function renderNotaHtml_(n) {
     const ancho = n.ancho || 280, alto = n.alto || 200;
     const color = n.color || COLOR_FONDO_DEFAULT;
     return '' +
-      '<div class="nota-postit tipo-region' + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+      '<div class="nota-postit tipo-region' + (n.fijada ? ' fijada' : '') + claseAjena + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
         'style="left:' + n.x + 'px; top:' + n.y + 'px; width:' + ancho + 'px; height:' + alto + 'px; background:' + hexToRgba_(color, .22) + '; border-color:' + color + '; z-index:' + (n.zIndex || 0) + '">' +
         pin +
-        '<div class="nota-texto nota-region-etiqueta" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
-        (n.fijada ? '' : '<div class="nota-resize-handle" data-id="' + n.id + '"></div>') +
+        '<div class="nota-texto nota-region-etiqueta" contenteditable="' + editable + '" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+        (n.fijada || !propia ? '' : '<div class="nota-resize-handle" data-id="' + n.id + '"></div>') +
       '</div>';
   }
 
@@ -4054,10 +4170,10 @@ function renderNotaHtml_(n) {
   // transparente) y sin --nota-rot (sin rotación).
   if (tipo === 'texto') {
     return '' +
-      '<div class="nota-postit tipo-texto tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+      '<div class="nota-postit tipo-texto tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + claseAjena + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
         'style="left:' + n.x + 'px; top:' + n.y + 'px; z-index:' + (n.zIndex || 0) + '">' +
         pin +
-        '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+        '<div class="nota-texto" contenteditable="' + editable + '" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
       '</div>';
   }
 
@@ -4066,20 +4182,20 @@ function renderNotaHtml_(n) {
   // acota a 1 en el input).
   if (tipo === 'emoji') {
     return '' +
-      '<div class="nota-postit tipo-emoji' + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+      '<div class="nota-postit tipo-emoji' + (n.fijada ? ' fijada' : '') + claseAjena + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
         'style="left:' + n.x + 'px; top:' + n.y + 'px; z-index:' + (n.zIndex || 0) + '">' +
         pin +
-        '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+        '<div class="nota-texto" contenteditable="' + editable + '" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
       '</div>';
   }
 
   // tipo === 'postit' — comportamiento original, sin cambios
   const rot = notaRotacion_(n.id);
   return '' +
-    '<div class="nota-postit tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
+    '<div class="nota-postit tam-' + n.tamaño + (n.fijada ? ' fijada' : '') + claseAjena + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
       'style="left:' + n.x + 'px; top:' + n.y + 'px; background:' + n.color + '; --nota-rot:' + rot + 'deg; z-index:' + (n.zIndex || 0) + '">' +
       pin +
-      '<div class="nota-texto" contenteditable="true" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+      '<div class="nota-texto" contenteditable="' + editable + '" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
     '</div>';
 }
 
@@ -4409,38 +4525,30 @@ function notaGenerarId_() {
   return 'n' + Date.now() + Math.random().toString(36).slice(2, 10); // fallback para navegadores muy viejos
 }
 
-// ── Crear / duplicar (optimista) ─────────────────────────────
-// NUEVO v7.1.3 — reintento automático para guardados de Notas (crear/
-// actualizar), pedido por Ale ("si no pudo guardar, que no borre, que
-// intente"): antes de asumir que falló, reintenta 1 vez — mismo
-// criterio que ya se usa para las lecturas de Listas (v7.1.1/v7.1.2).
-async function notaLlamarGuardado_(action, params, reintentando) {
-  try {
-    const res = await llamarBackend(action, params);
-    if (!res.ok) throw new Error(res.error || (action + ' falló'));
-    return res;
-  } catch (err) {
-    if (!reintentando) return notaLlamarGuardado_(action, params, true);
-    throw err;
-  }
-}
-
-async function notaCrear_(x, y, opts) {
+// ── Crear / duplicar (NUEVO v8.5.0 — 100% en memoria) ─────────
+// FIX v8.5.0 — antes había un POST inmediato a crearNota (con
+// notaLlamarGuardado_/reintento) y un buffer para la condición de
+// carrera del ID temporal (v5.1.2/v5.1.3). Con guardado explícito no
+// hay round-trip acá: la nota nace directo en memoria, marcada como
+// propia (usuario=emailActual) y pública=false por default — recién
+// viaja al backend cuando el usuario aprieta Guardar (ver
+// notasGuardarCambios_).
+function notaCrear_(x, y, opts) {
   opts = opts || {};
   const tipo = opts.tipo || 'postit'; // NUEVO v6.2.0
   const esRegion = tipo === 'region';
-  const id = notaGenerarId_(); // NUEVO v5.1.3 — este ID ya es el definitivo, no se reemplaza después
-  const notaOptimista = {
+  const id = notaGenerarId_();
+  const nota = {
     id: id, tipo: tipo, texto: opts.texto || '', color: opts.color || COLOR_FONDO_DEFAULT, tamaño: opts.tamaño || 'S', // NUEVO v6.1.0 — tip 3: default S en vez de M
     ancho: opts.ancho || null, alto: opts.alto || null, // NUEVO v6.2.0 — solo los usa región
     x: Math.round(x), y: Math.round(y),
     // NUEVO v6.2.0 — una región nace atrás de todo automáticamente (piso
     // de zIndex), el resto sigue naciendo adelante de todo (techo)
     zIndex: esRegion ? (notasMinZIndex_() - 1) : (notasMaxZIndex_() + 1),
-    fijada: false, usuario: emailActual
+    fijada: false, usuario: emailActual, publica: false // FIX v8.5.0
   };
-  notas.push(notaOptimista);
-  notasPendientesCreacion.add(id); // NUEVO v5.1.3 — mientras esté acá, actualizarNotaBackend_ bufferea en vez de llamar al backend
+  notas.push(nota);
+  notasMarcarSinGuardar_();
   pintarNotasCanvas();
   if (tipo === 'emoji') {
     // NUEVO v6.2.0 — foco automático + leyenda del atajo del SO (no se
@@ -4450,45 +4558,12 @@ async function notaCrear_(x, y, opts) {
   } else if (!opts.texto && !esRegion) {
     notaEnfocarTexto_(id); // una región recién dibujada no roba el foco — no tiene sentido ahí
   }
-  try {
-    const res = await notaLlamarGuardado_('crearNota', {
-      obraId: obraActual.obraId, id: id, texto: notaOptimista.texto, color: notaOptimista.color, tamaño: notaOptimista.tamaño,
-      x: notaOptimista.x, y: notaOptimista.y, email: emailActual,
-      tipo: notaOptimista.tipo, ancho: notaOptimista.ancho, alto: notaOptimista.alto // NUEVO v6.2.0
-    });
-    const nota = notas.find(function (n) { return n.id === id; });
-    if (nota) {
-      nota.zIndex = res.zIndex;
-      nota.fechaCreacion = res.fechaCreacion;
-      nota.fechaModificacion = res.fechaModificacion;
-      notaActualizarMetaEnDom_(id, nota); // solo zIndex/tooltip — el ID nunca cambió, no hace falta tocarlo
-    }
-    notasPendientesCreacion.delete(id);
-    // Si mientras tanto se editó texto/color/tamaño/posición (quedó en el
-    // buffer porque la fila todavía no existía confirmada en el Sheet), se
-    // manda todo junto en un solo guardado — ya sin ningún cambio de ID.
-    const pendientes = notasCambiosPendientes.get(id);
-    notasCambiosPendientes.delete(id);
-    if (pendientes) actualizarNotaBackend_(id, pendientes);
-  } catch (err) {
-    notas = notas.filter(function (n) { return n.id !== id; });
-    notasPendientesCreacion.delete(id);
-    notasCambiosPendientes.delete(id); // no dejar buffer huérfano si la creación falló
-    pintarNotasCanvas();
-    mostrarToast('No se pudo crear la nota');
-  }
 }
 
-// NUEVO v5.1.3 — reemplaza a notaActualizarIdEnDom_ (ya no hace falta
-// tocar el data-id, el ID es estable desde que se creó la nota). Solo
-// sincroniza zIndex (por si otro usuario creó notas en simultáneo) y el
-// tooltip (recién acá se sabe la fechaCreacion real).
-function notaActualizarMetaEnDom_(id, nota) {
-  const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
-  if (!div) return;
-  div.style.zIndex = nota.zIndex || 0;
-  div.title = notaFechaTexto_(nota);
-}
+// FIX v8.5.0 — notaActualizarMetaEnDom_ (v5.1.3) se retira: solo
+// sincronizaba zIndex/tooltip tras la confirmación async del backend
+// al crear una nota, que ya no existe (todo queda en memoria hasta el
+// guardado explícito, ver notaCrear_).
 
 function notaEnfocarTexto_(id) {
   setTimeout(function () {
@@ -4567,11 +4642,19 @@ function notaEmojiLimitar_(div) {
   }
 }
 
+// FIX v8.5.0 — una nota pública sigue siendo editable SOLO por su
+// dueño (ver diseño del guardado explícito) — el resto la ve, nadie
+// más la mueve/edita/oculta. Evita cualquier conflicto de escritura
+// simultánea entre 2 usuarios sobre la misma nota.
+function notaEsPropia_(nota) {
+  return !!nota && nota.usuario === emailActual;
+}
+
 function notaOnPointerDown_(e) {
   const div = e.currentTarget;
   const id = div.dataset.id;
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota || nota.fijada) return;
+  if (!nota || nota.fijada || !notaEsPropia_(nota)) return; // FIX v8.5.0 — no propia = solo vista
   e.stopPropagation(); // no dispara el pan del tablero de fondo
   div.setPointerCapture(e.pointerId);
   notaDragState = { id: id, pointerId: e.pointerId, startXPantalla: e.clientX, startYPantalla: e.clientY, notaX0: nota.x, notaY0: nota.y, movio: false };
@@ -4603,8 +4686,7 @@ function notaOnPointerUpDrag_(e) {
   const movio = notaDragState.movio;
   notaDragState = null;
   if (!movio) return; // fue un tap/click, no un drag real — no guarda nada
-  const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (nota) actualizarNotaBackend_(id, { x: nota.x, y: nota.y });
+  notasMarcarSinGuardar_(); // FIX v8.5.0 — solo llega acá si es propia (gateado en notaOnPointerDown_)
 }
 
 // NUEVO v6.2.0 — resize de región, arrastre desde la esquina (handle),
@@ -4615,7 +4697,7 @@ function notaResizeOnPointerDown_(e) {
   const handle = e.currentTarget;
   const id = handle.dataset.id;
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota || nota.fijada) return;
+  if (!nota || nota.fijada || !notaEsPropia_(nota)) return; // FIX v8.5.0 — no propia = solo vista
   notaSeleccionar_(id);
   handle.setPointerCapture(e.pointerId);
   notaResizeState = { id: id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, anchoO: nota.ancho, altoO: nota.alto };
@@ -4640,40 +4722,17 @@ function notaResizeOnPointerUp_(e) {
   handle.removeEventListener('pointermove', notaResizeOnPointerMove_);
   handle.removeEventListener('pointerup', notaResizeOnPointerUp_);
   handle.removeEventListener('pointercancel', notaResizeOnPointerUp_);
-  const id = notaResizeState.id;
   notaResizeState = null;
-  const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (nota) actualizarNotaBackend_(id, { ancho: nota.ancho, alto: nota.alto });
+  notasMarcarSinGuardar_(); // FIX v8.5.0
 }
 
 function notaGuardarTexto_(id, textoNuevo) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota) return;
+  if (!nota || !notaEsPropia_(nota)) return; // FIX v8.5.0 — defensivo (contenteditable ya está apagado para ajenas)
   const texto = (textoNuevo || '').trim();
   if (texto === (nota.texto || '')) return; // sin cambios reales
   nota.texto = texto;
-  actualizarNotaBackend_(id, { texto: texto });
-}
-
-function actualizarNotaBackend_(id, cambios) {
-  // NUEVO v5.1.3 — mientras la creación de esta nota sigue en vuelo
-  // (`notasPendientesCreacion`), el Sheet todavía no tiene la fila: se
-  // acumulan los cambios en un buffer y se aplican juntos cuando
-  // `notaCrear_` confirme (ver ahí) — no se llama al backend antes de eso.
-  if (notasPendientesCreacion.has(id)) {
-    const previos = notasCambiosPendientes.get(id) || {};
-    notasCambiosPendientes.set(id, Object.assign(previos, cambios));
-    return;
-  }
-  actualizarNotaBackendReal_(id, cambios);
-}
-
-async function actualizarNotaBackendReal_(id, cambios) {
-  try {
-    await notaLlamarGuardado_('actualizarNota', { obraId: obraActual.obraId, notaId: id, cambios: cambios, email: emailActual });
-  } catch (err) {
-    mostrarToast('No se pudo guardar el cambio — probá Actualizar');
-  }
+  notasMarcarSinGuardar_(); // FIX v8.5.0
 }
 
 // ── Menú contextual (clic derecho / mantener presionado) ─────
@@ -4723,6 +4782,15 @@ function notaCerrarMenu_() {
 
 function renderNotaMenuHtml_(nota) {
   const tipo = nota.tipo || 'postit';
+  // FIX v8.5.0 — nota ajena (pública de otro usuario): menú mínimo,
+  // solo Duplicar (crea una copia PROPIA, no toca la original) — nada
+  // que mute la nota de otro.
+  if (!notaEsPropia_(nota)) {
+    return '' +
+      '<div class="nota-menu-autor">' + escaparHtml(notaFechaTexto_(nota)) + ' · de ' + escaparHtml(nota.usuario || '') + ', solo vista</div>' +
+      '<div class="nota-menu-sep"></div>' +
+      '<button class="nota-menu-item" onclick="notaDuplicar_(\'' + nota.id + '\')"><i class="ti ti-copy"></i> Duplicar a mi tablero</button>';
+  }
   // NUEVO v6.2.0 — Color/Tamaño según el tipo (cerrado con Ale): postit
   // tiene los dos; región solo Color (tinta el marco/relleno, el
   // tamaño se maneja con el resize); texto libre solo Tamaño (controla
@@ -4746,26 +4814,37 @@ function renderNotaMenuHtml_(nota) {
     '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'frente\')"><i class="ti ti-stack-front"></i> Traer al frente</button>' +
     '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'atras\')"><i class="ti ti-stack-back"></i> Enviar atrás</button>' +
     '<button class="nota-menu-item" onclick="notaToggleFijada_(\'' + nota.id + '\')"><i class="ti ti-pin"></i> ' + (nota.fijada ? 'Desfijar posición' : 'Fijar posición') + '</button>' +
+    // NUEVO v8.5.0 — toggle público/privado (default privado, ver notaCrear_)
+    '<button class="nota-menu-item" onclick="notaTogglePublica_(\'' + nota.id + '\')"><i class="ti ti-' + (nota.publica ? 'lock' : 'world') + '"></i> ' + (nota.publica ? 'Hacer privada' : 'Hacer pública') + '</button>' +
     '<div class="nota-menu-sep"></div>' +
     '<button class="nota-menu-item nota-menu-danger" onclick="notaOcultar_(\'' + nota.id + '\')"><i class="ti ti-trash"></i> Quitar</button>';
 }
 
+function notaTogglePublica_(id) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota || !notaEsPropia_(nota)) return;
+  nota.publica = !nota.publica;
+  notasMarcarSinGuardar_();
+  notaCerrarMenu_();
+  mostrarToast(nota.publica ? 'Nota pública — el resto la va a ver al guardar' : 'Nota privada de nuevo');
+}
+
 function notaCambiarColor_(id, hex) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota) return;
+  if (!nota || !notaEsPropia_(nota)) return;
   nota.color = hex;
   const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
   if (div) div.style.background = hex;
-  actualizarNotaBackend_(id, { color: hex });
+  notasMarcarSinGuardar_();
   notaCerrarMenu_();
 }
 
 function notaCambiarTamaño_(id, tam) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota) return;
+  if (!nota || !notaEsPropia_(nota)) return;
   nota.tamaño = tam;
   pintarNotasCanvas();
-  actualizarNotaBackend_(id, { tamaño: tam });
+  notasMarcarSinGuardar_();
   notaCerrarMenu_();
 }
 
@@ -4775,42 +4854,51 @@ function notaDuplicar_(id) {
   notaCerrarMenu_();
   // NUEVO v6.2.0 — propaga tipo/ancho/alto (si es región, el duplicado
   // nace con el mismo tamaño y también atrás de todo, por el branch de zIndex de notaCrear_)
+  // FIX v8.5.0 — notaCrear_ siempre pone usuario=emailActual: duplicar
+  // una nota ajena (pública de otro) crea una copia 100% propia, sin
+  // tocar la original — por eso no hace falta gatear este botón.
   notaCrear_(nota.x + 24, nota.y + 24, { tipo: nota.tipo, texto: nota.texto, color: nota.color, tamaño: nota.tamaño, ancho: nota.ancho, alto: nota.alto });
 }
 
 function notaZOrden_(id, direccion) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota) return;
+  if (!nota || !notaEsPropia_(nota)) return;
   const nuevoZ = direccion === 'frente' ? (notasMaxZIndex_() + 1) : (notasMinZIndex_() - 1);
   nota.zIndex = nuevoZ;
   const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
   if (div) div.style.zIndex = nuevoZ;
-  actualizarNotaBackend_(id, { zIndex: nuevoZ });
+  notasMarcarSinGuardar_();
   notaCerrarMenu_();
 }
 
 function notaToggleFijada_(id) {
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota) return;
+  if (!nota || !notaEsPropia_(nota)) return;
   nota.fijada = !nota.fijada;
   pintarNotasCanvas();
-  actualizarNotaBackend_(id, { fijada: nota.fijada });
+  notasMarcarSinGuardar_();
   notaCerrarMenu_();
 }
 
-async function notaOcultar_(id) {
+// FIX v8.5.0 — "Quitar" ya no llama al backend (ocultarNota): saca la
+// nota de `notas` en memoria (deja de verse y de contar como propia
+// al guardar) y marca sin-guardar. El soft-delete real (oculta=true en
+// el Sheet) lo hace guardarTableroPropio_ recién al Guardar, comparando
+// qué IDs propios ya no vinieron en el array — ver diseño en el
+// Handoff. Gateado a propias (el botón ni siquiera se muestra para
+// notas ajenas, ver renderNotaMenuHtml_) — defensivo acá también.
+function notaOcultar_(id) {
+  const nota = notas.find(function (n) { return String(n.id) === String(id); });
+  if (!nota || !notaEsPropia_(nota)) { notaCerrarMenu_(); return; }
   notaCerrarMenu_();
-  const ok = await mostrarConfirm('Quitar nota', '¿Quitar esta nota? No se borra, pero deja de verse en el tablero.', { danger: true, textoAceptar: 'Quitar' });
-  if (!ok) return;
-  if (notaSeleccionadaId === id) notaSeleccionadaId = null; // NUEVO v5.1.1
-  notas = notas.filter(function (n) { return String(n.id) !== String(id); });
-  pintarNotasCanvas();
-  try {
-    const res = await llamarBackend('ocultarNota', { obraId: obraActual.obraId, notaId: id, email: emailActual });
-    if (!res.ok) throw new Error(res.error || 'ocultarNota falló');
-  } catch (err) {
-    mostrarToast('No se pudo quitar — probá Actualizar');
-  }
+  mostrarConfirm('Quitar nota', '¿Quitar esta nota? No se borra hasta que guardes, pero deja de verse en el tablero ahora.', { danger: true, textoAceptar: 'Quitar' })
+    .then(function (ok) {
+      if (!ok) return;
+      if (notaSeleccionadaId === id) notaSeleccionadaId = null; // NUEVO v5.1.1
+      notas = notas.filter(function (n) { return String(n.id) !== String(id); });
+      notasMarcarSinGuardar_();
+      pintarNotasCanvas();
+    });
 }
 </script>
 </body>
