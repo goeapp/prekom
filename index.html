@@ -254,6 +254,12 @@ input { font-family: inherit; }
   white-space  : nowrap;
 }
 .hdr-btn-cambiar-obra:hover { border-color: var(--accent); color: var(--accent); }
+/* NUEVO v8.6.3 — antes solo el grupo verde (.hdr-nav-btn) tenía estilo
+   :disabled; Cambiar obra/Lápiz ya se deshabilitaban desde v8.6.2 pero
+   sin ningún aviso visual (:hover seguía cambiando de color igual que
+   habilitado) — mismo criterio que .hdr-nav-btn:disabled de acá abajo. */
+.hdr-btn-cambiar-obra:disabled { opacity: .4; cursor: not-allowed; }
+.hdr-btn-cambiar-obra:disabled:hover { border-color: rgba(255,255,255,.18); color: rgba(255,255,255,.6); }
 .hdr-sep { flex: 1; }
 .hdr-email { font-size: .72rem; color: rgba(255,255,255,.4); white-space: nowrap; }
 
@@ -1517,7 +1523,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.6.2';
+const APP_VERSION = 'v8.6.4';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1868,6 +1874,11 @@ let notasSinGuardar = false;             // true si hay cambios locales sin pers
 let notasGuardando = false;              // guard contra doble click en Guardar
 let notasAvisoTimerId = null;            // setInterval del recordatorio cada 5 min
 let notasTableroPublico = false;         // FIX v8.5.0 (corrección de diseño) — 1 solo interruptor para TODO el pizarrón propio, no por nota (ver notasToggleTablero_)
+// NUEVO v8.6.4 — selector de tableros públicos: null = viendo "Mis notas"
+// (propias); un email = viendo el tablero de ESE usuario en solo lectura.
+// Reemplaza el modelo viejo de canvas único mezclado (propias+ajenas
+// juntas) — ahora se ve un tablero por vez.
+let notasViendoTableroDe = null;
 let notasModoDibujo = null;              // NUEVO v6.2.0 — 'region' mientras se está dibujando una región nueva (arrastre estilo Lápiz)
 let notasDibujoRegion = null;            // NUEVO v6.2.0 — {pointerId,x0,y0} del arrastre en curso
 let notaResizeState = null;              // NUEVO v6.2.0 — resize de región (distinto del arrastre de mover)
@@ -4015,6 +4026,7 @@ async function renderNotasHub() {
   vistaActual = 'notas';
   marcarNavActiva('notas');
   destruirTablaSiExiste();
+  notasViendoTableroDe = null; // NUEVO v8.6.4 — siempre arranca en "Mis notas"
   document.getElementById('main-view').innerHTML = renderNotasEsqueleto_();
   wireNotasBoard_();
   aplicarTransformNotas_();
@@ -4030,14 +4042,19 @@ async function renderNotasHub() {
 function renderNotasEsqueleto_() {
   return '' +
     '<div class="notas-toolbar">' +
+      // NUEVO v8.6.4 — selector de tableros: "Mis notas" (default, fijo)
+      // + 1 opción por cada usuario con notas públicas. Se repuebla en
+      // cada cargarNotas() exitoso (ver notasPintarSelectorTablero_),
+      // porque la lista de usuarios depende de lo que traiga el backend.
+      '<select class="btn-toolbar" id="notas-selector-tablero" onchange="notasCambiarTableroVisto_(this.value)" title="Qué tablero estás viendo"></select>' +
       // FIX v7.1.2 — el menú desplegable "+ Agregar" pasa a 3 botones
       // directos en la toolbar (confirmado por Ale); Texto libre se saca
       // del tablero ("no suma") — el tipo sigue soportado en el render
       // por si ya existiera alguna nota vieja de ese tipo en el Sheet,
       // pero ya no se puede crear una nueva desde acá.
-      '<button class="btn-toolbar principal" onclick="notasMenuCrearAccion_(\'nota\')"><i class="ti ti-note"></i> Nota</button>' +
-      '<button class="btn-toolbar" onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Marco</button>' +
-      '<button class="btn-toolbar" onclick="notasAbrirPickerEmoji_(event)"><i class="ti ti-mood-smile"></i> Emoji</button>' +
+      '<button class="btn-toolbar principal notas-btn-lectura" onclick="notasMenuCrearAccion_(\'nota\')"><i class="ti ti-note"></i> Nota</button>' +
+      '<button class="btn-toolbar notas-btn-lectura" onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Marco</button>' +
+      '<button class="btn-toolbar notas-btn-lectura" onclick="notasAbrirPickerEmoji_(event)"><i class="ti ti-mood-smile"></i> Emoji</button>' +
       '<div class="notas-zoom-controls">' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(-1)" title="Alejar">−</button>' +
         '<button class="btn-toolbar" onclick="notasCentrarVista()" title="Centrar vista">Centrar</button>' +
@@ -4049,12 +4066,12 @@ function renderNotasEsqueleto_() {
       // por nota, es 1 solo interruptor para TODO el pizarrón propio (ver
       // notasToggleTablero_): aplica a todas las notas propias juntas al
       // guardar, y las nuevas nacen heredando el estado actual.
-      '<button class="btn-toolbar" id="btn-notas-visibilidad" onclick="notasToggleTablero_()"><i class="ti ti-lock"></i> Mi pizarrón: Privado</button>' +
-      '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
+      '<button class="btn-toolbar notas-btn-lectura" id="btn-notas-visibilidad" onclick="notasToggleTablero_()"><i class="ti ti-lock"></i> Mi pizarrón: Privado</button>' +
+      '<button class="btn-toolbar notas-btn-lectura" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
       // NUEVO v8.5.0 — guardado explícito: activo solo con cambios sin
       // guardar (ver notasMarcarSinGuardar_/notasMarcarGuardado_)
-      '<button class="btn-toolbar principal" id="btn-notas-guardar" onclick="notasGuardarCambios_()" disabled><i class="ti ti-device-floppy"></i> Guardar</button>' +
-      '<span class="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
+      '<button class="btn-toolbar principal notas-btn-lectura" id="btn-notas-guardar" onclick="notasGuardarCambios_()" disabled><i class="ti ti-device-floppy"></i> Guardar</button>' +
+      '<span class="notas-hint" id="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
     '</div>' +
     '<div class="notas-board' + (notasGrillaVisible ? ' grilla-visible' : '') + '" id="notas-board">' +
       '<div class="notas-canvas" id="notas-canvas"></div>' +
@@ -4074,9 +4091,8 @@ async function cargarNotas(reintentando) {
     const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
     if (!ok) return;
   }
-  const btn = document.getElementById('btn-notas-actualizar');
   const overlay = document.getElementById('notas-board-overlay'); // NUEVO v8.6.0 — reemplaza el spinner chico del botón (v5.1.1)
-  if (btn) btn.disabled = true;
+  notasToolbarHabilitar_(false); // NUEVO v8.6.3 — antes solo el botón Actualizar se deshabilitaba a sí mismo; ahora toda la toolbar, mientras carga
   if (overlay) overlay.classList.remove('hidden');
   try {
     const res = await llamarBackend('leerNotas', { obraId: obraActual.obraId, email: emailActual }); // FIX v8.5.0 — email obligatorio (propias+públicas)
@@ -4089,14 +4105,75 @@ async function cargarNotas(reintentando) {
     notas = res.notas || [];
     notasMarcarGuardado_(); // FIX v8.5.0 — refetch del servidor = ya no hay nada "sin guardar"
     notasSincronizarTableroPublico_(); // FIX v8.5.0
+    notasPintarSelectorTablero_(); // NUEVO v8.6.4
     pintarNotasCanvas();
   } catch (err) {
     if (!reintentando) { await cargarNotas(true); return; } // 1 reintento automático antes de rendirse
     mostrarToast('No se pudo actualizar Notas — se mantienen las últimas cargadas');
   } finally {
-    if (btn) btn.disabled = false;
+    notasToolbarHabilitar_(true); // NUEVO v8.6.3
+    notasAplicarModoLectura_(); // NUEVO v8.6.4 — reaplica el bloqueo de "viendo tablero ajeno" por encima del enable-all de arriba
     if (overlay) overlay.classList.add('hidden'); // NUEVO v8.6.0
   }
+}
+
+// NUEVO v8.6.4 — repuebla el <select> de tableros con "Mis notas" +
+// 1 opción por cada usuario distinto entre las notas AJENAS que
+// llegaron (ya vienen filtradas como públicas por leerNotas_ del
+// backend — cualquier nota con usuario !== emailActual que haya
+// llegado hasta acá es necesariamente pública). Se llama después de
+// cada cargarNotas() exitoso porque la lista de usuarios depende de
+// lo que traiga el backend, no se puede armar de entrada.
+function notasPintarSelectorTablero_() {
+  const sel = document.getElementById('notas-selector-tablero');
+  if (!sel) return;
+  const usuarios = Array.from(new Set(
+    notas.filter(function (n) { return n.usuario !== emailActual; }).map(function (n) { return n.usuario; })
+  )).sort();
+  sel.innerHTML = '<option value="">Mis notas</option>' +
+    usuarios.map(function (u) { return '<option value="' + escaparHtml(u) + '">' + escaparHtml(u) + '</option>'; }).join('');
+  // Si el usuario que se estaba viendo ya no tiene notas públicas (se las
+  // puso en privado, o las borró), vuelve solo a "Mis notas" en vez de
+  // quedar señalando a alguien que ya no está en la lista.
+  if (notasViendoTableroDe && usuarios.indexOf(notasViendoTableroDe) === -1) notasViendoTableroDe = null;
+  sel.value = notasViendoTableroDe || '';
+}
+
+// NUEVO v8.6.4 — cambiar de tablero desde el <select>: repinta el
+// canvas con el nuevo set, re-centra la vista (el tablero ajeno puede
+// estar en cualquier posición del canvas infinito) y aplica/saca el
+// modo solo lectura.
+function notasCambiarTableroVisto_(valor) {
+  notaCerrarMenu_();
+  notasCerrarPickerEmoji_();
+  notasViendoTableroDe = valor || null;
+  notasAplicarModoLectura_();
+  pintarNotasCanvas();
+  notasCentrarVista();
+}
+
+// NUEVO v8.6.4 — modo solo lectura al ver el tablero de otro usuario:
+// zoom/pan/Centrar/Grilla siguen funcionando (son de navegación, no
+// mutan nada — cerrado con Ale); todo lo que crea o guarda algo se
+// bloquea (clase .notas-btn-lectura, ver renderNotasEsqueleto_) y el
+// clic derecho/doble clic sobre notas ajenas no hace nada (ver
+// notaOnContextMenu_/notasOnDblClick_).
+function notasAplicarModoLectura_() {
+  const soloLectura = !!notasViendoTableroDe;
+  document.querySelectorAll('.notas-btn-lectura').forEach(function (b) { b.disabled = soloLectura; });
+  const hint = document.getElementById('notas-hint');
+  if (hint) hint.textContent = soloLectura
+    ? 'Viendo el tablero de ' + notasViendoTableroDe + ' — solo lectura (zoom/pan/Centrar/Grilla disponibles)'
+    : 'Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí';
+}
+
+// NUEVO v8.6.3 — habilita/deshabilita TODA la toolbar de Notas de una
+// vez (Nota/Marco/Emoji/zoom/Centrar/Grilla/Mi pizarrón/Actualizar/
+// Guardar), reportado por Ale: mientras cargarNotas_/notasGuardarCambios_
+// están en vuelo, ningún botón de la toolbar debería poder tocarse —
+// antes solo el botón que disparaba la acción se autodeshabilitaba.
+function notasToolbarHabilitar_(habilitado) {
+  document.querySelectorAll('.notas-toolbar button').forEach(function (b) { b.disabled = !habilitado; });
 }
 
 // ── Guardado explícito (NUEVO v8.5.0) ─────────────────────────
@@ -4131,6 +4208,7 @@ async function notasGuardarCambios_(silencioso) {
   if (notasGuardando || !notasSinGuardar) return;
   notasGuardando = true;
   notasActualizarBotonGuardar_();
+  notasToolbarHabilitar_(false); // NUEVO v8.6.3 — mientras guarda, ningún botón de la toolbar se puede tocar
   const btn = document.getElementById('btn-notas-guardar');
   if (btn) btn.classList.add('cargando');
   try {
@@ -4147,6 +4225,8 @@ async function notasGuardarCambios_(silencioso) {
   } finally {
     notasGuardando = false;
     if (btn) btn.classList.remove('cargando');
+    notasToolbarHabilitar_(true); // NUEVO v8.6.3 — el estado puntual de Guardar se corrige acá abajo
+    notasAplicarModoLectura_(); // NUEVO v8.6.4
     notasActualizarBotonGuardar_();
   }
 }
@@ -4168,14 +4248,25 @@ function notasFlushAlSalir_() {
   if (notasSinGuardar && !notasGuardando) notasGuardarCambios_(true);
 }
 
+// NUEVO v8.6.4 — set de notas del tablero que se está viendo: las
+// propias si notasViendoTableroDe es null ("Mis notas"), o las del
+// usuario elegido en el selector (todas ya vienen filtradas como
+// públicas desde el backend — ver leerNotas_/esPublica).
+function notasVisibles_() {
+  return notasViendoTableroDe
+    ? notas.filter(function (n) { return n.usuario === notasViendoTableroDe; })
+    : notas.filter(function (n) { return notaEsPropia_(n); });
+}
+
 function pintarNotasCanvas() {
   const canvas = document.getElementById('notas-canvas');
   if (!canvas) return;
-  canvas.innerHTML = notas.map(function (n) { return renderNotaHtml_(n); }).join('');
+  const visibles = notasVisibles_(); // FIX v8.6.4 — antes pintaba TODO `notas` mezclado (propias+ajenas)
+  canvas.innerHTML = visibles.map(function (n) { return renderNotaHtml_(n); }).join('');
   // NUEVO v6.2.0 — el autoajuste de fuente (shrink-to-fit) solo aplica a
   // post-it y texto libre; región tiene etiqueta de fuente fija chica,
   // emoji tiene fuente fija grande (1 solo carácter, nunca desborda).
-  notas.forEach(function (n) { if ((n.tipo || 'postit') !== 'region' && n.tipo !== 'emoji') notaAutoajustarTexto_(n.id); });
+  visibles.forEach(function (n) { if ((n.tipo || 'postit') !== 'region' && n.tipo !== 'emoji') notaAutoajustarTexto_(n.id); });
   wireNotasEventosNotas_();
   // NUEVO v5.1.1 — un repintado completo recrea los divs, así que hay
   // que reaplicar el resaltado de selección (se pierde con el innerHTML nuevo)
@@ -4355,7 +4446,8 @@ function notasCentrarVista() {
   const board = document.getElementById('notas-board');
   if (!board) return; // FIX v7.1.1 — red de seguridad extra si se llama sin la vista Notas montada
   const rect = board.getBoundingClientRect();
-  if (notas.length === 0) {
+  const visibles = notasVisibles_(); // FIX v8.6.4 — antes centraba sobre TODO `notas` mezclado
+  if (visibles.length === 0) {
     notasView = { panX: 0, panY: 0, zoom: 1 };
     aplicarTransformNotas_();
     return;
@@ -4364,7 +4456,7 @@ function notasCentrarVista() {
   // donde estaban las notas. Ahora calcula el rectángulo real que ocupan
   // (considerando el tamaño S/M/L de cada una) y centra sobre eso.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  notas.forEach(function (n) {
+  visibles.forEach(function (n) {
     const dim = notaDimensiones_(n); // NUEVO v6.2.0 — antes asumía cuadrada S/M/L para todas, ahora respeta región/emoji
     minX = Math.min(minX, n.x);
     minY = Math.min(minY, n.y);
@@ -4544,6 +4636,7 @@ function notasOnPointerUp_(e) {
 }
 
 function notasOnDblClick_(e) {
+  if (notasViendoTableroDe) return; // NUEVO v8.6.4 — solo lectura, no se crea nada en el tablero de otro
   if (notasModoDibujo) return; // NUEVO v6.2.0 — en modo dibujo, el dblclick no compite con el arrastre
   if (e.target.closest('.nota-postit')) return; // dblclick en una nota no crea otra
   const rect = e.currentTarget.getBoundingClientRect();
@@ -4748,7 +4841,7 @@ function wireNotasEventosNotas_() {
     let timerLongPress = null;
     div.addEventListener('pointerdown', function (e) {
       if (e.pointerType !== 'touch') return;
-      timerLongPress = setTimeout(function () { notaAbrirMenu_(div.dataset.id, e.clientX, e.clientY); }, 550);
+      timerLongPress = setTimeout(function () { if (!notasViendoTableroDe) notaAbrirMenu_(div.dataset.id, e.clientX, e.clientY); }, 550);
     });
     ['pointerup', 'pointercancel', 'pointermove'].forEach(function (ev) {
       div.addEventListener(ev, function () { if (timerLongPress) { clearTimeout(timerLongPress); timerLongPress = null; } });
@@ -4910,6 +5003,7 @@ function notaGuardarTexto_(id, textoNuevo) {
 // ── Menú contextual (clic derecho / mantener presionado) ─────
 function notaOnContextMenu_(e) {
   e.preventDefault();
+  if (notasViendoTableroDe) return; // NUEVO v8.6.4 — solo lectura, sin menú contextual en el tablero de otro
   notaAbrirMenu_(e.currentTarget.dataset.id, e.clientX, e.clientY);
 }
 
