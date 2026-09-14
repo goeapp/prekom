@@ -1482,7 +1482,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.5.0';
+const APP_VERSION = 'v8.5.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1826,6 +1826,7 @@ let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de
 let notasSinGuardar = false;             // true si hay cambios locales sin persistir
 let notasGuardando = false;              // guard contra doble click en Guardar
 let notasAvisoTimerId = null;            // setInterval del recordatorio cada 5 min
+let notasTableroPublico = false;         // FIX v8.5.0 (corrección de diseño) — 1 solo interruptor para TODO el pizarrón propio, no por nota (ver notasToggleTablero_)
 let notasModoDibujo = null;              // NUEVO v6.2.0 — 'region' mientras se está dibujando una región nueva (arrastre estilo Lápiz)
 let notasDibujoRegion = null;            // NUEVO v6.2.0 — {pointerId,x0,y0} del arrastre en curso
 let notaResizeState = null;              // NUEVO v6.2.0 — resize de región (distinto del arrastre de mover)
@@ -3989,6 +3990,11 @@ function renderNotasEsqueleto_() {
       '</div>' +
       // NUEVO v7.1.2 — toggle de grilla de fondo (confirmado por Ale)
       '<button class="btn-toolbar" id="btn-notas-grilla" onclick="notasToggleGrilla_()"><i class="ti ti-grid-dots"></i> Grilla</button>' +
+      // FIX v8.5.0 (corrección de diseño) — el toggle público/privado NO es
+      // por nota, es 1 solo interruptor para TODO el pizarrón propio (ver
+      // notasToggleTablero_): aplica a todas las notas propias juntas al
+      // guardar, y las nuevas nacen heredando el estado actual.
+      '<button class="btn-toolbar" id="btn-notas-visibilidad" onclick="notasToggleTablero_()"><i class="ti ti-lock"></i> Mi pizarrón: Privado</button>' +
       '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
       // NUEVO v8.5.0 — guardado explícito: activo solo con cambios sin
       // guardar (ver notasMarcarSinGuardar_/notasMarcarGuardado_)
@@ -4023,6 +4029,7 @@ async function cargarNotas(reintentando) {
     if (!res.ok) throw new Error(res.error || 'leerNotas falló');
     notas = res.notas || [];
     notasMarcarGuardado_(); // FIX v8.5.0 — refetch del servidor = ya no hay nada "sin guardar"
+    notasSincronizarTableroPublico_(); // FIX v8.5.0
     pintarNotasCanvas();
   } catch (err) {
     if (!reintentando) { await cargarNotas(true); return; } // 1 reintento automático antes de rendirse
@@ -4511,6 +4518,39 @@ function notasToggleGrilla_() {
   aplicarTransformNotas_();
 }
 
+// FIX v8.5.0 (corrección de diseño, reemplaza al toggle por nota) — 1
+// solo interruptor para TODO el pizarrón propio: aplica el mismo
+// valor de `publica` a TODAS las notas propias a la vez (no una por
+// una). Notas ajenas (públicas de otros) no se tocan — nunca viajan
+// en el guardado propio de todas formas.
+function notasToggleTablero_() {
+  notasTableroPublico = !notasTableroPublico;
+  notas.forEach(function (n) {
+    if (notaEsPropia_(n)) n.publica = notasTableroPublico;
+  });
+  notasActualizarBotonVisibilidad_();
+  notasMarcarSinGuardar_();
+  mostrarToast(notasTableroPublico ? 'Pizarrón público — el resto lo va a ver al guardar' : 'Pizarrón privado de nuevo');
+}
+
+function notasActualizarBotonVisibilidad_() {
+  const btn = document.getElementById('btn-notas-visibilidad');
+  if (!btn) return;
+  btn.classList.toggle('activo', notasTableroPublico);
+  btn.innerHTML = '<i class="ti ti-' + (notasTableroPublico ? 'world' : 'lock') + '"></i> Mi pizarrón: ' + (notasTableroPublico ? 'Público' : 'Privado');
+}
+
+// FIX v8.5.0 — al cargar (inicial o "Actualizar"), el estado del
+// interruptor se deriva de las notas propias ya guardadas (deberían
+// venir todas con el mismo `publica`, invariante que sostiene
+// notasToggleTablero_/guardarTableroPropio_); tablero recién creado
+// (sin notas propias todavía) arranca en privado.
+function notasSincronizarTableroPublico_() {
+  const propia = notas.find(function (n) { return notaEsPropia_(n); });
+  notasTableroPublico = propia ? !!propia.publica : false;
+  notasActualizarBotonVisibilidad_();
+}
+
 function notasMaxZIndex_() {
   return notas.reduce(function (max, n) { return Math.max(max, n.zIndex || 0); }, 0);
 }
@@ -4545,7 +4585,7 @@ function notaCrear_(x, y, opts) {
     // NUEVO v6.2.0 — una región nace atrás de todo automáticamente (piso
     // de zIndex), el resto sigue naciendo adelante de todo (techo)
     zIndex: esRegion ? (notasMinZIndex_() - 1) : (notasMaxZIndex_() + 1),
-    fijada: false, usuario: emailActual, publica: false // FIX v8.5.0
+    fijada: false, usuario: emailActual, publica: notasTableroPublico // FIX v8.5.0 — hereda el estado actual del pizarrón, no un default fijo
   };
   notas.push(nota);
   notasMarcarSinGuardar_();
@@ -4814,19 +4854,11 @@ function renderNotaMenuHtml_(nota) {
     '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'frente\')"><i class="ti ti-stack-front"></i> Traer al frente</button>' +
     '<button class="nota-menu-item" onclick="notaZOrden_(\'' + nota.id + '\',\'atras\')"><i class="ti ti-stack-back"></i> Enviar atrás</button>' +
     '<button class="nota-menu-item" onclick="notaToggleFijada_(\'' + nota.id + '\')"><i class="ti ti-pin"></i> ' + (nota.fijada ? 'Desfijar posición' : 'Fijar posición') + '</button>' +
-    // NUEVO v8.5.0 — toggle público/privado (default privado, ver notaCrear_)
-    '<button class="nota-menu-item" onclick="notaTogglePublica_(\'' + nota.id + '\')"><i class="ti ti-' + (nota.publica ? 'lock' : 'world') + '"></i> ' + (nota.publica ? 'Hacer privada' : 'Hacer pública') + '</button>' +
+    // FIX v8.5.0 — el toggle público/privado se sacó de acá: es 1 solo
+    // interruptor por TODO el pizarrón (botón "Mi pizarrón" en la
+    // toolbar, ver notasToggleTablero_), no por nota.
     '<div class="nota-menu-sep"></div>' +
     '<button class="nota-menu-item nota-menu-danger" onclick="notaOcultar_(\'' + nota.id + '\')"><i class="ti ti-trash"></i> Quitar</button>';
-}
-
-function notaTogglePublica_(id) {
-  const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota || !notaEsPropia_(nota)) return;
-  nota.publica = !nota.publica;
-  notasMarcarSinGuardar_();
-  notaCerrarMenu_();
-  mostrarToast(nota.publica ? 'Nota pública — el resto la va a ver al guardar' : 'Nota privada de nuevo');
 }
 
 function notaCambiarColor_(id, hex) {
