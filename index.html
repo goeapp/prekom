@@ -627,6 +627,15 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
    damos por CSS (ver nth-child de abajo) — ahí sí `left` y ancho real
    coinciden siempre. */
 .tabla-lista-scroll table.dataTable { table-layout: fixed; }
+/* FIX v8.4.8 — causa raíz real del "agujero" entre columnas fijas
+   (diagnosticado con Ale por consola, no otra hipótesis): con
+   `box-sizing: content-box` (el default), el `padding: 7px 10px`
+   de cada celda (20px horizontales) se sumaba POR ENCIMA de los
+   anchos declarados acá abajo (36/260/60px) — el ancho real
+   terminaba siendo 20px más grande que el `left` acumulado asumía.
+   `border-box` hace que el ancho declarado ya incluya el padding,
+   así `left` y ancho real vuelven a coincidir siempre. */
+.tabla-lista-scroll table.dataTable th, .tabla-lista-scroll table.dataTable td { box-sizing: border-box; }
 /* Header pegado arriba del propio contenedor con scroll (no de la
    página) — mismo mecanismo que .app-header, aplicado acá al thead. */
 .tabla-lista-scroll table.dataTable thead th { position: sticky; top: 0; z-index: 3; }
@@ -1471,7 +1480,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.7';
+const APP_VERSION = 'v8.4.8';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -3204,8 +3213,19 @@ function montarTablaLista(nombreTab, schema, datos) {
     return '160px'; // texto_corto y cualquier tipo no contemplado
   }
 
-  const theadHtml = '<tr>' + conAcciones_(schema.map(function (col) {
-    return '<th style="width:' + anchoColumna_(col) + '">' + escaparHtml(col.etiqueta || col.campo) + '</th>';
+  // FIX v8.4.8 — ID y Tarea (schema[0] y schema[1]) ya tienen su ancho
+  // resuelto por la regla CSS de nth-child(1)/nth-child(2) (fijas por
+  // convención de código, igual que Acciones) — llevar ADEMÁS un
+  // `style="width:..."` propio acá (por venir del mismo schema.map que
+  // el resto de las columnas) pisaba esa regla externa sin querer (el
+  // inline gana sin necesitar !important) y era la causa real del
+  // "agujero" que reportó Ale entre Tarea y Acciones: el `left` de
+  // Acciones asume los anchos de la regla CSS, no los que terminaban
+  // rindiendo ID/Tarea por el inline. A partir de acá, esas 2 columnas
+  // no llevan `style` propio — quedan 100% gobernadas por el CSS.
+  const theadHtml = '<tr>' + conAcciones_(schema.map(function (col, i) {
+    const styleAncho = i < IDX_ACCIONES_ ? '' : ' style="width:' + anchoColumna_(col) + '"';
+    return '<th' + styleAncho + '>' + escaparHtml(col.etiqueta || col.campo) + '</th>';
   }), '<th class="acciones-col">Acciones</th>').join('') + '</tr>';
 
   const tbodyHtml = datos.map(function (fila) {
@@ -3248,6 +3268,7 @@ function montarTablaLista(nombreTab, schema, datos) {
     lengthMenu: [10, 20, 50],
     order: [],
     dom: '<"dt-top"lip><"tabla-lista-scroll"t>', // sin 'f' (buscador global propio) y sin dt-bot — todo el bloque de controles arriba
+    autoWidth: false, // FIX v8.4.8 — DataTables recalculaba y reescribía por su cuenta el `width` inline de cada <th> después de cada render (con su propio criterio, formato "width: Npx;"), pisando tanto la regla CSS de sticky como nuestros propios anchos — 2da causa real (con la de arriba) del "agujero" entre columnas fijas
     columnDefs: puedeEditarListas ? [{ targets: IDX_ACCIONES_, orderable: false }] : []
   });
 
@@ -3285,6 +3306,21 @@ function ajustarAltoTablaLista_() {
   const sobrante = document.documentElement.scrollHeight - window.innerHeight;
   if (sobrante > 0) {
     scrollBox.style.maxHeight = Math.max(alto - sobrante, 220) + 'px';
+  }
+
+  // FIX v8.4.8 — diagnosticado con Ale por consola en su notebook
+  // (devicePixelRatio: 1.25): con escalado NO entero (125%/150%,
+  // típico en notebooks — no pasa en su monitor de 23" a 100%), el
+  // navegador redondea a píxel físico al pintar, y puede quedar un
+  // resto MENOR A 1px CSS que `scrollHeight`/`innerHeight` (ya
+  // redondeados a px CSS) no llegan a reflejar — el "sobrante" de
+  // arriba da 0 aunque en pantalla sí se termine dibujando 1px físico
+  // de scroll de más. No se puede medir ese resto (por eso no se
+  // detectaba con la red de seguridad ya existente), así que se
+  // descuenta un colchón fijo chico, solo cuando el escalado es
+  // fraccionario.
+  if (window.devicePixelRatio % 1 !== 0) {
+    scrollBox.style.maxHeight = Math.max(parseFloat(scrollBox.style.maxHeight) - 2, 220) + 'px';
   }
 }
 // FIX v8.4.3 — si la tipografía (DM Sans) todavía no había terminado
