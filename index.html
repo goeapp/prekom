@@ -637,19 +637,19 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
    por completo — nada que instanciar ni destruir, es CSS puro sobre
    la tabla real. */
 .tabla-lista-scroll table.dataTable th:nth-child(1), .tabla-lista-scroll table.dataTable td:nth-child(1) {
-  position: sticky; left: 0; z-index: 2; width: 48px; max-width: 48px; background: var(--surface);
-}
+  position: sticky; left: 0; z-index: 2; width: 36px; max-width: 36px; background: var(--surface);
+} /* FIX v8.4.7 (Ale): de 48 a 36px — ID no pasa de 2 dígitos */
 .tabla-lista-scroll table.dataTable th:nth-child(2), .tabla-lista-scroll table.dataTable td:nth-child(2) {
-  position: sticky; left: 48px; z-index: 2; width: 200px; max-width: 200px; background: var(--surface);
-}
+  position: sticky; left: 36px; z-index: 2; width: 260px; max-width: 260px; background: var(--surface);
+} /* FIX v8.4.7 (Ale): de 200 a 260px (+30%) */
 /* 3ra columna fija (Acciones, solo si puedeEditarListas — ver
    IDX_ACCIONES_ en montarTablaLista) — mismo mecanismo, left
-   acumulado sobre las 2 anteriores (48px + 200px). Si esta lista no
+   acumulado sobre las 2 anteriores (36px + 260px). Si esta lista no
    tiene columna de Acciones, el selector simplemente no matchea nada. */
 .tabla-lista-scroll table.dataTable th:nth-child(3).acciones-col, .tabla-lista-scroll table.dataTable td:nth-child(3).acciones-col {
-  position: sticky; left: 248px; z-index: 2; width: 74px; max-width: 74px; background: var(--surface);
+  position: sticky; left: 296px; z-index: 2; width: 60px; max-width: 60px; background: var(--surface);
   box-shadow: 2px 0 4px rgba(0,0,0,.06); /* la sombra que marca el límite de la zona fija pasa a la última columna fija real */
-}
+} /* FIX v8.4.7 (Ale): de 74 a 60px */
 .tabla-lista-scroll table.dataTable thead th:nth-child(3).acciones-col { z-index: 4; background: var(--accent2); }
 .tabla-lista-scroll table.dataTable thead th:nth-child(1),
 .tabla-lista-scroll table.dataTable thead th:nth-child(2) { z-index: 4; background: var(--accent2); } /* esquina: fija en ambos ejes a la vez */
@@ -1471,7 +1471,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.4.6';
+const APP_VERSION = 'v8.4.7';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2301,6 +2301,18 @@ function marcarNavActiva(vista) {
   // Hook obligatorio de Lápiz Global (§5 de la guía) — cambio de vista
   // principal borra cualquier marca dibujada.
   if(typeof lapizBorrar === 'function') lapizBorrar();
+  // FIX v8.4.7 — lapizSyncCanvasSize() solo corría 1 vez, al arrancar
+  // la app (lapizInit), con el alto de la vista que hubiera en ESE
+  // momento. Al cambiar a una vista más corta, el canvas se quedaba
+  // con el tamaño viejo (más alto que el contenido real) — eso
+  // explicaba el resto de scroll que seguía viéndose después del fix
+  // de v8.4.6. Se vuelve a sincronizar acá, en cada cambio de vista.
+  // El doble requestAnimationFrame espera a que el navegador termine
+  // de pintar el contenido nuevo antes de medir — si se mide antes,
+  // se repite el mismo problema con la vista anterior.
+  if (typeof lapizSyncCanvasSize === 'function') {
+    requestAnimationFrame(function () { requestAnimationFrame(lapizSyncCanvasSize); });
+  }
   // NUEVO v4.0.0 (batch 3) — el buscador de Contenido solo tiene
   // sentido en la vista Contenido
   document.getElementById('contenido-buscador-wrap').classList.toggle('hidden', vista !== 'arbol');
