@@ -1523,7 +1523,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.6.4';
+const APP_VERSION = 'v8.6.5';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -4061,13 +4061,13 @@ function renderNotasEsqueleto_() {
         '<button class="btn-toolbar" onclick="notasZoomBoton_(1)" title="Acercar">+</button>' +
       '</div>' +
       // NUEVO v7.1.2 — toggle de grilla de fondo (confirmado por Ale)
-      '<button class="btn-toolbar" id="btn-notas-grilla" onclick="notasToggleGrilla_()"><i class="ti ti-grid-dots"></i> Grilla</button>' +
+      '<button class="btn-toolbar' + (notasGrillaVisible ? ' activo' : '') + '" id="btn-notas-grilla" onclick="notasToggleGrilla_()"><i class="ti ti-grid-dots"></i> Grilla</button>' +
       // FIX v8.5.0 (corrección de diseño) — el toggle público/privado NO es
       // por nota, es 1 solo interruptor para TODO el pizarrón propio (ver
       // notasToggleTablero_): aplica a todas las notas propias juntas al
       // guardar, y las nuevas nacen heredando el estado actual.
       '<button class="btn-toolbar notas-btn-lectura" id="btn-notas-visibilidad" onclick="notasToggleTablero_()"><i class="ti ti-lock"></i> Mi pizarrón: Privado</button>' +
-      '<button class="btn-toolbar notas-btn-lectura" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
+      '<button class="btn-toolbar" id="btn-notas-actualizar" onclick="cargarNotas()"><i class="ti ti-refresh"></i> Actualizar</button>' +
       // NUEVO v8.5.0 — guardado explícito: activo solo con cambios sin
       // guardar (ver notasMarcarSinGuardar_/notasMarcarGuardado_)
       '<button class="btn-toolbar principal notas-btn-lectura" id="btn-notas-guardar" onclick="notasGuardarCambios_()" disabled><i class="ti ti-device-floppy"></i> Guardar</button>' +
@@ -4089,7 +4089,17 @@ function renderNotasEsqueleto_() {
 async function cargarNotas(reintentando) {
   if (!reintentando && notasSinGuardar) {
     const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
-    if (!ok) return;
+    if (!ok) {
+      // FIX v8.6.5 — antes cortaba acá con un return desnudo: el canvas y
+      // el selector de tableros habían quedado vacíos desde que entró la
+      // vista (recién se pintan más abajo, tras el fetch), así que
+      // Cancelar dejaba la pantalla en blanco aunque las notas siguieran
+      // intactas en memoria (`notas` nunca se tocó). Repinta con lo que
+      // ya hay, sin ir de nuevo al backend — no hace falta, nada cambió.
+      notasPintarSelectorTablero_();
+      pintarNotasCanvas();
+      return;
+    }
   }
   const overlay = document.getElementById('notas-board-overlay'); // NUEVO v8.6.0 — reemplaza el spinner chico del botón (v5.1.1)
   notasToolbarHabilitar_(false); // NUEVO v8.6.3 — antes solo el botón Actualizar se deshabilitaba a sí mismo; ahora toda la toolbar, mientras carga
