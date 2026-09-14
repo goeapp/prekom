@@ -855,7 +855,13 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 .nota-postit.fijada { cursor: default; }
 .nota-postit.nota-ajena { cursor: default; opacity: .82; } /* FIX v8.5.0 — pública de otro usuario, solo vista */
 .nota-postit.nota-ajena .nota-texto { cursor: default; }
-.nota-postit.seleccionada { outline: 3px solid var(--accent); outline-offset: 2px; } /* NUEVO v5.1.1 */
+/* FIX v8.6.2 — antes outline-offset:2px dibujaba el aro de selección
+   POR FUERA del borde real de la nota; un `outline` no forma parte de la
+   caja a los efectos de detectar el clic, así que clickear justo sobre
+   el aro (en vez de la nota) caía en lo que estuviera debajo (ej. un
+   Marco) — reportado por Ale como "errático". Offset negativo = el aro
+   se dibuja hacia ADENTRO, siempre dentro del área real clickeable. */
+.nota-postit.seleccionada { outline: 3px solid var(--accent); outline-offset: -4px; } /* NUEVO v5.1.1 */
 .nota-postit.tam-S { width: 140px; height: 140px; }
 .nota-postit.tam-M { width: 200px; height: 200px; }
 .nota-postit.tam-L { width: 260px; height: 260px; }
@@ -1511,7 +1517,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.6.1';
+const APP_VERSION = 'v8.6.2';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2410,6 +2416,8 @@ async function mostrarApp() {
   document.getElementById('btn-nav-arbol').disabled = true;
   document.getElementById('btn-nav-listas').disabled = true;
   document.getElementById('btn-nav-notas').disabled = true;
+  document.getElementById('btn-cambiar-obra').disabled = true; // NUEVO v8.6.2
+  document.getElementById('btn-lapiz-toggle').disabled = true; // NUEVO v8.6.2
 
   try {
     // FIX v8.5.0 — 'inicializarObra' (1 sola llamada, desde v6.0.0) se
@@ -2454,6 +2462,8 @@ async function mostrarApp() {
     document.getElementById('btn-nav-arbol').disabled = false;
     document.getElementById('btn-nav-listas').disabled = false;
     document.getElementById('btn-nav-notas').disabled = false;
+    document.getElementById('btn-cambiar-obra').disabled = false; // NUEVO v8.6.2
+    document.getElementById('btn-lapiz-toggle').disabled = false; // NUEVO v8.6.2
 
     lapizInit(); // Lápiz Global — una sola vez, tras el primer render
 
@@ -2468,6 +2478,16 @@ async function mostrarApp() {
     document.getElementById('main-view').innerHTML =
       '<div class="estado-vacio">' + escaparHtml(err.message || 'No se pudo conectar con el backend.') +
       '<br><br><button class="btn-accion" onclick="mostrarApp()">Reintentar</button></div>';
+    // FIX v8.6.2 — gap preexistente (los 3 de nav ya lo tenían, sin
+    // notarse porque "Reintentar" alcanzaba): si la carga falla, hay que
+    // rehabilitar los 5 botones — si no, "Cambiar obra" queda inutilizable
+    // como escape cuando la obra sigue fallando en loop (antes de este
+    // cambio, Cambiar obra ni se deshabilitaba, así que no se notaba).
+    document.getElementById('btn-nav-arbol').disabled = false;
+    document.getElementById('btn-nav-listas').disabled = false;
+    document.getElementById('btn-nav-notas').disabled = false;
+    document.getElementById('btn-cambiar-obra').disabled = false;
+    document.getElementById('btn-lapiz-toggle').disabled = false;
   }
 }
 
@@ -4016,7 +4036,7 @@ function renderNotasEsqueleto_() {
       // por si ya existiera alguna nota vieja de ese tipo en el Sheet,
       // pero ya no se puede crear una nueva desde acá.
       '<button class="btn-toolbar principal" onclick="notasMenuCrearAccion_(\'nota\')"><i class="ti ti-note"></i> Nota</button>' +
-      '<button class="btn-toolbar" onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Región</button>' +
+      '<button class="btn-toolbar" onclick="notasMenuCrearAccion_(\'region\')"><i class="ti ti-square"></i> Marco</button>' +
       '<button class="btn-toolbar" onclick="notasAbrirPickerEmoji_(event)"><i class="ti ti-mood-smile"></i> Emoji</button>' +
       '<div class="notas-zoom-controls">' +
         '<button class="btn-toolbar" onclick="notasZoomBoton_(-1)" title="Alejar">−</button>' +
@@ -4235,7 +4255,10 @@ function renderNotaHtml_(n) {
       '<div class="nota-postit tipo-emoji tam-' + (n.tamaño || 'M') + (n.fijada ? ' fijada' : '') + claseAjena + '" data-id="' + n.id + '" title="' + tooltip + '" ' +
         'style="left:' + n.x + 'px; top:' + n.y + 'px; z-index:' + (n.zIndex || 0) + '">' +
         pin +
-        '<div class="nota-texto" contenteditable="' + editable + '" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
+        // FIX v8.6.2 — emoji NUNCA se edita (antes seguía el mismo criterio de
+        // ownership que postit/texto/región); el ícono se elige una sola vez
+        // en el picker al crearla, no se puede volver a tocar después.
+        '<div class="nota-texto" contenteditable="false" data-id="' + n.id + '">' + escaparHtml(n.texto || '') + '</div>' +
       '</div>';
   }
 
@@ -4512,7 +4535,7 @@ function notasOnPointerUp_(e) {
     const y = Math.round(Math.min(y0, canvasY));
     const ancho = Math.max(NOTA_REGION_MIN_PX, Math.round(Math.abs(canvasX - x0)));
     const alto = Math.max(NOTA_REGION_MIN_PX, Math.round(Math.abs(canvasY - y0)));
-    notaCrear_(x, y, { tipo: 'region', ancho: ancho, alto: alto });
+    notaCrear_(x, y, { tipo: 'region', ancho: ancho, alto: alto, texto: notasProximoNombreMarco_() }); // FIX v8.6.2 — antes nacía sin texto ("Región"→"Marco")
     return;
   }
   notasPointers.delete(e.pointerId);
@@ -4664,6 +4687,16 @@ function notaGenerarId_() {
 // propia (usuario=emailActual) y pública=false por default — recién
 // viaja al backend cuando el usuario aprieta Guardar (ver
 // notasGuardarCambios_).
+// NUEVO v8.6.2 — "Región" pasa a llamarse "Marco" en toda la UI; auto-nombre
+// "Marco N" al crear uno nuevo. N = cantidad de Marcos PROPIOS que ya
+// existen + 1 (no un contador histórico — si se borra "Marco 2", el
+// próximo vuelve a ser "Marco 2", no "Marco 3"). No cuenta Marcos ajenos
+// (públicos de otro usuario).
+function notasProximoNombreMarco_() {
+  const cantidad = notas.filter(function (n) { return n.tipo === 'region' && notaEsPropia_(n); }).length;
+  return 'Marco ' + (cantidad + 1);
+}
+
 function notaCrear_(x, y, opts) {
   opts = opts || {};
   const tipo = opts.tipo || 'postit'; // NUEVO v6.2.0
@@ -4786,8 +4819,15 @@ function notaOnPointerDown_(e) {
   const div = e.currentTarget;
   const id = div.dataset.id;
   const nota = notas.find(function (n) { return String(n.id) === String(id); });
-  if (!nota || nota.fijada || !notaEsPropia_(nota)) return; // FIX v8.5.0 — no propia = solo vista
+  // FIX v8.6.2 — antes el stopPropagation() estaba DESPUÉS de este chequeo:
+  // un clic en una nota fijada o ajena (ninguna de las dos se puede mover)
+  // hacía return sin frenar la propagación, y el evento caía al listener
+  // del tablero de fondo, arrancando un pan de TODO el tablero — reportado
+  // por Ale ("estás en una nota fijada y la querés mover y se mueve todo
+  // el tablero"). Ahora el clic queda absorbido por la nota en cualquier
+  // caso; solo se sigue de largo (drag real) si es propia y no está fijada.
   e.stopPropagation(); // no dispara el pan del tablero de fondo
+  if (!nota || nota.fijada || !notaEsPropia_(nota)) return; // FIX v8.5.0 — no propia = solo vista
   div.setPointerCapture(e.pointerId);
   notaDragState = { id: id, pointerId: e.pointerId, startXPantalla: e.clientX, startYPantalla: e.clientY, notaX0: nota.x, notaY0: nota.y, movio: false };
   div.addEventListener('pointermove', notaOnPointerMoveDrag_);
