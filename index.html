@@ -687,7 +687,17 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 /* FIX v8.4.0 — bolita naranja sobre "Filtros" cuando hay algún filtro
    activo (ver actualizarBadgeFiltrosLista_), para que no quede un
    filtro aplicado invisible para Ale. */
-.btn-filtros-badge { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 1.5px solid var(--surface); }
+/* FIX v8.6.8 — la bolita decorativa pasa a mini-botón clickeable
+   ("✕" que limpia todos los filtros sin abrir el panel, pedido por
+   Ale: hasta ahora había que abrir Filtros y buscar el botón "Quitar
+   filtros" al pie); crece de 9px a 16px para que sea cómoda de tocar. */
+.btn-filtros-badge {
+  position: absolute; top: -7px; right: -7px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--accent); border: 1.5px solid var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; line-height: 1; color: #fff; font-weight: 700; cursor: pointer;
+}
+.btn-filtros-badge:hover { background: var(--accent2); }
 .tag-valor { display: inline-block; padding: 2px 11px; border-radius: 99px; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; } /* FIX v8.3.1 (punto 5): sin esto el badge partía el texto en 2 líneas en columnas angostas */
 .btn-fila-accion { background: none; border: none; font-size: 14px; padding: 0 5px; cursor: pointer; }
 .btn-editar-fila { color: var(--accent); }
@@ -1544,7 +1554,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.6.7';
+const APP_VERSION = 'v8.6.8';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1805,21 +1815,39 @@ async function capturarPantalla(){
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     stream.getTracks().forEach(t => t.stop());
-    canvas.toBlob(blob => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const nombreObraVisible = (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
-        ? configObra.nombre
-        : (obraActual && obraActual.nombreObra) ? obraActual.nombreObra : (obraActual && obraActual.obraId);
-      const contextoId = lapizSanitizarNombreArchivo(nombreObraVisible);
-      a.download = `${contextoId}_pantalla_${lapizTimestampArchivo()}.png`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      mostrarToast('Captura guardada');
-    }, 'image/png');
+    // FIX v8.6.8 — bug reportado por Ale, ya había pasado antes: en la
+    // primera captura, después de bajar el archivo, "borraba" el
+    // contenido (apagaba el Lápiz y limpiaba el canvas). Causa real:
+    // canvas.toBlob() es async y esta función nunca lo esperaba — el
+    // try terminaba y el finally soltaba `capturando=false` de
+    // inmediato, ANTES de que el callback de toBlob corriera y
+    // disparara la descarga real (a.click()). Si en ese momento (el
+    // propio a.click() o un diálogo nativo "Guardar como") el
+    // navegador dispara un visibilitychange, ya lo agarraba con
+    // `capturando` en false → lo toma como cambio de pestaña real →
+    // lapizToggle() → lapizBorrar(). Fix: se envuelve toBlob en una
+    // Promise y se espera (await) ANTES del finally, así el flag
+    // sigue en true durante toda la descarga real.
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const nombreObraVisible = (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
+      ? configObra.nombre
+      : (obraActual && obraActual.nombreObra) ? obraActual.nombreObra : (obraActual && obraActual.obraId);
+    const contextoId = lapizSanitizarNombreArchivo(nombreObraVisible);
+    a.download = `${contextoId}_pantalla_${lapizTimestampArchivo()}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    mostrarToast('Captura guardada');
+    // Margen extra tras el click: si el navegador tiene "Preguntar
+    // dónde guardar cada archivo" activado, el diálogo nativo puede
+    // tardar un instante en aparecer y dispara su propio
+    // visibilitychange — se sigue protegiendo un rato más antes de
+    // soltar el flag en el finally.
+    await new Promise(resolve => setTimeout(resolve, 600));
   } catch(err){
     if(stream) stream.getTracks().forEach(t => t.stop());
     if(err.name === 'NotAllowedError') mostrarToast('Captura cancelada');
@@ -3115,7 +3143,7 @@ async function abrirLista(nombreTab) {
           '<button class="btn-limpiar-buscador hidden" id="btn-limpiar-buscador" title="Borrar búsqueda">&times;</button>' +
         '</div>' +
         '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
-        '<button class="btn-toolbar" style="position:relative" onclick="abrirPanelFiltrosLista()">Filtros<span class="btn-filtros-badge hidden" id="btn-filtros-lista-badge"></span></button>' +
+        '<button class="btn-toolbar" style="position:relative" onclick="abrirPanelFiltrosLista()">Filtros<span class="btn-filtros-badge hidden" id="btn-filtros-lista-badge" title="Quitar filtros" onclick="event.stopPropagation(); quitarFiltrosLista();">✕</span></button>' +
         '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
         (puedeEditarListas ? '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' : '') +
       '</div>' +
