@@ -1523,7 +1523,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.6.5';
+const APP_VERSION = 'v8.6.6';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -4046,7 +4046,10 @@ function renderNotasEsqueleto_() {
       // + 1 opción por cada usuario con notas públicas. Se repuebla en
       // cada cargarNotas() exitoso (ver notasPintarSelectorTablero_),
       // porque la lista de usuarios depende de lo que traiga el backend.
-      '<select class="btn-toolbar" id="notas-selector-tablero" onchange="notasCambiarTableroVisto_(this.value)" title="Qué tablero estás viendo"></select>' +
+      // FIX v8.6.6 — nace con "Mis notas" en vez de vacío; antes se veía
+      // en blanco hasta que cargarNotas() resolvía y recién ahí
+      // notasPintarSelectorTablero_() lo poblaba (reportado por Ale).
+      '<select class="btn-toolbar" id="notas-selector-tablero" onchange="notasCambiarTableroVisto_(this.value)" title="Qué tablero estás viendo"><option value="">Mis notas</option></select>' +
       // FIX v7.1.2 — el menú desplegable "+ Agregar" pasa a 3 botones
       // directos en la toolbar (confirmado por Ale); Texto libre se saca
       // del tablero ("no suma") — el tipo sigue soportado en el render
@@ -4175,6 +4178,10 @@ function notasAplicarModoLectura_() {
   if (hint) hint.textContent = soloLectura
     ? 'Viendo el tablero de ' + notasViendoTableroDe + ' — solo lectura (zoom/pan/Centrar/Grilla disponibles)'
     : 'Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí';
+  // FIX v8.6.6 — btn-notas-guardar también tiene .notas-btn-lectura, así
+  // que el enable-all de arriba lo deja habilitado aunque no haya nada
+  // sin guardar; se reaplica acá su estado real (sinGuardar+soloLectura).
+  notasActualizarBotonGuardar_();
 }
 
 // NUEVO v8.6.3 — habilita/deshabilita TODA la toolbar de Notas de una
@@ -4201,9 +4208,15 @@ function notasMarcarGuardado_() {
   notasSinGuardar = false;
   notasActualizarBotonGuardar_();
 }
+// FIX v8.6.6 — suma el chequeo de modo lectura (notasViendoTableroDe):
+// antes solo miraba notasSinGuardar/notasGuardando, y quedaba pisado
+// por notasToolbarHabilitar_(true) (enable-all tras cargarNotas()) y
+// por notasAplicarModoLectura_ (enable-all de .notas-btn-lectura al
+// volver a "Mis notas") — ninguna de las dos re-evaluaba este estado
+// después. Ahora es la única fuente de verdad; ver notasAplicarModoLectura_.
 function notasActualizarBotonGuardar_() {
   const btn = document.getElementById('btn-notas-guardar');
-  if (btn) btn.disabled = !notasSinGuardar || notasGuardando;
+  if (btn) btn.disabled = !!notasViendoTableroDe || !notasSinGuardar || notasGuardando;
 }
 
 /**
@@ -5102,7 +5115,20 @@ function notaCambiarColor_(id, hex) {
   if (!nota || !notaEsPropia_(nota)) return;
   nota.color = hex;
   const div = document.querySelector('.nota-postit[data-id="' + id + '"]');
-  if (div) div.style.background = hex;
+  if (div) {
+    // FIX v8.6.6 — antes pintaba siempre sólido (div.style.background =
+    // hex), sin importar el tipo; un Marco (región) nace traslúcido
+    // (ver notaPostitHtml_, hexToRgba_(color,.22)+border-color propio)
+    // pero al cambiar el color desde acá perdía esa transparencia y
+    // quedaba con el borde viejo. Ahora replica el mismo criterio del
+    // render según tipo.
+    if (nota.tipo === 'region') {
+      div.style.background = hexToRgba_(hex, .22);
+      div.style.borderColor = hex;
+    } else {
+      div.style.background = hex;
+    }
+  }
   notasMarcarSinGuardar_();
   notaCerrarMenu_();
 }
