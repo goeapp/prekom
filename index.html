@@ -476,6 +476,16 @@ input { font-family: inherit; }
   white-space    : nowrap;
 }
 .toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* NUEVO v8.7.0 — toggle deslizable genérico (checkbox + slider), primer
+   switch on/off del stack; mismos tokens de color del resto de la app. */
+.switch-wrap { display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; color: var(--muted); cursor: pointer; user-select: none; }
+.switch { position: relative; display: inline-block; width: 34px; height: 20px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch-slider { position: absolute; inset: 0; background: var(--border); border-radius: 999px; transition: background .15s ease; cursor: pointer; }
+.switch-slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: transform .15s ease; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.switch input:checked + .switch-slider { background: var(--accent); }
+.switch input:checked + .switch-slider::before { transform: translateX(14px); }
+.switch input:focus-visible + .switch-slider { outline: 2px solid var(--accent); outline-offset: 2px; }
 .modal-head { background: var(--accent2); color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
 .modal-head h3 { margin: 0; font-size: 18px; font-weight: 600; }
 .modal-close { background: none; border: none; color: rgba(255,255,255,.5); font-size: 20px; line-height: 1; }
@@ -1554,7 +1564,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.6.8';
+const APP_VERSION = 'v8.7.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1868,12 +1878,14 @@ window.addEventListener('unhandledrejection', function (e) {
   console.error('Promesa rechazada sin capturar:', e.reason);
   mostrarAviso('Ocurrió un error inesperado: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
 });
-// NUEVO v8.5.0 — flush best-effort de Notas al cerrar/recargar la
-// pestaña: no bloquea el cierre (no hay forma de esperar una promesa
-// acá), es solo un intento de no perder cambios de último momento.
-window.addEventListener('beforeunload', function () {
-  if (notasSinGuardar && !notasGuardando) notasGuardarCambios_(true);
-});
+// FIX v8.7.0 — se saca el flush best-effort de beforeunload (v8.5.0):
+// mismo motivo que notasFlushAlSalir_ (ver marcarNavActiva) — guardaba
+// en silencio un estado local que podía estar desactualizado frente a
+// otro dispositivo con la PWA abierta, pisando el tablero real del
+// servidor sin que nadie lo viera venir. Guardado 100% manual ahora:
+// si el usuario cierra/recarga sin guardar, pierde ese cambio puntual
+// (mismo riesgo que cualquier formulario sin autosave), pero nunca
+// pisa datos ajenos más nuevos en silencio.
 
 // ── ESTADO EN MEMORIA ───────────────────────────────────────
 let emailActual = '';
@@ -1921,6 +1933,11 @@ let notaSeleccionadaId = null;           // NUEVO v5.1.1 — resaltado visual de
 // acción, no hay ID temporal que blindar.
 let notasSinGuardar = false;             // true si hay cambios locales sin persistir
 let notasGuardando = false;              // guard contra doble click en Guardar
+// NUEVO v8.7.0 — toggle "pedir confirmación al guardar" (deslizable,
+// junto al botón Guardar). Default true (pide confirm); en false,
+// Guardar persiste directo. Se resetea a true siempre que se abre la
+// app — a propósito, decisión de Ale, no persiste en localStorage.
+let notasPedirConfirmacionGuardado = true;
 let notasAvisoTimerId = null;            // setInterval del recordatorio cada 5 min
 let notasTableroPublico = false;         // FIX v8.5.0 (corrección de diseño) — 1 solo interruptor para TODO el pizarrón propio, no por nota (ver notasToggleTablero_)
 // NUEVO v8.6.4 — selector de tableros públicos: null = viendo "Mis notas"
@@ -2449,7 +2466,15 @@ function marcarNavActiva(vista) {
   // propio (sin el padding/max-width de .view normal); se activa/
   // desactiva acá para que cualquier navegación de salida lo saque.
   document.getElementById('main-view').classList.toggle('view-notas', vista === 'notas');
-  if (vista !== 'notas') { notaCerrarMenu_(); notaSeleccionadaId = null; notasFlushAlSalir_(); } // NUEVO v5.1.1 — no arrastrar selección entre vistas; FIX v8.5.0 — flush best-effort al salir
+  // FIX v8.7.0 — se saca el flush silencioso al salir (notasFlushAlSalir_,
+  // de v8.5.0): mandaba un guardado en segundo plano con lo que hubiera
+  // en memoria en ESE momento, sin aviso. Si ese estado local estaba
+  // desactualizado (p.ej. la PWA abierta en otro dispositivo cambió
+  // algo mientras tanto), el overwrite total de guardarTableroPropio_
+  // pisaba el tablero real del servidor con datos viejos — reportado
+  // por Ale. Ahora el único camino a guardar es el click explícito en
+  // el botón Guardar (ver notasGuardarCambios_).
+  if (vista !== 'notas') { notaCerrarMenu_(); notaSeleccionadaId = null; } // NUEVO v5.1.1 — no arrastrar selección entre vistas
   // NUEVO v7.1.0 — red de seguridad del fix de scroll de Notas (v6.1.0),
   // reubicada acá y acotada a la vista Notas: antes corría para toda la
   // app (ver mostrarPantalla) y le sacaba el scroll de página a
@@ -4145,7 +4170,7 @@ async function renderNotasHub() {
   wireNotasBoard_();
   aplicarTransformNotas_();
   notasIniciarAvisoPeriodico_(); // NUEVO v8.5.0 — arranca 1 sola vez, sigue corriendo aunque se navegue afuera
-  await cargarNotas();
+  await cargarNotas(null, false); // FIX v8.7.0 — entrar/volver a la vista NO pregunta, pisa en silencio + toast si había algo sin guardar
   // FIX v7.1.1 — antes llamaba a notasCentrarVista() sin chequear si el
   // usuario ya había navegado a otra vista mientras cargaba (Contenido/
   // Listas); en ese caso #notas-board ya no existe en el DOM y explotaba
@@ -4188,6 +4213,15 @@ function renderNotasEsqueleto_() {
       // NUEVO v8.5.0 — guardado explícito: activo solo con cambios sin
       // guardar (ver notasMarcarSinGuardar_/notasMarcarGuardado_)
       '<button class="btn-toolbar principal notas-btn-lectura" id="btn-notas-guardar" onclick="notasGuardarCambios_()" disabled><i class="ti ti-device-floppy"></i> Guardar</button>' +
+      // NUEVO v8.7.0 — toggle deslizable "pedir confirmación al guardar",
+      // siempre arranca en true (ver notasPedirConfirmacionGuardado).
+      '<label class="switch-wrap" title="Si está activo, Guardar pide confirmación antes de persistir">' +
+        '<span class="switch">' +
+          '<input type="checkbox" id="chk-notas-confirmar" ' + (notasPedirConfirmacionGuardado ? 'checked' : '') + ' onchange="notasPedirConfirmacionGuardado = this.checked">' +
+          '<span class="switch-slider"></span>' +
+        '</span>' +
+        '<span class="switch-label">Confirmar al guardar</span>' +
+      '</label>' +
       '<span class="notas-hint" id="notas-hint">Clic derecho (o mantené presionado) en una nota para más opciones · doble clic en el tablero para crear una nota ahí</span>' +
     '</div>' +
     '<div class="notas-board' + (notasGrillaVisible ? ' grilla-visible' : '') + '" id="notas-board">' +
@@ -4198,25 +4232,40 @@ function renderNotasEsqueleto_() {
 }
 
 // FIX v8.5.0 — antes del refetch (que pisa `notas` entero), si hay
-// cambios locales sin guardar hay que confirmar el descarte — si no,
-// "Actualizar" borraría en silencio trabajo que el usuario todavía no
-// persistió. `reintentando` es el reintento automático interno, nunca
-// pasa por acá una segunda vez (ya se confirmó, o nunca hubo nada que
-// confirmar en el primer intento).
-async function cargarNotas(reintentando) {
-  if (!reintentando && notasSinGuardar) {
-    const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
-    if (!ok) {
-      // FIX v8.6.5 — antes cortaba acá con un return desnudo: el canvas y
-      // el selector de tableros habían quedado vacíos desde que entró la
-      // vista (recién se pintan más abajo, tras el fetch), así que
-      // Cancelar dejaba la pantalla en blanco aunque las notas siguieran
-      // intactas en memoria (`notas` nunca se tocó). Repinta con lo que
-      // ya hay, sin ir de nuevo al backend — no hace falta, nada cambió.
-      notasPintarSelectorTablero_();
-      pintarNotasCanvas();
-      return;
+// cambios locales sin guardar hay que lidiar con el descarte. `reintentando`
+// es el reintento automático interno, nunca pasa por acá una segunda vez
+// (ya se resolvió el descarte, o nunca hubo nada que resolver, en el
+// primer intento).
+//
+// FIX v8.7.0 — se suma `confirmarDescarte` para distinguir 2 orígenes que
+// antes compartían el mismo comportamiento (confirm bloqueante siempre):
+//   - Click manual en "Actualizar" (confirmarDescarte=true, default):
+//     sigue preguntando con mostrarConfirm() antes de pisar cambios sin
+//     guardar — es una acción explícita del usuario, amerita la pregunta.
+//   - Entrar/volver a la vista Notas vía renderNotasHub (confirmarDescarte
+//     explícito en false): NO pregunta nada — pisa en silencio con lo que
+//     traiga el servidor y avisa con un toast ("Se descartaron cambios sin
+//     guardar") en vez de bloquear con un modal.
+async function cargarNotas(reintentando, confirmarDescarte) {
+  if (confirmarDescarte === undefined) confirmarDescarte = true; // default = comportamiento de "Actualizar"
+  const habiaSinGuardar = notasSinGuardar; // se captura ANTES de decidir, notasMarcarGuardado_() lo resetea más abajo
+  if (!reintentando && habiaSinGuardar) {
+    if (confirmarDescarte) {
+      const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
+      if (!ok) {
+        // FIX v8.6.5 — antes cortaba acá con un return desnudo: el canvas y
+        // el selector de tableros habían quedado vacíos desde que entró la
+        // vista (recién se pintan más abajo, tras el fetch), así que
+        // Cancelar dejaba la pantalla en blanco aunque las notas siguieran
+        // intactas en memoria (`notas` nunca se tocó). Repinta con lo que
+        // ya hay, sin ir de nuevo al backend — no hace falta, nada cambió.
+        notasPintarSelectorTablero_();
+        pintarNotasCanvas();
+        return;
+      }
     }
+    // confirmarDescarte===false: sigue de largo sin preguntar, el aviso
+    // llega como toast recién si el fetch de abajo llega a pisar algo.
   }
   const overlay = document.getElementById('notas-board-overlay'); // NUEVO v8.6.0 — reemplaza el spinner chico del botón (v5.1.1)
   notasToolbarHabilitar_(false); // NUEVO v8.6.3 — antes solo el botón Actualizar se deshabilitaba a sí mismo; ahora toda la toolbar, mientras carga
@@ -4234,8 +4283,11 @@ async function cargarNotas(reintentando) {
     notasSincronizarTableroPublico_(); // FIX v8.5.0
     notasPintarSelectorTablero_(); // NUEVO v8.6.4
     pintarNotasCanvas();
+    // NUEVO v8.7.0 — si se pisó en silencio (sin el confirm de arriba)
+    // habiendo cambios locales reales, se avisa acá con un toast.
+    if (!confirmarDescarte && habiaSinGuardar) mostrarToast('Se descartaron cambios sin guardar');
   } catch (err) {
-    if (!reintentando) { await cargarNotas(true); return; } // 1 reintento automático antes de rendirse
+    if (!reintentando) { await cargarNotas(true, confirmarDescarte); return; } // 1 reintento automático antes de rendirse
     mostrarToast('No se pudo actualizar Notas — se mantienen las últimas cargadas');
   } finally {
     notasToolbarHabilitar_(true); // NUEVO v8.6.3
@@ -4340,9 +4392,18 @@ function notasActualizarBotonGuardar_() {
  * total del lado del servidor (upsert + soft-delete de lo que ya no
  * viene). Las notas públicas de otros usuarios, aunque se vean en
  * pantalla, NUNCA viajan acá — no son propias, no se guardan.
+ *
+ * FIX v8.7.0 — guardado 100% manual: se saca el parámetro `silencioso`
+ * (ya no existe ningún llamado en segundo plano, ver marcarNavActiva/
+ * beforeunload). Se suma confirm() antes de persistir, condicionado al
+ * toggle notasPedirConfirmacionGuardado (deslizable en la toolbar).
  */
-async function notasGuardarCambios_(silencioso) {
+async function notasGuardarCambios_() {
   if (notasGuardando || !notasSinGuardar) return;
+  if (notasPedirConfirmacionGuardado) {
+    const ok = await mostrarConfirm('Guardar tablero', '¿Confirmás guardar los cambios del tablero de Notas?');
+    if (!ok) return;
+  }
   notasGuardando = true;
   notasActualizarBotonGuardar_();
   notasToolbarHabilitar_(false); // NUEVO v8.6.3 — mientras guarda, ningún botón de la toolbar se puede tocar
@@ -4353,12 +4414,9 @@ async function notasGuardarCambios_(silencioso) {
     const res = await llamarBackend('guardarTableroPropio', { obraId: obraActual.obraId, email: emailActual, notas: propias });
     if (!res.ok) throw new Error(res.error || 'guardarTableroPropio falló');
     notasMarcarGuardado_();
-    if (!silencioso) mostrarToast('Tablero guardado');
+    mostrarToast('Tablero guardado');
   } catch (err) {
-    if (!silencioso) mostrarToast('No se pudo guardar — probá de nuevo');
-    // silencioso (flush best-effort al salir/cerrar): sin toast, no
-    // hay pantalla para mostrarlo — notasSinGuardar queda true, el
-    // aviso de los 5 min y el botón Guardar lo siguen reflejando.
+    mostrarToast('No se pudo guardar — probá de nuevo');
   } finally {
     notasGuardando = false;
     if (btn) btn.classList.remove('cargando');
@@ -4377,12 +4435,6 @@ function notasIniciarAvisoPeriodico_() {
   notasAvisoTimerId = setInterval(function () {
     if (notasSinGuardar) mostrarToast('Tenés cambios sin guardar en Notas');
   }, 5 * 60 * 1000);
-}
-
-// Flush best-effort al salir de la vista Notas (cambiar de pestaña
-// dentro de la app) — silencioso, no bloquea la navegación.
-function notasFlushAlSalir_() {
-  if (notasSinGuardar && !notasGuardando) notasGuardarCambios_(true);
 }
 
 // NUEVO v8.6.4 — set de notas del tablero que se está viendo: las
