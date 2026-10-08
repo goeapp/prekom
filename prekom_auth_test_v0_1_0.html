@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PreKOM Auth Test</title>
+<!--
+  prekom_auth_test_v0_1_0.html
+  Prueba de Supabase Auth (código por mail) como reemplazo de pwa_pin,
+  + primera escritura protegida por RLS en el espejo PWAgoe.
+
+  Requiere en Supabase:
+    - prekom_espejo_v0_1_0.sql + _datos_v0_1_0.sql + v0_2_0.sql ejecutados
+    - Authentication → Emails → plantilla "Magic Link" con {{ .Token }}
+
+  Flujo: email → "Enviar código" → código de 6 dígitos → sesión.
+  Ya logueado:
+    Prueba A: comentario firmado con TU email       → la base debe ACEPTARLO
+    Prueba B: comentario firmado con OTRO email     → la base debe RECHAZARLO
+  Los comentarios de prueba empiezan con "[PRUEBA AUTH]" (fácil de borrar).
+-->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<style>
+:root {
+  --bg: #f8fafc; --card: #ffffff; --texto: #0f172a; --texto-2: #475569; --borde: #e2e8f0;
+  --header: #0f172a; --amber: #d97706; --amber-suave: #fef3c7;
+  --ok: #059669; --ok-suave: #d1fae5; --error: #dc2626; --error-suave: #fee2e2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1120; --card: #111827; --texto: #e2e8f0; --texto-2: #94a3b8; --borde: #1f2937;
+    --amber-suave: #3b2a0a; --ok: #34d399; --ok-suave: #052e1f; --error: #f87171; --error-suave: #3b0d0d;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--texto); font-family: 'DM Sans', sans-serif; overflow-x: hidden; }
+header { background: var(--header); color: #fff; padding: 12px 16px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.logo-pre { font-family: 'Bebas Neue', sans-serif; font-size: 18px; color: var(--amber); }
+.logo-kom { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: .5px; }
+.logo-sub { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: #cbd5e1; margin-left: 4px; }
+.version { margin-left: auto; font-size: 12px; color: #94a3b8; }
+main { max-width: 760px; margin: 0 auto; padding: 16px; }
+.card { background: var(--card); border: 1px solid var(--borde); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.card h2 { font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 22px; margin: 0 0 10px; letter-spacing: .5px; }
+.fila { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+label { font-size: 14px; color: var(--texto-2); display: block; margin-bottom: 4px; }
+input { font-family: inherit; font-size: 16px; padding: 9px 12px; border: 1px solid var(--borde); border-radius: 8px;
+        background: var(--bg); color: var(--texto); width: 100%; max-width: 340px; }
+input.codigo { letter-spacing: 6px; font-size: 22px; max-width: 200px; text-align: center; }
+button { font-family: inherit; font-size: 15px; background: var(--amber); color: #fff; border: 0; border-radius: 8px;
+         padding: 9px 18px; font-weight: 700; cursor: pointer; }
+button.sec { background: transparent; color: var(--texto); border: 1px solid var(--borde); font-weight: 500; }
+button:disabled { opacity: .5; cursor: wait; }
+.msg { font-size: 14px; padding: 8px 12px; border-radius: 8px; margin-top: 8px; }
+.msg.ok { background: var(--ok-suave); color: var(--ok); }
+.msg.error { background: var(--error-suave); color: var(--error); }
+.msg.info { background: var(--amber-suave); color: var(--texto); }
+.sesion { font-size: 14px; color: var(--texto-2); line-height: 1.6; }
+.sesion b { color: var(--texto); }
+.prueba { border: 1px solid var(--borde); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.prueba h3 { margin: 0 0 4px; font-size: 16px; }
+.prueba p { margin: 0 0 10px; font-size: 13px; color: var(--texto-2); }
+.res { font-weight: 700; font-size: 14px; margin-top: 8px; }
+.res.ok { color: var(--ok); } .res.error { color: var(--error); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--borde); text-align: left; vertical-align: top; }
+th { color: var(--texto-2); font-weight: 500; font-size: 12px; }
+.tabla-wrap { overflow-x: auto; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <span class="logo-pre">pre</span><span class="logo-kom">KOM</span><span class="logo-sub">Auth Test</span>
+  <span class="version" id="app-version"></span>
+</header>
+
+<main>
+  <!-- PASO 1: email -->
+  <section class="card" id="paso-email">
+    <h2>Ingresar</h2>
+    <label for="inp-email">Email</label>
+    <div class="fila">
+      <input id="inp-email" type="email" autocomplete="email">
+      <button id="btn-enviar" type="button">Enviar código</button>
+    </div>
+    <div id="msg-email"></div>
+  </section>
+
+  <!-- PASO 2: código -->
+  <section class="card" id="paso-codigo" hidden>
+    <h2>Código de acceso</h2>
+    <p class="sesion">Te mandamos un código a <b id="txt-email-enviado"></b>. Revisá también Spam.</p>
+    <label for="inp-codigo">Código</label>
+    <div class="fila">
+      <input id="inp-codigo" class="codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="10">
+      <button id="btn-validar" type="button">Ingresar</button>
+      <button id="btn-volver" type="button" class="sec">Cambiar email</button>
+    </div>
+    <div id="msg-codigo"></div>
+  </section>
+
+  <!-- PASO 3: logueado -->
+  <section class="card" id="paso-app" hidden>
+    <h2>Sesión activa</h2>
+    <div class="sesion" id="txt-sesion"></div>
+    <div class="fila" style="margin-top:10px">
+      <button id="btn-salir" type="button" class="sec">Cerrar sesión</button>
+    </div>
+  </section>
+
+  <section class="card" id="card-pruebas" hidden>
+    <h2>Pruebas de escritura (RLS)</h2>
+    <div class="prueba">
+      <h3>A — Comentario firmado con tu email</h3>
+      <p>Se agrega en el punto <b>1 (OBJETIVO)</b> de la 3000 PPTK. La base <b>debe aceptarlo</b>.</p>
+      <button id="btn-prueba-a" type="button">Probar A</button>
+      <div class="res" id="res-a"></div>
+    </div>
+    <div class="prueba">
+      <h3>B — Comentario firmado con otro email</h3>
+      <p>Mismo comentario, pero con autor <b id="txt-otro-email"></b>. La base <b>debe rechazarlo</b>.</p>
+      <button id="btn-prueba-b" type="button">Probar B</button>
+      <div class="res" id="res-b"></div>
+    </div>
+  </section>
+
+  <section class="card" id="card-lista" hidden>
+    <h2>Comentarios de contenido de la obra</h2>
+    <div class="tabla-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Punto</th><th>Autor</th><th>Fecha</th><th>Texto</th></tr></thead>
+        <tbody id="tbody-coment"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+// ── CONFIG (hardcodeada, prueba) ─────────────────────────────
+const APP_VERSION = 'v0.1.0';
+const SUPABASE_URL = 'https://uhuftsxrzwhmvzygcuvp.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_TCibRAnzgaDIbn_MIirw6w_FltKG8X3';
+const OBRA_ID = '28023c9f-f1f0-41a4-92af-89a2fc7d0793';
+const PUNTO_PRUEBA = '1';
+const EMAIL_SUGERIDO = 'aperin@broggio.com.ar';
+const OTRO_EMAIL = 'goecdg@gmail.com'; // para la prueba B (firma ajena)
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = function (id) { return document.getElementById(id); };
+let emailPendiente = '';
+
+// ── UI helpers ───────────────────────────────────────────────
+function mostrarMsg(id, tipo, texto) {
+  $(id).innerHTML = texto ? '<div class="msg ' + tipo + '">' + escapar_(texto) + '</div>' : '';
+}
+function mostrarPaso(paso) {
+  $('paso-email').hidden = paso !== 'email';
+  $('paso-codigo').hidden = paso !== 'codigo';
+  ['paso-app', 'card-pruebas', 'card-lista'].forEach(function (id) { $(id).hidden = paso !== 'app'; });
+}
+function escapar_(t) {
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function traducirError_(err) {
+  const m = (err && (err.message || err.msg)) || String(err);
+  if (/rate limit|too many|security purposes/i.test(m)) return 'Demasiados pedidos de código seguidos. Esperá un minuto y probá de nuevo. (' + m + ')';
+  if (/expired|invalid/i.test(m)) return 'Código incorrecto o vencido. (' + m + ')';
+  return m;
+}
+
+// ── PASO 1: pedir código ─────────────────────────────────────
+async function enviarCodigo() {
+  const email = $('inp-email').value.trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { mostrarMsg('msg-email', 'error', 'Ingresá un email válido.'); return; }
+  $('btn-enviar').disabled = true;
+  mostrarMsg('msg-email', 'info', 'Enviando código…');
+  const { error } = await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true } });
+  $('btn-enviar').disabled = false;
+  if (error) { console.error('[signInWithOtp]', error); mostrarMsg('msg-email', 'error', traducirError_(error)); return; }
+  emailPendiente = email;
+  mostrarMsg('msg-email', '', '');
+  $('txt-email-enviado').textContent = email;
+  $('inp-codigo').value = '';
+  mostrarMsg('msg-codigo', '', '');
+  mostrarPaso('codigo');
+  $('inp-codigo').focus();
+}
+
+// ── PASO 2: validar código ───────────────────────────────────
+async function validarCodigo() {
+  const token = $('inp-codigo').value.replace(/\D/g, '');
+  if (token.length < 6) { mostrarMsg('msg-codigo', 'error', 'El código tiene al menos 6 dígitos.'); return; }
+  $('btn-validar').disabled = true;
+  mostrarMsg('msg-codigo', 'info', 'Validando…');
+  const { data, error } = await sb.auth.verifyOtp({ email: emailPendiente, token: token, type: 'email' });
+  $('btn-validar').disabled = false;
+  if (error) { console.error('[verifyOtp]', error); mostrarMsg('msg-codigo', 'error', traducirError_(error)); return; }
+  await entrarApp_(data.session);
+}
+
+// ── PASO 3: logueado ─────────────────────────────────────────
+async function entrarApp_(session) {
+  const user = session.user;
+  const exp = new Date(session.expires_at * 1000);
+  $('txt-sesion').innerHTML =
+    'Usuario: <b>' + escapar_(user.email) + '</b><br>' +
+    'ID Supabase: <b>' + escapar_(user.id) + '</b><br>' +
+    'Token vence: <b>' + exp.toLocaleTimeString('es-AR') + '</b> (se renueva solo mientras la página esté abierta)';
+  $('txt-otro-email').textContent = OTRO_EMAIL;
+  $('res-a').textContent = ''; $('res-b').textContent = '';
+  mostrarPaso('app');
+  await cargarComentarios_();
+}
+
+async function insertarComentario_(autor) {
+  return sb.from('pk_comentarios_contenido').insert({
+    obra_id: OBRA_ID,
+    punto: PUNTO_PRUEBA,
+    usuario: autor,
+    texto: '[PRUEBA AUTH] ' + new Date().toLocaleString('es-AR') + ' — autor declarado: ' + autor
+  }).select('id');
+}
+
+async function pruebaA() {
+  const { data: s } = await sb.auth.getSession();
+  if (!s.session) { mostrarPaso('email'); return; }
+  $('btn-prueba-a').disabled = true;
+  const { data, error } = await insertarComentario_(s.session.user.email);
+  $('btn-prueba-a').disabled = false;
+  if (error) {
+    console.error('[pruebaA]', error);
+    $('res-a').className = 'res error';
+    $('res-a').textContent = '✗ Rechazado (no esperado): ' + error.message +
+      (/row-level security/i.test(error.message) ? ' — ¿tu email está en pk_usuarios_obras?' : '');
+  } else {
+    $('res-a').className = 'res ok';
+    $('res-a').textContent = '✓ Aceptado como se esperaba — comentario ID ' + data[0].id;
+    await cargarComentarios_();
+  }
+}
+
+async function pruebaB() {
+  $('btn-prueba-b').disabled = true;
+  const { error } = await insertarComentario_(OTRO_EMAIL);
+  $('btn-prueba-b').disabled = false;
+  if (error) {
+    $('res-b').className = 'res ok';
+    $('res-b').textContent = '✓ Rechazado como se esperaba: ' + error.message;
+  } else {
+    $('res-b').className = 'res error';
+    $('res-b').textContent = '✗ ACEPTADO — la regla de seguridad no está funcionando. Revisá que v0_2_0.sql se haya ejecutado.';
+    await cargarComentarios_();
+  }
+}
+
+async function cargarComentarios_() {
+  const { data, error } = await sb.from('pk_comentarios_contenido')
+    .select('id, punto, usuario, fecha, texto')
+    .eq('obra_id', OBRA_ID)
+    .order('id', { ascending: false })
+    .limit(10);
+  if (error) { console.error('[cargarComentarios]', error); $('tbody-coment').innerHTML = '<tr><td colspan="5">' + escapar_(error.message) + '</td></tr>'; return; }
+  $('tbody-coment').innerHTML = data.map(function (c) {
+    return '<tr><td>' + c.id + '</td><td>' + escapar_(c.punto) + '</td><td>' + escapar_(c.usuario) + '</td><td>' +
+      (c.fecha ? new Date(c.fecha).toLocaleString('es-AR') : '') + '</td><td>' + escapar_((c.texto || '').slice(0, 90)) + '</td></tr>';
+  }).join('');
+}
+
+async function salir() {
+  await sb.auth.signOut();
+  mostrarPaso('email');
+}
+
+// ── ARRANQUE ─────────────────────────────────────────────────
+$('app-version').textContent = APP_VERSION;
+$('inp-email').value = EMAIL_SUGERIDO;
+$('btn-enviar').addEventListener('click', enviarCodigo);
+$('inp-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') enviarCodigo(); });
+$('btn-validar').addEventListener('click', validarCodigo);
+$('inp-codigo').addEventListener('keydown', function (e) { if (e.key === 'Enter') validarCodigo(); });
+$('btn-volver').addEventListener('click', function () { mostrarPaso('email'); });
+$('btn-prueba-a').addEventListener('click', pruebaA);
+$('btn-prueba-b').addEventListener('click', pruebaB);
+$('btn-salir').addEventListener('click', salir);
+
+(async function () {
+  // sesión guardada (supabase-js la persiste en localStorage y la renueva sola)
+  const { data } = await sb.auth.getSession();
+  if (data.session) await entrarApp_(data.session); else mostrarPaso('email');
+})();
+</script>
+</body>
+</html>
