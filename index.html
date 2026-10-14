@@ -27,6 +27,8 @@
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<!-- v9.0.0 — datos en Supabase (proyecto PWAgoe): misma librería y versión que BDC v7 / LO v8 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
 <style>
 /* ─────────────────────────────────────────────────
    DESIGN TOKENS — mismos que Mesa de Trabajo / BDC
@@ -499,6 +501,17 @@ input { font-family: inherit; }
 .links-lista { display: flex; flex-direction: column; gap: 8px; }
 .links-lista a { display: block; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px; color: var(--text); text-decoration: none; }
 .links-lista a:hover { border-color: var(--accent); }
+/* v9.0.0 — edición de Links (administrar) */
+.links-acciones { margin-top: 14px; display: flex; gap: 8px; justify-content: flex-end; }
+.links-acciones .btn-secundario, .links-acciones .btn-accion { width: auto; margin: 0; padding: 8px 14px; }
+.link-fila { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 6px; margin-bottom: 8px; align-items: center; }
+.link-fila input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; font-size: 13px; background: var(--surface); color: var(--text); box-sizing: border-box; }
+.link-fila input:focus { outline: none; border-color: var(--accent); }
+.link-fila .link-quitar { background: none; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--muted); padding: 6px 9px; }
+.link-fila .link-quitar:hover { color: #dc2626; border-color: #dc2626; }
+.links-tope { font-size: 12px; color: var(--muted); margin: 2px 0 6px; }
+.links-vacio { font-size: 13px; color: var(--muted); padding: 6px 0; }
+@media (max-width: 560px) { .link-fila { grid-template-columns: 1fr auto; } .link-fila .link-url { grid-column: 1 / 2; } }
 
 .ql-toolbar.ql-snow { border-color: var(--border); border-radius: 8px 8px 0 0; }
 .ql-container.ql-snow { border-color: var(--border); border-radius: 0 0 8px 8px; min-height: 220px; font-size: 14px; font-family: 'DM Sans', sans-serif; }
@@ -1051,11 +1064,12 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
     <div id="paso-codigo" class="login-paso">
       <div class="caja-title">Ingresá el código</div>
-      <div class="caja-desc">Te enviamos un código de 6 dígitos a <strong id="email-confirmado"></strong>.</div>
+      <div class="caja-desc">Te enviamos un código de 6 dígitos a <strong id="email-confirmado"></strong>. Vence en 10 minutos.</div>
       <div id="login-error-pin" class="msg-error"></div>
       <input type="text" id="input-pin" class="input-pin" maxlength="6" inputmode="numeric" placeholder="······">
       <button class="btn-accion" id="btn-validar-pin">Ingresar</button>
       <button class="btn-secundario" id="btn-reenviar-pin">Reenviar código</button>
+      <button class="btn-secundario" id="btn-cambiar-email" style="margin-top:6px" onclick="document.getElementById('input-pin').value='';mostrarPasoLogin('email')">Usar otro email</button>
     </div>
 
     <div id="paso-validando" class="login-paso">
@@ -1092,7 +1106,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
-      <button class="hdr-nav-btn" id="btn-nav-listas" disabled>Listas</button>
+      <button class="hdr-nav-btn" id="btn-nav-listas" disabled title="Listas: próximamente (v9.1)">Listas</button>
       <button class="hdr-nav-btn" id="btn-nav-notas" disabled>Notas</button>
     </div>
     <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
@@ -1200,6 +1214,11 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
     </div>
     <div class="modal-body">
       <div class="links-lista" id="links-lista"></div>
+      <!-- v9.0.0 — edición de Links (perfil administrar, tope 5) -->
+      <div id="links-editor" class="hidden"></div>
+      <div class="links-acciones hidden" id="links-acciones">
+        <button class="btn-secundario" id="btn-links-editar" type="button"><i class="ti ti-pencil"></i> Editar links</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1301,6 +1320,29 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
 <script>
 // ============================================================
+// PreKOM — index_prekom_v9_0_0.html — lógica
+// v9.0.0 (14-oct-2026) — MIGRACIÓN A SUPABASE (patrón BDC v7 / LO v8).
+// Diseño cerrado: Diseno_PreKOM_v9_0_0.md.
+//  · Login: código por mail de Supabase Auth (reemplaza pwa_pin). La
+//    sesión no vence; "Cerrar sesión" la cierra solo en este dispositivo.
+//  · llamarBackend(action, params) se conserva y devuelve lo mismo que el
+//    GAS v8.5.1, pero va directo a Supabase (funciones pk_* de la base,
+//    que controlan permisos con goe_mi_nivel y fijan el autor). Las
+//    pantallas no cambian.
+//  · Una sola carga al abrir la obra (pk_cargar_obra): desaparece el
+//    doble viaje liviano/pesado y, con él, el 404 intermitente de Apps
+//    Script y el aviso "No se pudo actualizar Listas".
+//  · Perfiles goe_: ver = lee, comenta y usa sus notas · editar = además
+//    Resumen y color · administrar = además Links (nuevo: se editan desde
+//    el modal Links). Los nodos (punto/título) se manejan en GOE Admin.
+//  · Título del encabezado = código + nombre corto de la obra ("3000 PPTK").
+//    Sale la hoja Config.
+//  · Búsqueda de Contenido sin acentos ("ingenieria" encuentra "ingeniería").
+//  · Listas: botón visible y DESHABILITADO hasta la v9.1 (Listas nuevas).
+//    El código de Listas queda en el archivo, sin uso.
+//  · Actividad de uso a goe_actividad (app pk).
+// ============================================================
+// (historia anterior)
 // PreKOM — index_prekom_v5.1.3.html — lógica
 // v5.1.3 — fix estructural sobre Notas (reemplaza el enfoque de
 // v5.1.2, que mitigaba pero no cerraba del todo la carrera): idea de
@@ -1564,7 +1606,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v8.7.1';
+const APP_VERSION = 'v9.0.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -1576,7 +1618,21 @@ const PALETA_COLORES_FONDO = [
 ];
 const COLOR_FONDO_DEFAULT = PALETA_COLORES_FONDO[0];
 let puntoEnEdicionColor = null;
-const API_URL = 'https://script.google.com/macros/s/AKfycbz-iVE_9GFnEN8LYGK_NYEr5fzFOe_QL07i6CDUlhja58bzKo8vn1_wqtOxYFBpR_yS/exec'; // v8.6.1 — Maestro nuevo 1UiLc-_SX6AohXJMmzEhK4slKUJM-tRD3LZugFawMeBk, probado sin 404
+// v9.0.0 — Supabase (proyecto PWAgoe). El GAS v8.5.1 y sus Sheets quedan como respaldo, sin uso.
+const SUPABASE_URL  = 'https://uhuftsxrzwhmvzygcuvp.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_TCibRAnzgaDIbn_MIirw6w_FltKG8X3';
+const REDIRECT_MAIL = 'https://goeapp.github.io/prekom/';   // la plantilla del mail lo usa para poner "PREKOM"
+// Sesión propia de PreKOM: todas las PWA viven en goeapp.github.io (mismo localStorage)
+const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, storageKey: 'prekom-sb-auth' }
+}) : null;
+const COOLDOWN_SEG = 60; // Supabase admite un código nuevo por minuto
+// Una "sesión" = una carga de la página: agrupa los eventos de actividad de una misma visita
+const SESION_ID = (window.crypto && crypto.randomUUID)
+  ? crypto.randomUUID()
+  : 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+let cooldownInterval = null;
+let puedeEditarLinks = false;   // v9.0.0 — perfil administrar
 const SESION_KEY = 'prekom_sesion';
 const OBRA_KEY = 'prekom_obra_actual';
 const SESION_DIAS = 7;
@@ -2026,107 +2082,139 @@ function mostrarToast(mensaje) {
   }, 2000);
 }
 
-// ── HELPERS DE FETCH ────────────────────────────────────────
-// v7.1.4 — navigator.onLine + mensaje diferenciado por causa +
-// console.error siempre con action+params.
-// v7.1.5 — Content-Type explícito + 1 reintento automático acotado a
-// acciones seguras (ver ACCIONES_SEGURAS_REINTENTO abajo).
-// NUEVO v7.1.6 — se saca el timeout propio de 20s (AbortController)
-// que se había agregado en v7.1.4. Motivo: fue una decisión nueva,
-// no probada, que terminó convirtiendo pedidos simplemente lentos
-// (nunca antes tratados como error, ni en PreKOM antes de v7.1.4 ni
-// en BDC nunca) en errores mostrados al usuario — BDC nunca tuvo
-// límite propio y nunca mostró este síntoma. Se vuelve al mismo
-// criterio probado: esperar lo que haga falta, sin cortar nosotros
-// mismos un pedido que capaz iba a responder bien un poco más tarde.
-const ACCIONES_SEGURAS_REINTENTO = new Set([
-  'inicializarObraLiviana', 'inicializarObraPesada', // FIX v8.5.0 — reemplazan a 'inicializarObra'
-  'listarObras', 'listarGrupos', 'listarListas',
-  'leerListaSchema', 'leerListaDatos', 'leerListaValores', 'leerFavoritos',
-  'leerListaCompleta', 'recargarListasHome', // NUEVO v8.2.0
-  'leerComentarios', 'leerComentariosContenidoObra', 'leerNotas',
-  'validarSesion', 'guardarResumen', 'guardarColorFondo',
-  'moverListaAGrupo', 'ocultarComentario', 'ocultarComentarioContenido',
-  'ocultarNota', 'marcarFavorito', 'desmarcarFavorito',
-  'reordenarFavoritos', 'reordenarListasEnGrupo',
-  'guardarTableroPropio' // NUEVO v8.5.0 — idempotente: reenvía el mismo array completo, no duplica nada
-]);
+// ══════════════════════════════════════════════════════════════
+// v9.0.0 — DATOS EN SUPABASE (reemplaza llamarBackend → GAS)
+// ══════════════════════════════════════════════════════════════
+// llamarBackend(action, params) devuelve lo mismo que el GAS v8.5.1:
+// el resto de la app no cambia. Un rechazo de la base vuelve como
+// {ok:false, error} (mismo trato que un rechazo del GAS); una falla de
+// red tira una excepción (mismo trato que antes), con 1 reintento
+// automático en las lecturas.
+const ACCIONES_LECTURA = new Set(['validarSesion', 'listarObras', 'inicializarObra', 'leerComentariosContenidoObra', 'leerNotas']);
+const ACCIONES_LISTAS = new Set(['leerListaCompleta', 'recargarListasHome', 'leerListaValores', 'leerComentarios', 'agregarComentario',
+  'ocultarComentario', 'guardarFilaLista', 'borrarFilaLista', 'marcarFavorito', 'desmarcarFavorito', 'reordenarFavoritos',
+  'reordenarListasEnGrupo', 'moverListaAGrupo']);
 
-// NUEVO v8.3.0 — mismo alcance que el ACCIONES_GET del .gs: estas
-// acciones se mandan por GET (parámetros en la URL) en vez de POST con
-// body JSON. Migración motivada por la investigación de esta sesión:
-// con la misma implementación, mismos parámetros, el mecanismo GET
-// mostró una tasa de 404 varias veces menor que POST contra el hop de
-// redirect propio de los Web Apps de Apps Script. Las escrituras con
-// contenido potencialmente largo (guardarResumen, actualizarNota,
-// crearNota, guardarFilaLista, agregarComentario,
-// agregarComentarioContenido) y validarPIN (lleva el código PIN) se
-// quedan en POST a propósito — ver comentario en el .gs.
-const ACCIONES_GET = new Set([
-  'inicializarObraLiviana', 'inicializarObraPesada', // FIX v8.5.0 — reemplazan a 'inicializarObra'
-  'listarObras', 'leerListaCompleta', 'recargarListasHome',
-  'leerListaValores', 'leerComentarios', 'leerComentariosContenidoObra', 'leerNotas',
-  'verificarAdmin', 'verificarPermisosObra',
-  'marcarFavorito', 'desmarcarFavorito', 'reordenarFavoritos', 'reordenarListasEnGrupo',
-  'moverListaAGrupo', 'ocultarComentario', 'ocultarComentarioContenido', 'ocultarNota',
-  'guardarColorFondo', 'borrarFilaLista',
-  'solicitarPIN', 'validarSesion'
-]);
+function errRed_() { return new Error('No se pudo conectar con el servidor. Revisá tu conexión y volvé a intentar.'); }
 
-function armarQueryString_(action, params) {
-  const qs = new URLSearchParams();
-  qs.set('action', action);
-  Object.keys(params || {}).forEach(function (k) {
-    const v = params[k];
-    qs.set(k, (v !== null && typeof v === 'object') ? JSON.stringify(v) : String(v));
-  });
-  return qs.toString();
+/** Error de supabase-js → rechazo de la base ({ok:false}) o falla de red (excepción). (= BDC v7) */
+function sbResultado_(action, res) {
+  if (!res.error) return res.data;
+  const e = res.error;
+  const msg = String(e.message || e.msg || '');
+  if (!e.code && !e.details && (/fetch|network|Failed|Load failed|NetworkError/i.test(msg) || !msg)) {
+    console.error('[datos]', action, '— red:', e);
+    throw errRed_();
+  }
+  (e.code === 'P0001' ? console.warn : console.error)('[datos]', action, '— rechazo de la base:', e);
+  if (e.code === 'PGRST301' || e.code === 'PGRST303' || /JWT/i.test(msg)) return { ok: false, motivo: 'sin_sesion', error: 'La sesión venció. Volvé a ingresar.' };
+  return { ok: false, error: msg || 'La base rechazó la operación.' };
 }
+async function rpc_(action, fn, args) { return sbResultado_(action, await sb.rpc(fn, args)); }
 
 async function llamarBackend(action, params, reintentando) {
-  const esGet = ACCIONES_GET.has(action);
-
+  params = params || {};
   if (!navigator.onLine) {
     console.error('[llamarBackend]', action, '— sin conexión (navigator.onLine=false)', params);
     throw new Error('Estás sin conexión a internet. Revisá tu conexión y volvé a intentar.');
   }
-
-  let resp;
+  if (!sb) throw errRed_();   // no cargó la librería de Supabase (sin señal al abrir)
   try {
-    if (esGet) {
-      resp = await fetch(API_URL + '?' + armarQueryString_(action, params));
-    } else {
-      resp = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita preflight CORS — mismo criterio que BDC
-        body: JSON.stringify(Object.assign({ action: action }, params || {}))
-      });
+    return await llamarBackendSb_(action, params);
+  } catch (err) {
+    console.error('[llamarBackend]', action, params, '—', err.message);
+    if (!reintentando && ACCIONES_LECTURA.has(action)) {
+      await new Promise(function (r) { setTimeout(r, 700); });
+      return llamarBackend(action, params, true);
     }
-  } catch (fetchErr) {
-    return llamarBackendManejarFallo_(action, params, reintentando, new Error('No se pudo conectar con el backend. Revisá tu conexión y recargá la página.'));
-  }
-
-  if (!resp.ok) {
-    return llamarBackendManejarFallo_(action, params, reintentando, new Error('El backend respondió con un error (HTTP ' + resp.status + ').'));
-  }
-  try {
-    return await resp.json();
-  } catch (parseErr) {
-    return llamarBackendManejarFallo_(action, params, reintentando, new Error('El backend devolvió una respuesta inválida.'));
+    throw err;
   }
 }
 
-// NUEVO v7.1.5 — punto único de manejo de fallas de llamarBackend():
-// loguea siempre, y si la action es segura de repetir y todavía no
-// reintentamos, espera un instante y reintenta 1 sola vez antes de
-// propagar el error al llamador.
-async function llamarBackendManejarFallo_(action, params, reintentando, errorClasificado) {
-  console.error('[llamarBackend]', action, params, '—', errorClasificado.message);
-  if (!reintentando && ACCIONES_SEGURAS_REINTENTO.has(action)) {
-    await new Promise(function (r) { setTimeout(r, 700); });
-    return llamarBackend(action, params, true);
+async function llamarBackendSb_(action, params) {
+  const obraId = params.obraId || (obraActual ? obraActual.obraId : '');
+  if (ACCIONES_LISTAS.has(action)) return { ok: false, error: 'Listas llega en la v9.1.' };
+  switch (action) {
+    case 'validarSesion': return datosValidarSesion_();
+    case 'listarObras': return datosObras_();
+    case 'inicializarObra': return rpc_(action, 'pk_cargar_obra', { p_obra: obraId });
+    case 'guardarResumen': {
+      const r = await rpc_(action, 'pk_resumen_guardar', { p_obra: obraId, p_punto: params.punto, p_resumen: params.resumen || '' });
+      registrarActividad_('guardar_resumen', params.punto, r && r.ok ? 'OK' : 'ERROR', r && r.ok ? { largo: String(params.resumen || '').length } : { error: r && r.error });
+      return r;
+    }
+    case 'guardarColorFondo': {
+      const r = await rpc_(action, 'pk_color_guardar', { p_obra: obraId, p_punto: params.punto, p_color: params.color || '' });
+      registrarActividad_('guardar_color', params.punto, r && r.ok ? 'OK' : 'ERROR', { color: params.color || '' });
+      return r;
+    }
+    case 'leerComentariosContenidoObra': return rpc_(action, 'pk_comentarios_leer', { p_obra: obraId });
+    case 'agregarComentarioContenido': {
+      const r = await rpc_(action, 'pk_comentario_agregar', { p_obra: obraId, p_punto: params.punto, p_texto: params.texto || '' });
+      registrarActividad_('comentario_nuevo', params.punto, r && r.ok ? 'OK' : 'ERROR', r && r.ok ? { id: r.id } : { error: r && r.error });
+      return r;
+    }
+    case 'ocultarComentarioContenido': {
+      const r = await rpc_(action, 'pk_comentario_ocultar', { p_obra: obraId, p_id: Number(params.comentarioId) });
+      registrarActividad_('comentario_ocultar', String(params.comentarioId), r && r.ok ? 'OK' : (r && r.motivo) || 'ERROR');
+      return r;
+    }
+    case 'leerNotas': return rpc_(action, 'pk_notas_leer', { p_obra: obraId });
+    case 'guardarTableroPropio': {
+      const r = await rpc_(action, 'pk_notas_guardar', { p_obra: obraId, p_notas: params.notas || [] });
+      registrarActividad_('notas_guardar', '', r && r.ok ? 'OK' : 'ERROR', { notas: (params.notas || []).length });
+      return r;
+    }
+    case 'guardarLinks': {
+      const r = await rpc_(action, 'pk_links_guardar', { p_obra: obraId, p_links: params.links || [] });
+      registrarActividad_('links_guardar', '', r && r.ok ? 'OK' : 'ERROR', { links: (params.links || []).length });
+      return r;
+    }
   }
-  throw errorClasificado;
+  throw new Error('Acción desconocida: ' + action);
+}
+
+/** Sesión de Supabase + persona habilitada en PreKOM (= validarSesion de pwa_pin). */
+async function datosValidarSesion_() {
+  const s = await sb.auth.getSession();
+  const session = s && s.data && s.data.session;
+  if (!session) return { ok: false, motivo: 'sin_sesion' };
+  const email = String(session.user.email || '').toLowerCase();
+  const [rEntra, rPersona] = await Promise.all([sb.rpc('goe_puede_entrar', { p_app: 'pk' }), sb.rpc('goe_mi_persona')]);
+  const entra = sbResultado_('goe_puede_entrar', rEntra);
+  const personaId = sbResultado_('goe_mi_persona', rPersona);
+  if (entra && entra.ok === false) return entra;
+  if (!personaId) return { ok: false, motivo: 'no_encontrado' };
+  if (entra !== true) return { ok: false, motivo: 'inactivo' };
+  let nombre = email;
+  const rp = await sb.from('goe_personas').select('nombre_apellido').eq('id', personaId).maybeSingle();
+  if (!rp.error && rp.data) nombre = rp.data.nombre_apellido || email;
+  return { ok: true, email: email, nombreApellido: nombre, noExpira: true };
+}
+
+/** Obras de la persona en PreKOM (= listarObras). Nombre = código + nombre corto. */
+async function datosObras_() {
+  const obras = await rpc_('goe_mis_obras', 'goe_mis_obras', { p_app: 'pk' });
+  if (obras && obras.ok === false) return obras;
+  return { ok: true, obras: (obras || []).map(function (o) {
+    return { obraId: o.obra_id, nombreObra: o.codigo + ' ' + o.nombre_corto };
+  }) };
+}
+
+/**
+ * Actividad de uso en goe_actividad (app pk). La base fija quién y cuándo.
+ * Fire-and-forget: nunca frena ni rompe lo que hace el usuario. (= BDC v7)
+ */
+function registrarActividad_(evento, objeto, resultado, detalle) {
+  try {
+    if (!sb || !emailActual || !navigator.onLine) return;
+    sb.from('goe_actividad').insert({
+      app: 'pk', obra_id: obraActual ? obraActual.obraId : null, sesion_id: SESION_ID, evento: evento,
+      objeto: objeto == null || objeto === '' ? null : String(objeto).slice(0, 2000),
+      resultado: resultado == null || resultado === '' ? null : String(resultado).slice(0, 500),
+      detalle: detalle || null
+    }).then(function (r) { if (r.error) console.warn('[actividad]', r.error.message); }, function () { });
+  } catch (err) { /* nunca frena la UI */ }
 }
 
 // ── SESIÓN (localStorage) — mismo patrón que BDC ────────────
@@ -2204,19 +2292,16 @@ function iniciarMedicionHeader_() {
   }
 }
 
+// v9.0.0 — Login con Supabase Auth (código por mail). La sesión la guarda
+// Supabase en este dispositivo (no vence: se renueva sola). Con sesión
+// guardada siempre se revalida antes de mostrar nada.
 function boot() {
   document.addEventListener('keydown', onKeydownGlobal);
   iniciarMedicionHeader_();
-
-  const sesion = leerSesion();
-  if (!sesion || sesionVencidaLocalmente(sesion)) {
-    borrarSesion();
-    mostrarPantalla('login-screen');
-    mostrarPasoLogin('email');
-    return;
-  }
-
   mostrarPantalla('login-screen');
+  if (!sb) { mostrarPasoLogin('sin-conexion'); return; }
+  const sesion = leerSesion();
+  if (!sesion) { mostrarPasoLogin('email'); return; }
   mostrarPasoLogin('validando');
   revalidarSesion(sesion.email);
 }
@@ -2226,21 +2311,27 @@ async function revalidarSesion(email) {
   try {
     resultado = await llamarBackend('validarSesion', { email: email });
   } catch (err) {
-    mostrarPasoLogin('sin-conexion');
+    mostrarPasoLogin('sin-conexion');   // falla de red: no es un rechazo, la sesión no se borra
     return;
   }
   if (!resultado.ok) {
     borrarSesion();
+    if (resultado.motivo === 'sin_sesion') {   // no hay sesión de Supabase: pedir código de nuevo
+      document.getElementById('input-email').value = email || '';
+      mostrarPasoLogin('email');
+      return;
+    }
     mostrarTextoErrorAuth(resultado.motivo);
     mostrarPasoLogin('error-auth');
     return;
   }
-  await onLoginOk(email, resultado.nombreApellido);
+  guardarSesion(resultado.email || email, resultado.nombreApellido, true);
+  await onLoginOk(resultado.email || email, resultado.nombreApellido, 'sesion_guardada');
 }
 
-async function onLoginOk(email, nombreApellido) {
+async function onLoginOk(email, nombreApellido, origen) {
   emailActual = email;
-
+  registrarActividad_(origen === 'sesion_guardada' ? 'apertura' : 'login', '', 'OK', { origen: origen || 'codigo' });
   const obraGuardada = leerObraGuardada();
   if (obraGuardada) {
     obraActual = obraGuardada;
@@ -2276,86 +2367,134 @@ function mostrarPasoLogin(paso) {
 }
 
 const MOTIVOS_AUTH = {
-  no_encontrado: 'Ese email no está habilitado para preKOM. Consultá con el administrador.',
-  inactivo: 'Tu usuario está inactivo. Consultá con el administrador.',
-  bloqueado: 'Tu usuario quedó bloqueado por intentos fallidos. Consultá con el administrador.'
+  no_encontrado: 'Ese email no está habilitado para PreKOM. Pedile al administrador que te habilite en GOE Admin.',
+  inactivo: 'Tu acceso a PreKOM está desactivado. Consultá con el administrador.',
+  sin_sesion: 'La sesión venció. Volvé a ingresar.'
 };
 function mostrarTextoErrorAuth(motivo) {
   document.getElementById('texto-error-auth').textContent =
     MOTIVOS_AUTH[motivo] || 'No pudimos validar tu sesión. Iniciá sesión de nuevo.';
 }
 
-document.getElementById('btn-pedir-pin').addEventListener('click', async function () {
-  const email = document.getElementById('input-email').value.trim();
-  const errBox = document.getElementById('login-error-email');
-  errBox.classList.remove('visible');
-  if (!email) return;
+function traducirErrorAuth(err) {
+  const m = (err && (err.message || err.msg)) || String(err);
+  if (/rate limit|too many|security purposes/i.test(m)) return 'Esperá un minuto antes de pedir un código nuevo.';
+  if (/expired|invalid/i.test(m)) return 'Código incorrecto o vencido. Pedí uno nuevo si hace falta.';
+  if (/fetch|network/i.test(m)) return 'No pudimos conectar. Revisá tu conexión e intentá de nuevo.';
+  if (/signups? not allowed|not allowed/i.test(m)) return 'Ese email no está habilitado para PreKOM. Pedile al administrador que te habilite en GOE Admin.';
+  return m;
+}
 
-  this.disabled = true;
+function iniciarCooldownReenvio() {
+  const btn = document.getElementById('btn-reenviar-pin');
+  let restante = COOLDOWN_SEG;
+  btn.disabled = true;
+  clearInterval(cooldownInterval);
+  function tick() {
+    btn.textContent = 'Reenviar código (' + restante + 's)';
+    if (restante <= 0) {
+      clearInterval(cooldownInterval);
+      cooldownInterval = null;
+      btn.disabled = false;
+      btn.textContent = 'Reenviar código';
+      return;
+    }
+    restante--;
+  }
+  tick();
+  cooldownInterval = setInterval(tick, 1000);
+}
+
+/** Paso 1: pedir el código (Supabase Auth). esReenvio = mismo email, desde el paso 2. */
+async function pedirCodigo_(esReenvio) {
+  const btn = document.getElementById(esReenvio ? 'btn-reenviar-pin' : 'btn-pedir-pin');
+  const errBox = document.getElementById(esReenvio ? 'login-error-pin' : 'login-error-email');
+  errBox.classList.remove('visible');
+  const email = (esReenvio ? (document.getElementById('input-email').dataset.pendiente || '') : document.getElementById('input-email').value.trim()).toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errBox.textContent = 'Ingresá un email válido.';
+    errBox.classList.add('visible');
+    return;
+  }
+  if (!sb) { mostrarPasoLogin('sin-conexion'); return; }
+  btn.disabled = true;
   try {
-    const res = await llamarBackend('solicitarPIN', { email: email });
-    if (!res.ok) {
-      errBox.textContent = textoErrorSolicitarPin(res.motivo, res.restanteSegundos);
+    const { error } = await sb.auth.signInWithOtp({ email: email, options: { shouldCreateUser: true, emailRedirectTo: REDIRECT_MAIL } });
+    if (error) {
+      console.error('[signInWithOtp]', error);
+      errBox.textContent = traducirErrorAuth(error);
       errBox.classList.add('visible');
-      this.disabled = false;
+      if (/rate limit|too many|security purposes/i.test(error.message || '')) {
+        document.getElementById('input-email').dataset.pendiente = email;
+        document.getElementById('email-confirmado').textContent = email;
+        mostrarPasoLogin('codigo');
+        iniciarCooldownReenvio();
+        return;
+      }
+      btn.disabled = false;
       return;
     }
     document.getElementById('email-confirmado').textContent = email;
     document.getElementById('input-email').dataset.pendiente = email;
+    document.getElementById('input-pin').value = '';
+    document.getElementById('login-error-pin').classList.remove('visible');
     mostrarPasoLogin('codigo');
+    iniciarCooldownReenvio();
+    if (esReenvio) mostrarToast('Código reenviado');
   } catch (err) {
     mostrarPasoLogin('sin-conexion');
   }
-  this.disabled = false;
-});
-
-function textoErrorSolicitarPin(motivo, restanteSegundos) {
-  if (motivo === 'cooldown') return 'Esperá ' + restanteSegundos + ' segundos antes de pedir otro código.';
-  if (motivo === 'no_encontrado') return 'Ese email no está habilitado para preKOM.';
-  if (motivo === 'inactivo') return 'Tu usuario está inactivo.';
-  if (motivo === 'bloqueado') return 'Tu usuario está bloqueado por intentos fallidos.';
-  return 'No se pudo enviar el código. Probá de nuevo.';
+  if (!esReenvio) btn.disabled = false;
 }
 
-document.getElementById('btn-reenviar-pin').addEventListener('click', function () {
-  document.getElementById('input-email').value = document.getElementById('input-email').dataset.pendiente || '';
-  mostrarPasoLogin('email');
-});
+document.getElementById('btn-pedir-pin').addEventListener('click', function () { pedirCodigo_(false); });
+document.getElementById('input-email').addEventListener('keydown', function (e) { if (e.key === 'Enter') pedirCodigo_(false); });
+document.getElementById('btn-reenviar-pin').addEventListener('click', function () { pedirCodigo_(true); });
 
-document.getElementById('btn-validar-pin').addEventListener('click', async function () {
+/** Paso 2: validar el código y la persona habilitada en PreKOM. */
+async function validarCodigo_() {
+  const btn = document.getElementById('btn-validar-pin');
   const email = document.getElementById('input-email').dataset.pendiente;
-  const pin = document.getElementById('input-pin').value.trim();
+  const pin = document.getElementById('input-pin').value.replace(/\D/g, '');
   const errBox = document.getElementById('login-error-pin');
   errBox.classList.remove('visible');
-  if (!pin) return;
-
-  this.disabled = true;
+  if (!/^\d{6,10}$/.test(pin)) {
+    errBox.textContent = 'El código tiene 6 dígitos.';
+    errBox.classList.add('visible');
+    return;
+  }
+  btn.disabled = true;
   try {
-    const res = await llamarBackend('validarPIN', { email: email, pin: pin });
-    if (!res.ok) {
-      errBox.textContent = textoErrorValidarPin(res.motivo, res.restantes);
+    const { error } = await sb.auth.verifyOtp({ email: email, token: pin, type: 'email' });
+    if (error) {
+      console.error('[verifyOtp]', error);
+      errBox.textContent = traducirErrorAuth(error);
       errBox.classList.add('visible');
-      this.disabled = false;
+      btn.disabled = false;
       return;
     }
-    guardarSesion(email, res.nombreApellido, res.noExpira);
-    await onLoginOk(email, res.nombreApellido);
+    const r = await llamarBackend('validarSesion', { email: email });
+    if (!r.ok) {
+      try { await sb.auth.signOut({ scope: 'local' }); } catch (e) { /* sin red */ }
+      mostrarTextoErrorAuth(r.motivo);
+      mostrarPasoLogin('error-auth');
+      btn.disabled = false;
+      return;
+    }
+    clearInterval(cooldownInterval);
+    cooldownInterval = null;
+    guardarSesion(r.email || email, r.nombreApellido, true);
+    await onLoginOk(r.email || email, r.nombreApellido, 'codigo');
   } catch (err) {
     mostrarPasoLogin('sin-conexion');
   }
-  this.disabled = false;
-});
-
-function textoErrorValidarPin(motivo, restantes) {
-  if (motivo === 'pin_incorrecto') return 'Código incorrecto. Te quedan ' + restantes + ' intentos.';
-  if (motivo === 'bloqueado_ahora') return 'Demasiados intentos fallidos — tu usuario quedó bloqueado.';
-  if (motivo === 'pin_vencido') return 'El código venció. Pedí uno nuevo.';
-  if (motivo === 'sin_pin_generado') return 'Todavía no pediste un código para este email.';
-  return 'No se pudo validar el código.';
+  btn.disabled = false;
 }
+document.getElementById('btn-validar-pin').addEventListener('click', validarCodigo_);
+document.getElementById('input-pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') validarCodigo_(); });
 
 document.getElementById('btn-reintentar-conexion').addEventListener('click', boot);
-document.getElementById('btn-volver-email').addEventListener('click', function () { mostrarPasoLogin('email'); });
+document.getElementById('btn-volver-email').addEventListener('click', function () { document.getElementById('input-pin').value = ''; mostrarPasoLogin('email'); });
 
 // ── DIALOG "Sesión actual" (Ctrl+Alt+U) — de BDC ────────────
 function onKeydownGlobal(e) {
@@ -2381,7 +2520,9 @@ function abrirSessionDialog() {
   document.getElementById('session-dialog-overlay').classList.add('visible');
 }
 function cerrarSessionDialog() { document.getElementById('session-dialog-overlay').classList.remove('visible'); }
-function cerrarSesion() {
+async function cerrarSesion() {
+  registrarActividad_('logout', '', 'OK');
+  try { if (sb) await sb.auth.signOut({ scope: 'local' }); } catch (e) { /* sin red: igual se cierra acá */ }
   borrarSesion();
   cerrarSessionDialog();
   location.reload();
@@ -2399,7 +2540,7 @@ async function cargarObras() {
       return;
     }
     if (!r.obras || r.obras.length === 0) {
-      document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Todavía no ves ninguna obra asignada.<br>Pedile a un administrador que te agregue en "usuarios_obras".</div>';
+      document.getElementById('lista-obras').innerHTML = '<div class="obras-vacio">Todavía no ves ninguna obra asignada.<br>Pedile al administrador que te habilite en GOE Admin.</div>';
       return;
     }
     // Si hay una sola obra, se entra directo (sin pantalla intermedia)
@@ -2437,7 +2578,7 @@ function renderObras(obras) {
 document.getElementById('btn-cambiar-obra').addEventListener('click', cambiarObra);
 
 document.getElementById('btn-nav-arbol').addEventListener('click', function () { renderHome(); });
-document.getElementById('btn-nav-listas').addEventListener('click', function () { renderListasHub(); });
+document.getElementById('btn-nav-listas').addEventListener('click', function () { /* v9.0.0 — deshabilitado hasta la v9.1 */ });
 document.getElementById('btn-nav-notas').addEventListener('click', function () { renderNotasHub(); });
 
 function marcarNavActiva(vista) {
@@ -2515,37 +2656,36 @@ async function mostrarApp() {
     // con menos ventana de exposición al 404 por llamada. El spinner
     // de pantalla completa sigue igual que siempre, con un mensaje
     // distinto por paso (a pedido de Ale) en vez de un texto fijo.
-    document.getElementById('main-view').innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Verificando permisos…</div>';
-    const resLiviana = await llamarBackend('inicializarObraLiviana', { obraId: obraActual.obraId, email: emailActual });
-    if (!resLiviana.ok) throw new Error(resLiviana.error || 'inicializarObraLiviana falló');
+    // v9.0.0 — una sola carga (pk_cargar_obra): permisos, árbol, links y
+    // comentarios. Reemplaza el par inicializarObraLiviana + Pesada (v8.5.0).
+    document.getElementById('main-view').innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Cargando la obra…</div>';
+    const res = await llamarBackend('inicializarObra', { obraId: obraActual.obraId });
+    if (!res.ok) throw new Error(res.error || 'No se pudo cargar la obra.');
 
-    puedeEditarContenido = !!(resLiviana.permisos && resLiviana.permisos.puedeEditarContenido);
-    puedeEditarListas = !!(resLiviana.permisos && resLiviana.permisos.puedeEditarListas);
-
-    document.getElementById('main-view').innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Cargando árbol y listas…</div>';
-    const res = await llamarBackend('inicializarObraPesada', { obraId: obraActual.obraId, email: emailActual, sheetIdDedicado: resLiviana.sheetIdDedicado });
-    if (!res.ok) throw new Error(res.error || 'inicializarObraPesada falló');
+    puedeEditarContenido = !!(res.permisos && res.permisos.puedeEditarContenido);
+    puedeEditarListas = false;   // v9.0.0 — Listas llega en la v9.1
+    puedeEditarLinks = !!(res.permisos && res.permisos.puedeEditarLinks);
 
     arbol = res.arbol || [];
     comentariosContenido = res.comentariosContenido || [];
     links = res.links || [];
     configObra = res.config || null;
-    listasIndex = res.listas || [];
-    gruposIndex = res.grupos || []; // NUEVO v3.1.0
-    valoresListas = res.valores || [];
-    favoritosActuales = res.favoritos || [];
-    // FIX v8.5.0 — permisos ya vienen de inicializarObraLiviana (arriba);
-    // inicializarObraPesada ya no los devuelve.
+    listasIndex = [];
+    gruposIndex = [];
+    valoresListas = [];
+    favoritosActuales = [];
+    if (res.nombreObra && obraActual.nombreObra !== res.nombreObra) {   // código o nombre corto cambiado en GOE Admin
+      obraActual.nombreObra = res.nombreObra;
+      guardarObraActual(obraActual);
+    }
 
-    document.getElementById('hdr-obra-nombre').textContent =
-      (configObra && configObra.nombre && configObra.nombre !== 'completar con...')
-        ? configObra.nombre
-        : obraActual.nombreObra;
+    document.getElementById('hdr-obra-nombre').textContent = res.nombreObra || obraActual.nombreObra;
+    registrarActividad_('seleccion_obra', res.nombreObra || obraActual.nombreObra, 'OK', { nivel: res.nivel });
 
-    document.getElementById('btn-links').classList.toggle('hidden', links.length === 0);
+    document.getElementById('btn-links').classList.toggle('hidden', links.length === 0 && !puedeEditarLinks);
 
     document.getElementById('btn-nav-arbol').disabled = false;
-    document.getElementById('btn-nav-listas').disabled = false;
+    document.getElementById('btn-nav-listas').disabled = true; // v9.0.0 — Listas llega en la v9.1
     document.getElementById('btn-nav-notas').disabled = false;
     document.getElementById('btn-cambiar-obra').disabled = false; // NUEVO v8.6.2
     document.getElementById('btn-lapiz-toggle').disabled = false; // NUEVO v8.6.2
@@ -2569,7 +2709,7 @@ async function mostrarApp() {
     // como escape cuando la obra sigue fallando en loop (antes de este
     // cambio, Cambiar obra ni se deshabilitaba, así que no se notaba).
     document.getElementById('btn-nav-arbol').disabled = false;
-    document.getElementById('btn-nav-listas').disabled = false;
+    document.getElementById('btn-nav-listas').disabled = true; // v9.0.0 — Listas llega en la v9.1
     document.getElementById('btn-nav-notas').disabled = false;
     document.getElementById('btn-cambiar-obra').disabled = false;
     document.getElementById('btn-lapiz-toggle').disabled = false;
@@ -2590,11 +2730,18 @@ function contarSubpuntos(punto) {
   return arbol.filter(function (n) { return n.punto !== punto && n.punto.indexOf(punto + '.') === 0; }).length;
 }
 function comparePorPunto(a, b) {
-  const pa = a.punto.split('.').map(Number);
-  const pb = b.punto.split('.').map(Number);
+  // v9.0.0 — orden automático por punto, igual que la base (pk_clave_orden):
+  // números como números; segmentos con letras después, en orden alfabético.
+  const pa = String(a.punto).split('.');
+  const pb = String(b.punto).split('.');
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const va = pa[i] || 0, vb = pb[i] || 0;
-    if (va !== vb) return va - vb;
+    if (pa[i] === undefined) return -1;
+    if (pb[i] === undefined) return 1;
+    const na = /^\d+$/.test(pa[i]), nb = /^\d+$/.test(pb[i]);
+    if (na && nb) { const d = Number(pa[i]) - Number(pb[i]); if (d !== 0) return d; continue; }
+    if (na !== nb) return na ? -1 : 1;
+    const c = pa[i].toLowerCase().localeCompare(pb[i].toLowerCase());
+    if (c !== 0) return c;
   }
   return 0;
 }
@@ -2876,14 +3023,89 @@ document.getElementById('btn-guardar-editar').addEventListener('click', async fu
 });
 
 // ── MODAL — Links de la obra ──────────────────────────────────
+// v9.0.0 — el perfil administrar los edita acá (hasta 5). Se guarda la
+// lista completa de una vez (pk_links_guardar): todo o nada.
+const TOPE_LINKS = 5;
+let linksEditando = null;   // copia en edición, o null = modo lectura
+let linksGuardando = false;
+
+function renderModalLinks_() {
+  const lista = document.getElementById('links-lista');
+  const editor = document.getElementById('links-editor');
+  const acciones = document.getElementById('links-acciones');
+  if (!linksEditando) {
+    lista.innerHTML = links.length
+      ? links.map(function (l) { return '<a href="' + escaparHtml(l.url) + '" target="_blank" rel="noopener">' + escaparHtml(l.nombre) + '</a>'; }).join('')
+      : '<div class="links-vacio">Esta obra todavía no tiene links.</div>';
+    lista.classList.remove('hidden');
+    editor.classList.add('hidden');
+    acciones.innerHTML = '<button class="btn-secundario" id="btn-links-editar" type="button"><i class="ti ti-pencil"></i> Editar links</button>';
+    acciones.classList.toggle('hidden', !puedeEditarLinks);
+    const b = document.getElementById('btn-links-editar');
+    if (b) b.onclick = function () { linksEditando = links.map(function (l) { return { nombre: l.nombre, url: l.url }; }); renderModalLinks_(); };
+    return;
+  }
+  lista.classList.add('hidden');
+  editor.classList.remove('hidden');
+  editor.innerHTML = '<div class="links-tope">Hasta ' + TOPE_LINKS + ' links. La dirección empieza con http:// o https://</div>' +
+    linksEditando.map(function (l, i) {
+      return '<div class="link-fila" data-i="' + i + '">' +
+        '<input class="link-nombre" type="text" maxlength="200" placeholder="Nombre" value="' + escaparHtml(l.nombre) + '">' +
+        '<input class="link-url" type="url" maxlength="2000" placeholder="https://…" value="' + escaparHtml(l.url) + '">' +
+        '<button class="link-quitar" type="button" title="Quitar" data-i="' + i + '">&times;</button></div>';
+    }).join('') +
+    (linksEditando.length < TOPE_LINKS ? '<button class="btn-secundario" id="btn-link-agregar" type="button" style="width:auto;margin:4px 0 0">+ Agregar link</button>' : '');
+  acciones.classList.remove('hidden');
+  acciones.innerHTML = '<button class="btn-secundario" id="btn-links-cancelar" type="button">Cancelar</button>' +
+    '<button class="btn-accion" id="btn-links-guardar" type="button">Guardar</button>';
+  editor.querySelectorAll('.link-fila').forEach(function (f) {
+    const i = Number(f.dataset.i);
+    f.querySelector('.link-nombre').oninput = function () { linksEditando[i].nombre = this.value; };
+    f.querySelector('.link-url').oninput = function () { linksEditando[i].url = this.value; };
+    f.querySelector('.link-quitar').onclick = function () { linksEditando.splice(i, 1); renderModalLinks_(); };
+  });
+  const ag = document.getElementById('btn-link-agregar');
+  if (ag) ag.onclick = function () { linksEditando.push({ nombre: '', url: '' }); renderModalLinks_(); const ins = editor.querySelectorAll('.link-nombre'); if (ins.length) ins[ins.length - 1].focus(); };
+  document.getElementById('btn-links-cancelar').onclick = function () { linksEditando = null; renderModalLinks_(); };
+  document.getElementById('btn-links-guardar').onclick = guardarLinks_;
+}
+
+async function guardarLinks_() {
+  if (linksGuardando) return;
+  const limpios = linksEditando.map(function (l) { return { nombre: String(l.nombre || '').trim(), url: String(l.url || '').trim() }; })
+    .filter(function (l) { return l.nombre || l.url; });
+  for (let i = 0; i < limpios.length; i++) {
+    if (!limpios[i].nombre) { mostrarAviso('El link ' + (i + 1) + ' no tiene nombre.'); return; }
+    if (!/^https?:\/\//i.test(limpios[i].url)) { mostrarAviso('La dirección de "' + limpios[i].nombre + '" tiene que empezar con http:// o https://'); return; }
+  }
+  linksGuardando = true;
+  const btn = document.getElementById('btn-links-guardar');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const r = await llamarBackend('guardarLinks', { obraId: obraActual.obraId, links: limpios });
+    if (!r.ok) { mostrarAviso(r.error || 'No se pudieron guardar los links.'); return; }
+    links = r.links || limpios;
+    linksEditando = null;
+    document.getElementById('btn-links').classList.toggle('hidden', links.length === 0 && !puedeEditarLinks);
+    renderModalLinks_();
+    mostrarToast('Links guardados');
+  } catch (err) {
+    mostrarAviso(err.message || 'No se pudo conectar con el servidor.');
+  } finally {
+    linksGuardando = false;
+    const b2 = document.getElementById('btn-links-guardar');
+    if (b2) { b2.disabled = false; b2.textContent = 'Guardar'; }
+  }
+}
+
 document.getElementById('btn-links').addEventListener('click', function () {
-  const html = links.map(function (l) {
-    return '<a href="' + escaparHtml(l.url) + '" target="_blank" rel="noopener">' + escaparHtml(l.nombre) + '</a>';
-  }).join('');
-  document.getElementById('links-lista').innerHTML = html;
+  linksEditando = null;
+  renderModalLinks_();
   document.getElementById('modal-links').classList.remove('hidden');
 });
-document.getElementById('btn-cerrar-links').addEventListener('click', function () {
+document.getElementById('btn-cerrar-links').addEventListener('click', async function () {
+  if (linksEditando && !(await mostrarConfirm('Links sin guardar', 'Hay cambios en los links que no se guardaron. ¿Salir igual?', { textoAceptar: 'Salir sin guardar', danger: true }))) return;
+  linksEditando = null;
   document.getElementById('modal-links').classList.add('hidden');
 });
 
@@ -4041,9 +4263,16 @@ function breadcrumbTexto_(punto) {
   return caminoHasta(punto).map(function (n) { return n.titulo; }).join(' › ');
 }
 
+// v9.0.0 — búsqueda sin acentos: minúsculas y sin tildes/diéresis/ñ,
+// CONSERVANDO el largo (cada letra se cambia por una sola letra), así las
+// posiciones encontradas valen sobre el texto original para el resaltado.
+function normBusq_(t) {
+  return String(t || '').toLowerCase().replace(/[\u00C0-\u024F]/g, function (c) { return c.normalize('NFD').charAt(0); });
+}
+
 function snippetConTermino_(texto, termino, radio) {
   radio = radio || 60;
-  const idx = texto.toLowerCase().indexOf(termino.toLowerCase());
+  const idx = normBusq_(texto).indexOf(normBusq_(termino));
   if (idx === -1) return texto.length > radio * 2 ? texto.slice(0, radio * 2) + '…' : texto;
   const inicio = Math.max(0, idx - radio);
   const fin = Math.min(texto.length, idx + termino.length + radio);
@@ -4051,7 +4280,7 @@ function snippetConTermino_(texto, termino, radio) {
 }
 
 function resaltarTermino_(texto, termino) {
-  const idx = texto.toLowerCase().indexOf(termino.toLowerCase());
+  const idx = normBusq_(texto).indexOf(normBusq_(termino));
   if (idx === -1) return escaparHtml(texto);
   return escaparHtml(texto.slice(0, idx)) + '<mark>' + escaparHtml(texto.slice(idx, idx + termino.length)) + '</mark>' + escaparHtml(texto.slice(idx + termino.length));
 }
@@ -4060,21 +4289,21 @@ function ejecutarBusquedaContenido_(queryOriginal) {
   const wrap = document.getElementById('contenido-buscador-resultados');
   const query = (queryOriginal || '').trim();
   if (query.length < 2) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
-  const q = query.toLowerCase();
+  const q = normBusq_(query);   // v9.0.0 — sin acentos
 
   const matchesContenido = arbol.filter(function (n) {
-    return n.titulo.toLowerCase().indexOf(q) !== -1 || textoPlano_(n.resumen).toLowerCase().indexOf(q) !== -1;
+    return normBusq_(n.titulo).indexOf(q) !== -1 || normBusq_(textoPlano_(n.resumen)).indexOf(q) !== -1;
   }).sort(comparePorPunto);
 
   const matchesComentarios = comentariosContenido.filter(function (c) {
-    return String(c.texto || '').toLowerCase().indexOf(q) !== -1;
+    return normBusq_(c.texto).indexOf(q) !== -1;
   });
 
   let html = '';
   if (matchesContenido.length) {
     html += '<div class="buscador-seccion-titulo">Contenido (' + matchesContenido.length + ')</div>';
     html += matchesContenido.map(function (n) {
-      const base = n.titulo.toLowerCase().indexOf(q) !== -1 ? n.titulo : textoPlano_(n.resumen);
+      const base = normBusq_(n.titulo).indexOf(q) !== -1 ? n.titulo : textoPlano_(n.resumen);
       const snip = snippetConTermino_(base, query);
       return '<button class="buscador-item" data-tipo="contenido" data-punto="' + escaparHtml(n.punto) + '" data-termino="' + escaparHtml(query) + '">' +
         '<div class="buscador-item-breadcrumb">' + escaparHtml(breadcrumbTexto_(n.punto)) + '</div>' +
@@ -4130,10 +4359,10 @@ function resaltarEnResumen_(termino) {
   const box = document.querySelector('#nodo-marco .resumen-box');
   if (!box || !termino) return;
   const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, null);
-  const termLower = termino.toLowerCase();
+  const termLower = normBusq_(termino);   // v9.0.0 — sin acentos
   let nodoTexto;
   while ((nodoTexto = walker.nextNode())) {
-    const idx = nodoTexto.nodeValue.toLowerCase().indexOf(termLower);
+    const idx = normBusq_(nodoTexto.nodeValue).indexOf(termLower);
     if (idx !== -1) {
       const rango = document.createRange();
       rango.setStart(nodoTexto, idx);
@@ -4170,19 +4399,7 @@ async function renderNotasHub() {
   wireNotasBoard_();
   aplicarTransformNotas_();
   notasIniciarAvisoPeriodico_(); // NUEVO v8.5.0 — arranca 1 sola vez, sigue corriendo aunque se navegue afuera
-  // FIX v8.7.1 — si hay cambios sin guardar, NO se toca el backend al
-  // entrar/volver a la vista: se repinta directo con lo que ya está en
-  // memoria (la v8.7.0 seguía llamando a cargarNotas() igual, sin
-  // preguntar, y terminaba pisando en silencio notas recién creadas
-  // que todavía no se habían guardado — reportado por Ale). Si NO hay
-  // nada pendiente, sigue trayendo lo último del Sheet como siempre.
-  if (notasSinGuardar) {
-    notasPintarSelectorTablero_();
-    pintarNotasCanvas();
-    notasAplicarModoLectura_(); // NUEVO v8.6.4 — btn-notas-guardar nace con `disabled` hardcodeado en el HTML (ver renderNotasEsqueleto_); esta llamada es la que lo reactiva según notasSinGuardar/notasViendoTableroDe reales
-  } else {
-    await cargarNotas();
-  }
+  await cargarNotas(null, false); // FIX v8.7.0 — entrar/volver a la vista NO pregunta, pisa en silencio + toast si había algo sin guardar
   // FIX v7.1.1 — antes llamaba a notasCentrarVista() sin chequear si el
   // usuario ya había navegado a otra vista mientras cargaba (Contenido/
   // Listas); en ese caso #notas-board ya no existe en el DOM y explotaba
@@ -4244,35 +4461,40 @@ function renderNotasEsqueleto_() {
 }
 
 // FIX v8.5.0 — antes del refetch (que pisa `notas` entero), si hay
-// cambios locales sin guardar hay que confirmar el descarte — si no,
-// "Actualizar" borraría en silencio trabajo que el usuario todavía no
-// persistió. `reintentando` es el reintento automático interno, nunca
-// pasa por acá una segunda vez (ya se confirmó, o nunca hubo nada que
-// confirmar en el primer intento).
+// cambios locales sin guardar hay que lidiar con el descarte. `reintentando`
+// es el reintento automático interno, nunca pasa por acá una segunda vez
+// (ya se resolvió el descarte, o nunca hubo nada que resolver, en el
+// primer intento).
 //
-// FIX v8.7.0/8.7.1 — se probó (v8.7.0) sumar un modo "silencioso, sin
-// preguntar" para el llamado desde renderNotasHub (entrar/volver a la
-// vista) — pisaba notas locales recién creadas sin guardar, reportado
-// por Ale. Se revierte: `renderNotasHub()` directamente NO llama a
-// esta función si hay algo sin guardar (repinta desde memoria, ver
-// ahí). Con eso, el único origen que llega hasta acá con cambios sin
-// guardar vuelve a ser el click manual en "Actualizar" — se saca el
-// parámetro `confirmarDescarte`, la función vuelve al comportamiento
-// simple de v8.5.0 (confirm siempre).
-async function cargarNotas(reintentando) {
-  if (!reintentando && notasSinGuardar) {
-    const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
-    if (!ok) {
-      // FIX v8.6.5 — antes cortaba acá con un return desnudo: el canvas y
-      // el selector de tableros habían quedado vacíos desde que entró la
-      // vista (recién se pintan más abajo, tras el fetch), así que
-      // Cancelar dejaba la pantalla en blanco aunque las notas siguieran
-      // intactas en memoria (`notas` nunca se tocó). Repinta con lo que
-      // ya hay, sin ir de nuevo al backend — no hace falta, nada cambió.
-      notasPintarSelectorTablero_();
-      pintarNotasCanvas();
-      return;
+// FIX v8.7.0 — se suma `confirmarDescarte` para distinguir 2 orígenes que
+// antes compartían el mismo comportamiento (confirm bloqueante siempre):
+//   - Click manual en "Actualizar" (confirmarDescarte=true, default):
+//     sigue preguntando con mostrarConfirm() antes de pisar cambios sin
+//     guardar — es una acción explícita del usuario, amerita la pregunta.
+//   - Entrar/volver a la vista Notas vía renderNotasHub (confirmarDescarte
+//     explícito en false): NO pregunta nada — pisa en silencio con lo que
+//     traiga el servidor y avisa con un toast ("Se descartaron cambios sin
+//     guardar") en vez de bloquear con un modal.
+async function cargarNotas(reintentando, confirmarDescarte) {
+  if (confirmarDescarte === undefined) confirmarDescarte = true; // default = comportamiento de "Actualizar"
+  const habiaSinGuardar = notasSinGuardar; // se captura ANTES de decidir, notasMarcarGuardado_() lo resetea más abajo
+  if (!reintentando && habiaSinGuardar) {
+    if (confirmarDescarte) {
+      const ok = await mostrarConfirm('Descartar cambios sin guardar', 'Tenés cambios en el tablero sin guardar. Actualizar los va a descartar. ¿Continuar?', { danger: true, textoAceptar: 'Descartar y actualizar' });
+      if (!ok) {
+        // FIX v8.6.5 — antes cortaba acá con un return desnudo: el canvas y
+        // el selector de tableros habían quedado vacíos desde que entró la
+        // vista (recién se pintan más abajo, tras el fetch), así que
+        // Cancelar dejaba la pantalla en blanco aunque las notas siguieran
+        // intactas en memoria (`notas` nunca se tocó). Repinta con lo que
+        // ya hay, sin ir de nuevo al backend — no hace falta, nada cambió.
+        notasPintarSelectorTablero_();
+        pintarNotasCanvas();
+        return;
+      }
     }
+    // confirmarDescarte===false: sigue de largo sin preguntar, el aviso
+    // llega como toast recién si el fetch de abajo llega a pisar algo.
   }
   const overlay = document.getElementById('notas-board-overlay'); // NUEVO v8.6.0 — reemplaza el spinner chico del botón (v5.1.1)
   notasToolbarHabilitar_(false); // NUEVO v8.6.3 — antes solo el botón Actualizar se deshabilitaba a sí mismo; ahora toda la toolbar, mientras carga
@@ -4290,8 +4512,11 @@ async function cargarNotas(reintentando) {
     notasSincronizarTableroPublico_(); // FIX v8.5.0
     notasPintarSelectorTablero_(); // NUEVO v8.6.4
     pintarNotasCanvas();
+    // NUEVO v8.7.0 — si se pisó en silencio (sin el confirm de arriba)
+    // habiendo cambios locales reales, se avisa acá con un toast.
+    if (!confirmarDescarte && habiaSinGuardar) mostrarToast('Se descartaron cambios sin guardar');
   } catch (err) {
-    if (!reintentando) { await cargarNotas(true); return; } // 1 reintento automático antes de rendirse
+    if (!reintentando) { await cargarNotas(true, confirmarDescarte); return; } // 1 reintento automático antes de rendirse
     mostrarToast('No se pudo actualizar Notas — se mantienen las últimas cargadas');
   } finally {
     notasToolbarHabilitar_(true); // NUEVO v8.6.3
