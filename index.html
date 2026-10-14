@@ -611,9 +611,10 @@ input { font-family: inherit; }
 .card-avance { margin-top: 2px; }
 .tag-cat { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 99px; padding: 2px 9px; border: 1px solid transparent; white-space: nowrap; }
 .av-wrap { display: inline-flex; align-items: center; gap: 8px; width: 100%; }
-.av-bar { flex: 1; height: 8px; border-radius: 99px; background: #dc2626; overflow: hidden; min-width: 50px; }
+.av-bar { flex: 1; height: 8px; border-radius: 99px; background: #bbf7d0; overflow: hidden; min-width: 50px; }
 .av-ok { display: block; height: 100%; background: #16a34a; border-radius: 99px 0 0 99px; }
 .av-num { color: #16a34a; font-size: 12px; min-width: 34px; text-align: right; }
+.av-num.cero { color: #94a3b8; }
 .av-wrap.chica .av-bar { height: 6px; }
 .dias { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .dias-vencida { color: #dc2626; }
@@ -640,6 +641,56 @@ input { font-family: inherit; }
 .av-btn.sel { background: #16a34a; border-color: #15803d; color: #fff; }
 .av-btn.av-limpiar { color: var(--muted); }
 @media (max-width: 560px) { .columnas-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } .listas-ayuda { display: none; } }
+
+/* v9.1.1 — ajustes visuales de Listas */
+.switch-publica { font-size: 13px; color: var(--text); gap: 10px; }
+.switch-publica b { font-weight: 700; }
+.columnas-lista { gap: 8px; }
+.chip-col { display: block; cursor: pointer; margin: 0; }
+.chip-col input { position: absolute; opacity: 0; width: 0; height: 0; }
+.chip-col-txt { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--border); border-radius: 99px; padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--muted); background: var(--surface); transition: all .12s; user-select: none; }
+.chip-col-marca { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #cbd5e1; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; flex: none; }
+.chip-col input:checked + .chip-col-txt { background: var(--tag-bg); border-color: var(--accent); color: var(--tag-fg); }
+.chip-col input:checked + .chip-col-txt .chip-col-marca { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chip-col input:checked + .chip-col-txt .chip-col-marca::after { content: '✓'; }
+.chip-col input:focus-visible + .chip-col-txt { outline: 2px solid var(--accent); outline-offset: 2px; }
+#modal-fila-lista #fila-lista-form { display: block; }
+#fila-lista-form .fila-grupo { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 16px; align-items: start; }
+@media (max-width: 900px) { #fila-lista-form .fila-grupo { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { #fila-lista-form .fila-grupo { grid-template-columns: 1fr; } }
+.av-slider { display: flex; align-items: center; gap: 8px; height: 38px; }
+.av-slider input[type=range] { flex: 1; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 99px; background: #bbf7d0; outline: none; min-width: 60px; }
+.av-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 2px solid #16a34a; box-shadow: 0 1px 3px rgba(0,0,0,.2); cursor: pointer; }
+.av-slider input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid #16a34a; cursor: pointer; }
+.av-slider-num { min-width: 38px; text-align: right; color: #16a34a; font-size: 13px; }
+.av-slider-num.cero, .av-slider.vacio .av-slider-num { color: #94a3b8; }
+.av-slider.vacio input[type=range] { opacity: .45; }
+.av-slider-borrar { background: none; border: 1px solid var(--border); border-radius: 50%; width: 22px; height: 22px; line-height: 18px; padding: 0; color: var(--muted); font-size: 14px; flex: none; }
+.av-slider-borrar:hover { color: #dc2626; border-color: #fca5a5; }
+.seg-vista { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.seg-vista button { background: var(--surface); border: none; padding: 7px 12px; font-size: .74rem; font-weight: 600; color: var(--muted); }
+.seg-vista button + button { border-left: 1px solid var(--border); }
+.seg-vista button.activo { background: var(--accent2); color: #fff; }
+.cards-grid.compacto { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 8px; }
+@media (max-width: 560px) { .cards-grid.compacto { grid-template-columns: 1fr; } }
+.card-lista.compacta { flex-direction: row; align-items: center; gap: 10px; padding: 8px 12px 8px 10px; min-height: 44px; }
+.card-lista.compacta:hover { transform: none; }
+.card-lista.compacta .drag-handle { position: static; padding: 0 2px; }
+.card-lista.compacta .btn-favorito { position: static; font-size: 17px; margin-left: 2px; }
+.cc-nombre { flex: 1 1 auto; min-width: 110px; font-weight: 700; color: var(--accent2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+.cc-ind { font-size: 11.5px; font-weight: 700; border-radius: 99px; padding: 1px 8px; white-space: nowrap; }
+.cc-ind.rojo { background: #fee2e2; color: #991b1b; }
+.cc-ind.critica { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+.cc-avance { width: 104px; flex: none; }
+.cc-pend { font-size: 12px; color: var(--muted); white-space: nowrap; }
+#tip-lista { position: fixed; z-index: 300; background: #0f172a; color: #e2e8f0; border-radius: var(--radius-sm); padding: 10px 12px; font-size: 12.5px; min-width: 220px; max-width: 300px; box-shadow: 0 8px 24px rgba(0,0,0,.25); pointer-events: none; opacity: 0; transform: translateY(-2px); transition: opacity .12s, transform .12s; top: -999px; left: -999px; }
+#tip-lista.visible { opacity: 1; transform: none; }
+#tip-lista .tip-tit { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; margin-bottom: 6px; font-size: 13.5px; }
+#tip-lista .tip-fila { display: flex; justify-content: space-between; gap: 14px; padding: 2px 0; color: #94a3b8; }
+#tip-lista .tip-fila b { color: #f1f5f9; }
+#tip-lista .tip-fila b.rojo { color: #fca5a5; }
+#tip-lista .tip-fila b.critica { color: #fdba74; }
+@media (max-width: 560px) { .seg-vista button { padding: 6px 9px; } .cc-avance { width: 80px; } }
 
 /* Header de detalle de lista */
 .lista-header { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -1306,7 +1357,9 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
       <div class="form-campo"><label for="config-lista-nombre">Nombre<span class="req-marca">*</span></label>
         <input type="text" id="config-lista-nombre" maxlength="80" placeholder="Ej.: Compras del obrador"></div>
       <div class="form-campo"><label>Color</label><div class="colores-lista" id="config-lista-colores"></div></div>
-      <div class="form-campo"><label class="check-col" style="font-weight:600"><input type="checkbox" id="config-lista-publica"> Pública (los demás la ven, sin poder editarla)</label></div>
+      <div class="form-campo"><label class="switch-wrap switch-publica" for="config-lista-publica">
+        <span class="switch"><input type="checkbox" id="config-lista-publica"><span class="switch-slider"></span></span>
+        <span><b>Pública</b> — los demás la ven, sin poder editarla</span></label></div>
       <div class="form-campo"><label>Columnas opcionales</label>
         <div class="columnas-lista" id="config-lista-columnas"></div>
         <div class="config-ayuda">Siempre se ven: ID, Tarea, Fecha, Sector, Asignado, Estado, Crítico y Observaciones. Ocultar una columna no borra sus datos.</div></div>
@@ -1357,6 +1410,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
 <!-- ═══════════════ NOTAS — menú contextual (batch 1) ═══════════════ -->
 <div id="notas-menu-contextual" class="hidden"></div>
+<div id="tip-lista" role="tooltip"></div>
 <div id="notas-emoji-picker" class="hidden"></div>
 
 <canvas id="lpz-canvas" class="lpz-canvas"></canvas>
@@ -1390,7 +1444,17 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v9_1_0.html — lógica
+// PreKOM — index_prekom_v9_1_1.html — lógica
+// v9.1.1 (14-oct-2026) — ajustes visuales de Listas (prueba real de Ale):
+//  · Nueva lista / Configurar: "Pública" con interruptor deslizable; columnas
+//    opcionales como chips en 3 columnas (✓ cuando están elegidas).
+//  · Modal de fila en 4 columnas: Fecha·Sector·Asignado·Estado /
+//    Crítico·Marca·Orden·Avance / Cantidad·Unidad·Moneda·Valor; Tarea y
+//    Observaciones a todo el ancho. Avance con deslizador (de a 10) y ✕.
+//  · Barra de avance: verde fuerte lo hecho, verde claro lo que falta; 0 % en gris.
+//  · Home: modo COMPACTO por defecto (una línea por tarjeta, cuadro con el
+//    detalle al pasar el mouse o con toque largo) y botón Compacto/Detallado,
+//    recordado en el dispositivo.
 // v9.1.0 (14-oct-2026) — LISTAS NUEVAS (Diseno_PreKOM_v9_1_0.md).
 //  · Estructura fija: ID (por lista), Tarea, Fecha, Sector, Asignado,
 //    Estado, Crítico, Observaciones + 9 ocultables (Marca, Cantidad,
@@ -1692,7 +1756,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v9.1.0';
+const APP_VERSION = 'v9.1.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -3317,9 +3381,12 @@ function textoDias_(f) {
 function barraAvance_(v, chica) {
   if (v === null || v === undefined || v === '') return '';
   const n = Math.max(0, Math.min(100, Number(v)));
-  return '<span class="av-wrap' + (chica ? ' chica' : '') + '"><span class="av-bar"><span class="av-ok" style="width:' + n + '%"></span></span><b class="av-num">' + n + '%</b></span>';
+  return '<span class="av-wrap' + (chica ? ' chica' : '') + '"><span class="av-bar"><span class="av-ok" style="width:' + n + '%"></span></span><b class="av-num' + (n === 0 ? ' cero' : '') + '">' + n + '%</b></span>';
 }
 function nombreDe_(email) { return (LD.nombres && LD.nombres[email]) || email; }
+// v9.1.1 — vista del Home (compacto / detallado), recordada en el dispositivo
+function vistaListas_() { try { return localStorage.getItem('prekom_listas_vista') || 'compacto'; } catch (e) { return 'compacto'; } }
+function cambiarVistaListas(v) { try { localStorage.setItem('prekom_listas_vista', v); } catch (e) { /* sin storage */ } renderListasHub(false); }
 function claveFiltros_(id) { return 'prekom_filtros_' + (obraActual ? obraActual.obraId : '') + '_' + id; }
 function leerFiltros_(id) {
   try { const r = JSON.parse(localStorage.getItem(claveFiltros_(id)) || 'null'); if (r && r.cats) return r; } catch (e) { /* sin storage */ }
@@ -3343,6 +3410,7 @@ async function renderListasHub(recargar) {
   destruirTablaSiExiste();
   destruirSortablesListasHub_();
   listaMeta = null;
+  ocultarTipLista_();
   const main = document.getElementById('main-view');
   if (recargar !== false || !LD.catalogos.length) {
     main.innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Cargando listas…</div>';
@@ -3363,6 +3431,10 @@ async function renderListasHub(recargar) {
   let html = '<div class="listas-toolbar">' +
     '<button class="btn-toolbar" id="btn-listas-actualizar" onclick="renderListasHub()"><i class="ti ti-refresh"></i> Actualizar</button>' +
     '<button class="btn-toolbar principal" id="btn-nueva-lista" onclick="abrirModalConfigLista(null)">+ Nueva lista</button>' +
+    '<span class="seg-vista" id="seg-vista-listas">' +
+      '<button type="button" class="' + (vistaListas_() === 'compacto' ? 'activo' : '') + '" data-vista="compacto" onclick="cambiarVistaListas(\'compacto\')">Compacto</button>' +
+      '<button type="button" class="' + (vistaListas_() === 'detallado' ? 'activo' : '') + '" data-vista="detallado" onclick="cambiarVistaListas(\'detallado\')">Detallado</button>' +
+    '</span>' +
     '<span class="listas-ayuda">Arrastrá ⠿ para ordenar las tarjetas a tu gusto (solo lo ves vos).</span>' +
   '</div>';
   html += panelListas_('favoritos', '★ Favoritos', favs, 'Marcá una lista con ☆ para tenerla acá.');
@@ -3378,6 +3450,7 @@ async function renderListasHub(recargar) {
   usuarios.forEach(function (u) { html += panelListas_('u:' + u, nombreDe_(u), otros[u], ''); });
   main.innerHTML = html;
   inicializarDragDropListasHub_();
+  engancharTipsListas_();
 }
 
 function ordenarPanel_(panel, listas) {
@@ -3395,8 +3468,8 @@ function panelListas_(panel, titulo, listas, vacio) {
   const ordenadas = ordenarPanel_(panel, listas);
   return '<div class="listas-panel">' +
     '<div class="arbol-subtitulo">' + escaparHtml(titulo) + (panel.indexOf('u:') === 0 ? ' <span class="panel-sub">listas públicas</span>' : '') + '</div>' +
-    '<div class="cards-grid" data-panel="' + escaparHtml(panel) + '">' +
-      (ordenadas.length ? ordenadas.map(tarjetaLista_).join('') : '<div class="grupo-vacio">' + escaparHtml(vacio) + '</div>') +
+    '<div class="cards-grid' + (vistaListas_() === 'compacto' ? ' compacto' : '') + '" data-panel="' + escaparHtml(panel) + '">' +
+      (ordenadas.length ? ordenadas.map(vistaListas_() === 'compacto' ? tarjetaListaCompacta_ : tarjetaLista_).join('') : '<div class="grupo-vacio">' + escaparHtml(vacio) + '</div>') +
     '</div></div>';
 }
 
@@ -3417,6 +3490,62 @@ function tarjetaLista_(l) {
     (muestraAvance ? '<div class="card-avance">' + barraAvance_(r.avance, true) + '</div>' : '') +
   '</div>';
 }
+
+// v9.1.1 — tarjeta compacta: una línea; el detalle va en el cuadro (tooltip)
+function tarjetaListaCompacta_(l) {
+  const r = l.resumen || {};
+  const c = colorLista_(l.color);
+  const muestraAvance = (l.columnas || []).indexOf('avance') !== -1 && r.avance !== null && r.avance !== undefined;
+  return '<div class="card card-lista compacta" data-lista-id="' + l.id + '" style="border-left:5px solid ' + c.solido + '" onclick="abrirListaDesdeTarjeta_(event,' + l.id + ')">' +
+    '<span class="drag-handle" title="Arrastrar para ordenar" onclick="event.stopPropagation()">⠿</span>' +
+    '<span class="cc-nombre">' + escaparHtml(l.nombre) + '</span>' +
+    (r.vencidas ? '<span class="cc-ind rojo" title="Vencidas">● ' + r.vencidas + '</span>' : '') +
+    (r.criticas ? '<span class="cc-ind critica" title="Críticas abiertas">⚠ ' + r.criticas + '</span>' : '') +
+    (muestraAvance ? '<span class="cc-avance">' + barraAvance_(r.avance, true) + '</span>' : '<span class="cc-pend">' + (r.pendientes || 0) + ' pend.</span>') +
+    '<span class="btn-favorito' + (l.favorito ? ' activo' : '') + '" title="' + (l.favorito ? 'Quitar de favoritos' : 'Marcar como favorita') + '" onclick="event.stopPropagation(); toggleFavorito(' + l.id + ')">' + (l.favorito ? '★' : '☆') + '</span>' +
+  '</div>';
+}
+function htmlTipLista_(l) {
+  const r = l.resumen || {};
+  const fila = function (k, v, cls) { return '<div class="tip-fila"><span>' + k + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + v + '</b></div>'; };
+  return '<div class="tip-tit"><span class="lista-franja-mini" style="background:' + colorLista_(l.color).solido + '"></span>' + escaparHtml(l.nombre) + '</div>' +
+    fila('Lista', l.esDueno ? (l.publica ? 'Pública (tuya)' : 'Privada (tuya)') : 'de ' + escaparHtml(nombreDe_(l.usuario))) +
+    fila('Ítems', r.items || 0) + fila('Pendientes', r.pendientes || 0) +
+    fila('Vencidas', r.vencidas || 0, r.vencidas ? 'rojo' : '') + fila('Críticas abiertas', r.criticas || 0, r.criticas ? 'critica' : '') +
+    ((l.columnas || []).indexOf('avance') !== -1 ? fila('Avance promedio', (r.avance === null || r.avance === undefined ? '—' : r.avance + ' %')) : '') +
+    (l.comentarios ? fila('Comentarios', l.comentarios) : '');
+}
+let tipTimer_ = null, tipLargo_ = false;
+function mostrarTipLista_(el) {
+  const l = LD.listas.find(function (x) { return x.id === Number(el.getAttribute('data-lista-id')); });
+  const tip = document.getElementById('tip-lista');
+  if (!l || !tip) return;
+  tip.innerHTML = htmlTipLista_(l);
+  tip.classList.add('visible');
+  const b = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+  let top = b.bottom + 6, left = b.left + 12;
+  if (top + t.height > window.innerHeight - 8) top = b.top - t.height - 6;
+  if (left + t.width > window.innerWidth - 8) left = window.innerWidth - t.width - 8;
+  tip.style.top = Math.max(8, top) + 'px'; tip.style.left = Math.max(8, left) + 'px';
+}
+function ocultarTipLista_() { const tip = document.getElementById('tip-lista'); if (tip) tip.classList.remove('visible'); }
+function engancharTipsListas_() {
+  document.querySelectorAll('.card-lista.compacta').forEach(function (el) {
+    el.addEventListener('mouseenter', function () { mostrarTipLista_(el); });
+    el.addEventListener('mouseleave', ocultarTipLista_);
+    el.addEventListener('touchstart', function () { tipLargo_ = false; clearTimeout(tipTimer_); tipTimer_ = setTimeout(function () { tipLargo_ = true; mostrarTipLista_(el); }, 500); }, { passive: true });
+    el.addEventListener('touchend', function () { clearTimeout(tipTimer_); });
+    el.addEventListener('touchmove', function () { clearTimeout(tipTimer_); }, { passive: true });
+  });
+}
+// Después de un toque largo (que mostró el cuadro) no se abre la lista
+function abrirListaDesdeTarjeta_(ev, id) {
+  if (tipLargo_) { tipLargo_ = false; ev.preventDefault(); return; }
+  ocultarTipLista_();
+  abrirLista(id);
+}
+document.addEventListener('touchstart', function (e) { if (!e.target.closest || !e.target.closest('.card-lista.compacta')) ocultarTipLista_(); }, { passive: true });
+document.addEventListener('scroll', ocultarTipLista_, true);
 
 // ── DRAG & DROP (orden personal por panel) ────────────────────
 function destruirSortablesListasHub_() {
@@ -3494,7 +3623,7 @@ function abrirModalConfigLista(id) {
   });
   const cols = l ? (l.columnas || []) : [];
   document.getElementById('config-lista-columnas').innerHTML = COLS_OCULTABLES.map(function (c) {
-    return '<label class="check-col"><input type="checkbox" value="' + c.k + '"' + (cols.indexOf(c.k) !== -1 ? ' checked' : '') + '> ' + c.t + '</label>';
+    return '<label class="chip-col"><input type="checkbox" value="' + c.k + '"' + (cols.indexOf(c.k) !== -1 ? ' checked' : '') + '><span class="chip-col-txt"><span class="chip-col-marca"></span>' + c.t + '</span></label>';
   }).join('');
   document.getElementById('btn-borrar-lista').classList.toggle('hidden', !l);
   document.getElementById('config-lista-error').classList.remove('visible');
@@ -3546,6 +3675,7 @@ async function borrarListaDesdeConfig() {
 
 // ── DETALLE DE UNA LISTA ──────────────────────────────────────
 async function abrirLista(id) {
+  ocultarTipLista_();
   vistaActual = 'lista-detalle';
   marcarNavActiva('lista-detalle');
   destruirTablaSiExiste();
@@ -3829,29 +3959,44 @@ function abrirModalFilaLista(listaId, n) {
   }
   function num(k, paso) { return '<input type="number" step="' + paso + '" id="campo-fila-' + k + '" value="' + (f[k] === null || f[k] === undefined ? '' : escaparHtml(String(f[k]))) + '">'; }
   document.getElementById('fila-lista-campo-fijo').innerHTML = campo('tarea', 'Tarea', true, '<textarea id="campo-fila-tarea" rows="2">' + escaparHtml(f.tarea || '') + '</textarea>', true);
-  let html = campo('fecha', 'Fecha', false, '<input type="date" id="campo-fila-fecha" value="' + (f.fecha ? String(f.fecha).slice(0, 10) : '') + '">') +
-    campo('sector', 'Sector', true, sel('sector')) + campo('asignado', 'Asignado', false, sel('asignado')) +
-    campo('estado', 'Estado', true, sel('estado')) + campo('critico', 'Crítico', false, sel('critico'));
-  if (vis.indexOf('marca') !== -1) html += campo('marca', 'Marca', false, sel('marca'));
-  if (vis.indexOf('cantidad') !== -1) html += campo('cantidad', 'Cantidad', false, num('cantidad', '0.01'));
-  if (vis.indexOf('unidad') !== -1) html += campo('unidad', 'Unidad', false, sel('unidad'));
-  if (vis.indexOf('moneda') !== -1) html += campo('moneda', 'Moneda', false, sel('moneda'));
-  if (vis.indexOf('valor') !== -1) html += campo('valor', 'Valor', false, num('valor', '0.01'));
-  if (vis.indexOf('orden') !== -1) html += campo('orden', 'Orden', false, num('orden', '1'));
-  if (vis.indexOf('avance') !== -1) {
-    avanceModal = f.avance === null || f.avance === undefined ? null : Number(f.avance);
-    html += campo('avance', 'Avance', false, '<div class="avance-botones" id="campo-fila-avance">' +
-      [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(function (v) { return '<button type="button" class="av-btn' + (avanceModal === v ? ' sel' : '') + '" data-av="' + v + '">' + v + '</button>'; }).join('') +
-      '<button type="button" class="av-btn av-limpiar" data-av="" title="Sin avance">—</button></div>', true);
-  }
+  // v9.1.1 — 4 columnas, en 3 grupos (Ale): seguimiento / clasificación y avance / costo
+  // el Avance usa los lugares libres de su fila (el deslizador se lee mejor ancho)
+  const campoAncho_ = function (h, n) { return n > 1 ? h.replace('class="form-campo"', 'class="form-campo" style="grid-column: span ' + n + '"') : h; };
+  const grupo = function (campos) { const h = campos.filter(Boolean).join(''); return h ? '<div class="fila-grupo">' + h + '</div>' : ''; };
+  if (vis.indexOf('avance') !== -1) avanceModal = f.avance === null || f.avance === undefined ? null : Number(f.avance);
+  let html = grupo([
+      campo('fecha', 'Fecha', false, '<input type="date" id="campo-fila-fecha" value="' + (f.fecha ? String(f.fecha).slice(0, 10) : '') + '">'),
+      campo('sector', 'Sector', true, sel('sector')), campo('asignado', 'Asignado', false, sel('asignado')), campo('estado', 'Estado', true, sel('estado'))]) +
+    grupo([
+      campo('critico', 'Crítico', false, sel('critico')),
+      vis.indexOf('marca') !== -1 ? campo('marca', 'Marca', false, sel('marca')) : '',
+      vis.indexOf('orden') !== -1 ? campo('orden', 'Orden', false, num('orden', '1')) : '',
+      vis.indexOf('avance') !== -1 ? campoAncho_(campo('avance', 'Avance', false,
+        '<div class="av-slider' + (avanceModal === null ? ' vacio' : '') + '" id="campo-fila-avance">' +
+          '<input type="range" min="0" max="100" step="10" value="' + (avanceModal === null ? 0 : avanceModal) + '" aria-label="Avance">' +
+          '<b class="av-slider-num">' + (avanceModal === null ? '—' : avanceModal + '%') + '</b>' +
+          '<button type="button" class="av-slider-borrar" title="Sin avance">&times;</button></div>'), 4 - 1 - (vis.indexOf('marca') !== -1 ? 1 : 0) - (vis.indexOf('orden') !== -1 ? 1 : 0)) : '']) +
+    grupo([
+      vis.indexOf('cantidad') !== -1 ? campo('cantidad', 'Cantidad', false, num('cantidad', '0.01')) : '',
+      vis.indexOf('unidad') !== -1 ? campo('unidad', 'Unidad', false, sel('unidad')) : '',
+      vis.indexOf('moneda') !== -1 ? campo('moneda', 'Moneda', false, sel('moneda')) : '',
+      vis.indexOf('valor') !== -1 ? campo('valor', 'Valor', false, num('valor', '0.01')) : '']);
   html += campo('observaciones', 'Observaciones', false, '<textarea id="campo-fila-observaciones" rows="3">' + escaparHtml(f.observaciones || '') + '</textarea>', true);
   document.getElementById('fila-lista-form').innerHTML = html;
-  document.querySelectorAll('#campo-fila-avance .av-btn').forEach(function (b) {
-    b.onclick = function () {
-      avanceModal = b.dataset.av === '' ? null : Number(b.dataset.av);
-      document.querySelectorAll('#campo-fila-avance .av-btn').forEach(function (x) { x.classList.toggle('sel', x.dataset.av !== '' && Number(x.dataset.av) === avanceModal); });
+  const avs = document.getElementById('campo-fila-avance');
+  if (avs) {
+    const rango = avs.querySelector('input[type=range]'), numEl = avs.querySelector('.av-slider-num');
+    const pintar = function () {
+      avs.classList.toggle('vacio', avanceModal === null);
+      numEl.textContent = avanceModal === null ? '—' : avanceModal + '%';
+      numEl.classList.toggle('cero', avanceModal === 0);
+      const n = avanceModal === null ? 0 : avanceModal;
+      rango.style.background = 'linear-gradient(to right, #16a34a 0%, #16a34a ' + n + '%, #bbf7d0 ' + n + '%, #bbf7d0 100%)';
     };
-  });
+    rango.addEventListener('input', function () { avanceModal = Number(rango.value); pintar(); });
+    avs.querySelector('.av-slider-borrar').onclick = function () { avanceModal = null; rango.value = 0; pintar(); };
+    pintar();
+  }
   bloquearModalFilaLista_(false);
   document.getElementById('modal-fila-lista').classList.remove('hidden');
   setTimeout(function () { const t = document.getElementById('campo-fila-tarea'); if (t) t.focus(); }, 50);
@@ -3878,7 +4023,7 @@ document.getElementById('btn-guardar-fila-lista').addEventListener('click', asyn
   if (filaEnEdicionId !== null) fila.n = filaEnEdicionId;
   document.querySelectorAll('#fila-lista-campo-fijo .form-campo, #fila-lista-form .form-campo').forEach(function (div) {
     const k = div.dataset.campo;
-    if (k === 'avance') { fila.avance = avanceModal; return; }
+    if (k === 'avance') { fila.avance = avanceModal; return; }   // el deslizador no cuenta como input del formulario
     const input = div.querySelector('input, select, textarea');
     if (input) fila[k] = input.value;
   });
