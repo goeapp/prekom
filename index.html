@@ -29,6 +29,8 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <!-- v9.0.0 — datos en Supabase (proyecto PWAgoe): misma librería y versión que BDC v7 / LO v8 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js"></script>
+<!-- v9.1.0 — Exportar a Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 /* ─────────────────────────────────────────────────
    DESIGN TOKENS — mismos que Mesa de Trabajo / BDC
@@ -596,6 +598,49 @@ input { font-family: inherit; }
 .btn-favorito.activo { color: var(--accent); }
 .listas-vacio { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; }
 
+/* v9.1.0 — Listas nuevas */
+.listas-ayuda { font-size: .74rem; color: var(--muted); margin-left: auto; }
+.listas-panel { margin-bottom: 22px; }
+.panel-sub { font-family: 'DM Sans', sans-serif; font-size: .72rem; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+.card-lista { position: relative; padding-top: 34px; cursor: pointer; }
+.card-ind { font-size: 12.5px; color: var(--muted); }
+.card-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-ind { font-size: 11px; font-weight: 700; border-radius: 99px; padding: 2px 9px; }
+.chip-ind.rojo { background: #fee2e2; color: #991b1b; }
+.chip-ind.critica { background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; }
+.card-avance { margin-top: 2px; }
+.tag-cat { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 99px; padding: 2px 9px; border: 1px solid transparent; white-space: nowrap; }
+.av-wrap { display: inline-flex; align-items: center; gap: 8px; width: 100%; }
+.av-bar { flex: 1; height: 8px; border-radius: 99px; background: #dc2626; overflow: hidden; min-width: 50px; }
+.av-ok { display: block; height: 100%; background: #16a34a; border-radius: 99px 0 0 99px; }
+.av-num { color: #16a34a; font-size: 12px; min-width: 34px; text-align: right; }
+.av-wrap.chica .av-bar { height: 6px; }
+.dias { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.dias-vencida { color: #dc2626; }
+.dias-hoy { color: #d97706; }
+.dias-cerrada { color: #94a3b8; font-weight: 500; }
+.celda-num { text-align: right; font-variant-numeric: tabular-nums; }
+.lista-totales { margin-top: 10px; text-align: right; font-size: 13px; color: var(--text); }
+.lista-totales:empty { display: none; }
+.total-mon { font-variant-numeric: tabular-nums; font-weight: 600; }
+.listas-borradas { margin: -8px 0 22px; font-size: 13px; color: var(--muted); }
+.listas-borradas summary { cursor: pointer; padding: 4px 0; }
+.borrada-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.borrada-nombre { flex: 1; color: var(--text); }
+.lista-franja-mini { width: 6px; height: 22px; border-radius: 3px; }
+.colores-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch-lista { width: 28px; height: 28px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--border); cursor: pointer; }
+.swatch-lista.sel { box-shadow: 0 0 0 3px var(--accent2); }
+.columnas-lista { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 12px; }
+.check-col { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; text-transform: none; letter-spacing: 0; }
+.check-col input { width: 16px; height: 16px; accent-color: var(--accent); }
+.config-ayuda { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.avance-botones { display: flex; flex-wrap: wrap; gap: 5px; }
+.av-btn { min-width: 40px; padding: 6px 8px; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); font-size: 12.5px; font-weight: 600; color: var(--text); }
+.av-btn.sel { background: #16a34a; border-color: #15803d; color: #fff; }
+.av-btn.av-limpiar { color: var(--muted); }
+@media (max-width: 560px) { .columnas-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } .listas-ayuda { display: none; } }
+
 /* Header de detalle de lista */
 .lista-header { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
 .lista-header-titulo { display: flex; align-items: center; gap: 10px; }
@@ -1106,7 +1151,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
     <div class="hdr-obra-nombre" id="hdr-obra-nombre"></div>
     <div class="hdr-nav">
       <button class="hdr-nav-btn active" id="btn-nav-arbol" disabled>Contenido</button>
-      <button class="hdr-nav-btn" id="btn-nav-listas" disabled title="Listas: próximamente (v9.1)">Listas</button>
+      <button class="hdr-nav-btn" id="btn-nav-listas" disabled>Listas</button>
       <button class="hdr-nav-btn" id="btn-nav-notas" disabled>Notas</button>
     </div>
     <button class="hdr-btn-cambiar-obra" id="btn-cambiar-obra">Cambiar obra</button>
@@ -1250,6 +1295,31 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
   </div>
 </div>
 
+<!-- ═══════════════ MODAL — Nueva lista / Configurar lista (v9.1.0) ═══════════════ -->
+<div class="modal-overlay hidden" id="modal-config-lista">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="config-lista-titulo">Nueva lista</h3>
+      <button class="modal-close" onclick="cerrarModalConfigLista()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-campo"><label for="config-lista-nombre">Nombre<span class="req-marca">*</span></label>
+        <input type="text" id="config-lista-nombre" maxlength="80" placeholder="Ej.: Compras del obrador"></div>
+      <div class="form-campo"><label>Color</label><div class="colores-lista" id="config-lista-colores"></div></div>
+      <div class="form-campo"><label class="check-col" style="font-weight:600"><input type="checkbox" id="config-lista-publica"> Pública (los demás la ven, sin poder editarla)</label></div>
+      <div class="form-campo"><label>Columnas opcionales</label>
+        <div class="columnas-lista" id="config-lista-columnas"></div>
+        <div class="config-ayuda">Siempre se ven: ID, Tarea, Fecha, Sector, Asignado, Estado, Crítico y Observaciones. Ocultar una columna no borra sus datos.</div></div>
+      <div class="msg-error hidden" id="config-lista-error"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secundario hidden" style="width:auto;margin-right:auto;color:#dc2626;border-color:#fca5a5" id="btn-borrar-lista" onclick="borrarListaDesdeConfig()">Borrar lista</button>
+      <button class="btn-secundario" style="width:auto" onclick="cerrarModalConfigLista()">Cancelar</button>
+      <button class="btn-accion" style="width:auto" id="btn-guardar-config-lista" onclick="guardarConfigLista()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════ MÓDULO 2 — Panel lateral de Comentarios ═══════════════ -->
 <div id="comentarios-overlay" onclick="cerrarComentarios()"></div>
 <aside id="comentarios-panel">
@@ -1320,7 +1390,20 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v9_0_1.html — lógica
+// PreKOM — index_prekom_v9_1_0.html — lógica
+// v9.1.0 (14-oct-2026) — LISTAS NUEVAS (Diseno_PreKOM_v9_1_0.md).
+//  · Estructura fija: ID (por lista), Tarea, Fecha, Sector, Asignado,
+//    Estado, Crítico, Observaciones + 9 ocultables (Marca, Cantidad,
+//    Unidad, Moneda, Valor, Subtotal, Avance, Orden, Días).
+//  · Cada usuario (cualquier perfil) crea sus listas: nombre, color,
+//    pública/privada y columnas. Solo el dueño carga datos.
+//  · Home: Favoritos · Mis listas (+ Listas borradas) · un panel por
+//    usuario con sus públicas. Tarjetas con indicadores y orden personal
+//    (arrastrar ⠿), guardado en la base.
+//  · Catálogos por obra con color (GOE Admin v1.4). Días, Subtotal y
+//    totales por moneda calculados acá. Filtros recordados por lista en
+//    este dispositivo. Exportar a Excel (SheetJS).
+//  · Borrar lista o fila = ocultar, siempre con confirmación.
 // v9.0.1 (14-oct-2026) — FIX: el código de Supabase llega con 8 dígitos y el
 // campo cortaba en 6 (maxlength). Ahora acepta de 6 a 10, como BDC/Admin, y el
 // texto ya no dice "6 dígitos".
@@ -1609,7 +1692,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v9.0.1';
+const APP_VERSION = 'v9.1.0';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2093,10 +2176,10 @@ function mostrarToast(mensaje) {
 // {ok:false, error} (mismo trato que un rechazo del GAS); una falla de
 // red tira una excepción (mismo trato que antes), con 1 reintento
 // automático en las lecturas.
-const ACCIONES_LECTURA = new Set(['validarSesion', 'listarObras', 'inicializarObra', 'leerComentariosContenidoObra', 'leerNotas']);
-const ACCIONES_LISTAS = new Set(['leerListaCompleta', 'recargarListasHome', 'leerListaValores', 'leerComentarios', 'agregarComentario',
-  'ocultarComentario', 'guardarFilaLista', 'borrarFilaLista', 'marcarFavorito', 'desmarcarFavorito', 'reordenarFavoritos',
-  'reordenarListasEnGrupo', 'moverListaAGrupo']);
+const ACCIONES_LECTURA = new Set(['validarSesion', 'listarObras', 'inicializarObra', 'leerComentariosContenidoObra', 'leerNotas', 'listasCargar', 'listaAbrir', 'leerComentarios']);
+// v9.1.0 — acciones del módulo de Listas viejo (schema por hoja): ya no existen
+const ACCIONES_LISTAS = new Set(['leerListaCompleta', 'recargarListasHome', 'leerListaValores', 'guardarFilaLista', 'borrarFilaLista',
+  'marcarFavorito', 'desmarcarFavorito', 'reordenarFavoritos', 'reordenarListasEnGrupo', 'moverListaAGrupo']);
 
 function errRed_() { return new Error('No se pudo conectar con el servidor. Revisá tu conexión y volvé a intentar.'); }
 
@@ -2136,7 +2219,7 @@ async function llamarBackend(action, params, reintentando) {
 
 async function llamarBackendSb_(action, params) {
   const obraId = params.obraId || (obraActual ? obraActual.obraId : '');
-  if (ACCIONES_LISTAS.has(action)) return { ok: false, error: 'Listas llega en la v9.1.' };
+  if (ACCIONES_LISTAS.has(action)) return { ok: false, error: 'Acción de Listas de la v8: ya no existe.' };
   switch (action) {
     case 'validarSesion': return datosValidarSesion_();
     case 'listarObras': return datosObras_();
@@ -2168,6 +2251,39 @@ async function llamarBackendSb_(action, params) {
       registrarActividad_('notas_guardar', '', r && r.ok ? 'OK' : 'ERROR', { notas: (params.notas || []).length });
       return r;
     }
+    // ── Listas v9.1.0 ──
+    case 'listasCargar': return rpc_(action, 'pk_listas_cargar', { p_obra: obraId });
+    case 'listaAbrir': return rpc_(action, 'pk_lista_abrir', { p_lista: params.listaId });
+    case 'listaCrear': {
+      const r = await rpc_(action, 'pk_lista_crear', { p_obra: obraId, p_nombre: params.nombre, p_color: params.color, p_publica: !!params.publica, p_columnas: params.columnas || [] });
+      registrarActividad_('lista_crear', params.nombre, r && r.ok ? 'OK' : 'ERROR', { publica: !!params.publica, columnas: params.columnas || [] });
+      return r;
+    }
+    case 'listaConfigurar': {
+      const r = await rpc_(action, 'pk_lista_configurar', { p_lista: params.listaId, p_nombre: params.nombre, p_color: params.color, p_publica: !!params.publica, p_columnas: params.columnas || [] });
+      registrarActividad_('lista_configurar', params.nombre, r && r.ok ? 'OK' : 'ERROR', { lista: params.listaId });
+      return r;
+    }
+    case 'listaOcultar': {
+      const r = await rpc_(action, 'pk_lista_ocultar', { p_lista: params.listaId, p_oculta: !!params.oculta });
+      registrarActividad_(params.oculta ? 'lista_borrar' : 'lista_restaurar', String(params.listaId), r && r.ok ? 'OK' : 'ERROR');
+      return r;
+    }
+    case 'filaGuardar': {
+      const r = await rpc_(action, 'pk_fila_guardar', { p_lista: params.listaId, p_fila: params.fila || {} });
+      registrarActividad_('fila_guardar', String(params.listaId), r && r.ok ? 'OK' : 'ERROR', r && r.ok ? { n: r.fila.n, nueva: !params.fila.n } : { error: r && r.error });
+      return r;
+    }
+    case 'filaOcultar': {
+      const r = await rpc_(action, 'pk_fila_ocultar', { p_lista: params.listaId, p_n: params.n });
+      registrarActividad_('fila_borrar', String(params.listaId), r && r.ok ? 'OK' : 'ERROR', { n: params.n });
+      return r;
+    }
+    case 'listaFavorito': return rpc_(action, 'pk_lista_favorito', { p_lista: params.listaId });
+    case 'listaOrden': return rpc_(action, 'pk_lista_orden_guardar', { p_obra: obraId, p_panel: params.panel, p_ids: params.ids || [] });
+    case 'leerComentarios': return rpc_(action, 'pk_lista_comentarios', { p_lista: params.nombreLista });
+    case 'agregarComentario': return rpc_(action, 'pk_lista_comentario_agregar', { p_lista: params.nombreLista, p_texto: params.texto || '' });
+    case 'ocultarComentario': return rpc_(action, 'pk_lista_comentario_ocultar', { p_id: Number(params.comentarioId) });
     case 'guardarLinks': {
       const r = await rpc_(action, 'pk_links_guardar', { p_obra: obraId, p_links: params.links || [] });
       registrarActividad_('links_guardar', '', r && r.ok ? 'OK' : 'ERROR', { links: (params.links || []).length });
@@ -2581,7 +2697,7 @@ function renderObras(obras) {
 document.getElementById('btn-cambiar-obra').addEventListener('click', cambiarObra);
 
 document.getElementById('btn-nav-arbol').addEventListener('click', function () { renderHome(); });
-document.getElementById('btn-nav-listas').addEventListener('click', function () { /* v9.0.0 — deshabilitado hasta la v9.1 */ });
+document.getElementById('btn-nav-listas').addEventListener('click', function () { renderListasHub(); });
 document.getElementById('btn-nav-notas').addEventListener('click', function () { renderNotasHub(); });
 
 function marcarNavActiva(vista) {
@@ -2666,7 +2782,8 @@ async function mostrarApp() {
     if (!res.ok) throw new Error(res.error || 'No se pudo cargar la obra.');
 
     puedeEditarContenido = !!(res.permisos && res.permisos.puedeEditarContenido);
-    puedeEditarListas = false;   // v9.0.0 — Listas llega en la v9.1
+    puedeEditarListas = false;   // v9.1.0 — sin uso: en Listas cada uno edita las suyas
+    LD = { catalogos: [], listas: [], orden: {}, nombres: {}, email: '' };
     puedeEditarLinks = !!(res.permisos && res.permisos.puedeEditarLinks);
 
     arbol = res.arbol || [];
@@ -2688,7 +2805,7 @@ async function mostrarApp() {
     document.getElementById('btn-links').classList.toggle('hidden', links.length === 0 && !puedeEditarLinks);
 
     document.getElementById('btn-nav-arbol').disabled = false;
-    document.getElementById('btn-nav-listas').disabled = true; // v9.0.0 — Listas llega en la v9.1
+    document.getElementById('btn-nav-listas').disabled = false;
     document.getElementById('btn-nav-notas').disabled = false;
     document.getElementById('btn-cambiar-obra').disabled = false; // NUEVO v8.6.2
     document.getElementById('btn-lapiz-toggle').disabled = false; // NUEVO v8.6.2
@@ -2712,7 +2829,7 @@ async function mostrarApp() {
     // como escape cuando la obra sigue fallando en loop (antes de este
     // cambio, Cambiar obra ni se deshabilitaba, así que no se notaba).
     document.getElementById('btn-nav-arbol').disabled = false;
-    document.getElementById('btn-nav-listas').disabled = true; // v9.0.0 — Listas llega en la v9.1
+    document.getElementById('btn-nav-listas').disabled = false;
     document.getElementById('btn-nav-notas').disabled = false;
     document.getElementById('btn-cambiar-obra').disabled = false;
     document.getElementById('btn-lapiz-toggle').disabled = false;
@@ -3116,981 +3233,770 @@ document.getElementById('btn-cerrar-links').addEventListener('click', async func
 // MÓDULO 2 — LISTAS
 // ============================================================
 
-// ── HOME DE LISTAS (Paneles/Dashboard) ───────────────────────
-// v3.1.0 — batch 2: agrupado ahora contra el catálogo _ListasGrupos
-// (gruposIndex) en vez de texto libre; drag & drop vía SortableJS
-// (mover entre grupos existentes + reordenar dentro de un grupo +
-// reordenar favoritas). Obras que todavía no cargaron _ListasGrupos
-// siguen viéndose agrupadas por el valor crudo de Categoria (mismo
-// comportamiento que antes de v3.1.0), solo sin nombre "lindo" ni
-// drag entre grupos con permiso (ver puedeEditarListas).
-function renderListasHub() {
+// ── LISTAS v9.1.0 ─────────────────────────────────────────────
+// Diseño: Diseno_PreKOM_v9_1_0.md (14-oct-2026). Reemplaza al módulo
+// de Listas con schema por hoja (v1.00–v8.7): ahora la estructura es
+// FIJA, cada usuario crea sus listas (cualquier perfil), con color,
+// pública/privada y columnas ocultables. Catálogos por obra (GOE Admin).
+// Se conserva la tabla DataTables con columnas fijas (sticky), el modal
+// de alta/edición, el panel de Filtros y el de Comentarios.
+
+// Paleta de 14 colores (mismos nombres en la base y en GOE Admin)
+const PALETA_LISTAS = {
+  gris:       { nombre: 'Gris',       solido: '#64748b', bg: '#f1f5f9', fg: '#475569' },
+  negro:      { nombre: 'Negro',      solido: '#0f172a', bg: '#e2e8f0', fg: '#0f172a' },
+  rojo:       { nombre: 'Rojo',       solido: '#dc2626', bg: '#fee2e2', fg: '#991b1b' },
+  naranja:    { nombre: 'Naranja',    solido: '#ea580c', bg: '#ffedd5', fg: '#9a3412' },
+  amarillo:   { nombre: 'Amarillo',   solido: '#ca8a04', bg: '#fef9c3', fg: '#854d0e' },
+  lima:       { nombre: 'Lima',       solido: '#65a30d', bg: '#ecfccb', fg: '#3f6212' },
+  verde:      { nombre: 'Verde',      solido: '#16a34a', bg: '#dcfce7', fg: '#166534' },
+  verde_agua: { nombre: 'Verde agua', solido: '#0d9488', bg: '#ccfbf1', fg: '#115e59' },
+  celeste:    { nombre: 'Celeste',    solido: '#0284c7', bg: '#e0f2fe', fg: '#075985' },
+  azul:       { nombre: 'Azul',       solido: '#2563eb', bg: '#dbeafe', fg: '#1e40af' },
+  indigo:     { nombre: 'Índigo',     solido: '#4f46e5', bg: '#e0e7ff', fg: '#3730a3' },
+  violeta:    { nombre: 'Violeta',    solido: '#7c3aed', bg: '#ede9fe', fg: '#5b21b6' },
+  rosa:       { nombre: 'Rosa',       solido: '#db2777', bg: '#fce7f3', fg: '#9d174d' },
+  marron:     { nombre: 'Marrón',     solido: '#92400e', bg: '#f5ebe0', fg: '#78350f' }
+};
+const ORDEN_COLORES_LISTA = ['azul', 'verde', 'naranja', 'violeta', 'celeste', 'rosa', 'verde_agua', 'amarillo', 'indigo', 'rojo', 'lima', 'marron', 'gris', 'negro'];
+function colorLista_(k) { return PALETA_LISTAS[k] || PALETA_LISTAS.gris; }
+
+// Columnas: fijas + ocultables (en este orden en la tabla)
+const COLS_OCULTABLES = [
+  { k: 'marca', t: 'Marca' }, { k: 'cantidad', t: 'Cantidad' }, { k: 'unidad', t: 'Unidad' }, { k: 'moneda', t: 'Moneda' },
+  { k: 'valor', t: 'Valor' }, { k: 'subtotal', t: 'Subtotal' }, { k: 'avance', t: 'Avance' }, { k: 'orden', t: 'Orden' }, { k: 'dias', t: 'Días' }
+];
+const CATALOGOS_FILA = { sector: 'Sector', asignado: 'Asignado', estado: 'Estado', critico: 'Crítico', marca: 'Marca', unidad: 'Unidad', moneda: 'Moneda' };
+
+let LD = { catalogos: [], listas: [], orden: {}, nombres: {}, email: '' };   // datos del Home de Listas
+let catPorId = {};
+let listaMeta = null;                 // lista abierta (json de pk_lista_json)
+let filtrosLista = null;              // { atajos:[], cats:{sector:[ids]...}, texto:'' }
+let listaEnConfig = null;             // null = modal en modo "Nueva lista"
+let avanceModal = null;               // valor elegido en los botones de Avance del modal
+
+function indexarCatalogos_() {
+  catPorId = {};
+  LD.catalogos.forEach(function (c) { catPorId[c.id] = c; });
+}
+function opcionesCat_(catalogo, valorActual) {
+  return LD.catalogos.filter(function (c) { return c.catalogo === catalogo && (c.activo || String(c.id) === String(valorActual)); })
+    .sort(function (a, b) { return a.orden - b.orden || a.valor.localeCompare(b.valor); });
+}
+function tagCat_(id) {
+  const c = catPorId[id];
+  if (!c) return '';
+  const p = colorLista_(c.color);
+  return '<span class="tag-cat" style="background:' + p.bg + ';color:' + p.fg + ';border-color:' + p.solido + '33">' + escaparHtml(c.valor) + '</span>';
+}
+function estaCerrada_(f) { const e = catPorId[f.estado]; return !!(e && e.cierra); }
+function esCritica_(f) { const c = catPorId[f.critico]; return !!(c && c.critico); }
+function hoyISO_() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function diasHasta_(fechaISO) {
+  if (!fechaISO) return null;
+  const a = new Date(hoyISO_() + 'T00:00:00'), b = new Date(String(fechaISO).slice(0, 10) + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
+}
+function esVencida_(f) { const d = diasHasta_(f.fecha); return d !== null && d < 0 && !estaCerrada_(f); }
+function subtotal_(f) {
+  if (f.cantidad === null || f.cantidad === undefined || f.cantidad === '' || f.valor === null || f.valor === undefined || f.valor === '') return null;
+  return Math.round(Number(f.cantidad) * Number(f.valor) * 100) / 100;
+}
+function fmtNum_(n, dec) {
+  if (n === null || n === undefined || n === '' || isNaN(Number(n))) return '';
+  return Number(n).toLocaleString('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtFecha_(iso) { if (!iso) return ''; const p = String(iso).slice(0, 10).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+function textoDias_(f) {
+  const d = diasHasta_(f.fecha);
+  if (d === null) return { txt: '', cls: '' };
+  const cerrada = estaCerrada_(f);
+  const txt = d > 0 ? 'Faltan ' + d : d === 0 ? 'Hoy' : 'Vencida hace ' + (-d);
+  return { txt: txt, cls: cerrada ? 'dias-cerrada' : (d < 0 ? 'dias-vencida' : (d === 0 ? 'dias-hoy' : '')) };
+}
+function barraAvance_(v, chica) {
+  if (v === null || v === undefined || v === '') return '';
+  const n = Math.max(0, Math.min(100, Number(v)));
+  return '<span class="av-wrap' + (chica ? ' chica' : '') + '"><span class="av-bar"><span class="av-ok" style="width:' + n + '%"></span></span><b class="av-num">' + n + '%</b></span>';
+}
+function nombreDe_(email) { return (LD.nombres && LD.nombres[email]) || email; }
+function claveFiltros_(id) { return 'prekom_filtros_' + (obraActual ? obraActual.obraId : '') + '_' + id; }
+function leerFiltros_(id) {
+  try { const r = JSON.parse(localStorage.getItem(claveFiltros_(id)) || 'null'); if (r && r.cats) return r; } catch (e) { /* sin storage */ }
+  return { atajos: [], cats: {}, texto: '' };
+}
+function guardarFiltros_() {
+  try { if (listaMeta) localStorage.setItem(claveFiltros_(listaMeta.id), JSON.stringify(filtrosLista)); } catch (e) { /* sin storage */ }
+}
+
+// ── HOME DE LISTAS ────────────────────────────────────────────
+async function cargarListasHome_() {
+  const r = await llamarBackend('listasCargar', { obraId: obraActual.obraId });
+  if (!r.ok) throw new Error(r.error || 'No se pudo cargar Listas.');
+  LD = { catalogos: r.catalogos || [], listas: r.listas || [], orden: r.orden || {}, nombres: r.nombres || {}, email: r.email || emailActual };
+  indexarCatalogos_();
+}
+
+async function renderListasHub(recargar) {
   vistaActual = 'listas';
   marcarNavActiva('listas');
   destruirTablaSiExiste();
   destruirSortablesListasHub_();
-
-  let html = '';
-
-  // NUEVO v7.1.0 — toolbar con el botón Actualizar + franja de
-  // favoritos, envueltos juntos en .listas-toolbar. Se pinta SIEMPRE,
-  // incluso sin listas todavía, para poder refrescar si se cargó una
-  // lista nueva directo en el Sheet (antes el early-return de abajo
-  // dejaba a la obra sin forma de refrescar desde la PWA).
-  const favoritas = favoritosActuales
-    .map(function (nt) { return listasIndex.find(function (l) { return l.nombreTab === nt; }); })
-    .filter(Boolean);
-  html += '<div class="listas-toolbar">';
-  html += '<button class="btn-toolbar" id="btn-listas-actualizar" onclick="actualizarListasHub_()"><i class="ti ti-refresh"></i> Actualizar</button>';
-  if (favoritas.length) {
-    html += '<div class="favoritos-strip" id="favoritos-strip">' + favoritas.map(function (l) {
-      return '<span class="favorito-chip" data-nombretab="' + l.nombreTab + '" onclick="abrirLista(\'' + l.nombreTab + '\')">★ ' + escaparHtml(l.nombreVisible) + '</span>';
-    }).join('') + '</div>';
-  } else {
-    html += '<div class="favoritos-vacio" id="favoritos-strip">Todavía no marcaste ninguna lista como favorita.</div>';
+  listaMeta = null;
+  const main = document.getElementById('main-view');
+  if (recargar !== false || !LD.catalogos.length) {
+    main.innerHTML = '<div class="estado-vacio"><div class="spinner"></div>Cargando listas…</div>';
+    try { await cargarListasHome_(); }
+    catch (err) {
+      main.innerHTML = '<div class="estado-vacio">' + escaparHtml(err.message) + '<br><br><button class="btn-accion" style="width:auto" onclick="renderListasHub()">Reintentar</button></div>';
+      return;
+    }
+    if (vistaActual !== 'listas') return;
   }
-  html += '</div>';
+  const mias = LD.listas.filter(function (l) { return l.esDueno && !l.oculta; });
+  const borradas = LD.listas.filter(function (l) { return l.esDueno && l.oculta; });
+  const favs = LD.listas.filter(function (l) { return l.favorito && !l.oculta; });
+  const otros = {};
+  LD.listas.forEach(function (l) { if (!l.esDueno && !l.oculta) (otros[l.usuario] = otros[l.usuario] || []).push(l); });
+  const usuarios = Object.keys(otros).sort(function (a, b) { return nombreDe_(a).localeCompare(nombreDe_(b)); });
 
-  if (!listasIndex.length) {
-    html += '<div class="estado-vacio">Todavía no hay listas creadas para esta obra.<br>Creá una desde el menú "PreKOM Admin" del Sheet ("Crear nueva lista").</div>';
-    document.getElementById('main-view').innerHTML = html;
-    return;
+  let html = '<div class="listas-toolbar">' +
+    '<button class="btn-toolbar" id="btn-listas-actualizar" onclick="renderListasHub()"><i class="ti ti-refresh"></i> Actualizar</button>' +
+    '<button class="btn-toolbar principal" id="btn-nueva-lista" onclick="abrirModalConfigLista(null)">+ Nueva lista</button>' +
+    '<span class="listas-ayuda">Arrastrá ⠿ para ordenar las tarjetas a tu gusto (solo lo ves vos).</span>' +
+  '</div>';
+  html += panelListas_('favoritos', '★ Favoritos', favs, 'Marcá una lista con ☆ para tenerla acá.');
+  html += panelListas_('mis', 'Mis listas', mias, 'Todavía no creaste ninguna lista. Tocá "+ Nueva lista".');
+  if (borradas.length) {
+    html += '<details class="listas-borradas"><summary>Listas borradas (' + borradas.length + ')</summary>' +
+      borradas.map(function (l) {
+        return '<div class="borrada-item"><span class="lista-franja-mini" style="background:' + colorLista_(l.color).solido + '"></span>' +
+          '<span class="borrada-nombre">' + escaparHtml(l.nombre) + '</span>' +
+          '<button class="btn-toolbar" onclick="restaurarLista(' + l.id + ')">Restaurar</button></div>';
+      }).join('') + '</details>';
   }
-
-  // Grupos: SIEMPRE se pintan todos los del catálogo _ListasGrupos —
-  // aunque tengan 0 listas en este momento — para que el contenedor
-  // (y su drop-zone de drag&drop) no desaparezca al vaciarse un grupo
-  // (bug reportado por Ale 07-sep-2026: al mover la única lista de un
-  // grupo, ese grupo dejaba de existir en el DOM y ya no se podía
-  // volver a soltar nada ahí desde la PWA). Van en el orden del
-  // catálogo (Orden), y DESPUÉS los grupos "sin catalogar" (texto
-  // libre en Categoria que no matchea ningún GrupoId) que sí tengan
-  // alguna lista — mismo comportamiento de siempre para obras que
-  // todavía no migraron a _ListasGrupos.
-  const catalogadosIds = gruposIndex.map(function (g) { return g.grupoId; });
-  const gruposVistos = [];
-  listasIndex.forEach(function (l) {
-    const gid = l.categoria || '';
-    if (gruposVistos.indexOf(gid) === -1) gruposVistos.push(gid);
-  });
-  const sinCatalogar = gruposVistos.filter(function (gid) { return catalogadosIds.indexOf(gid) === -1; });
-  const catalogadosOrdenados = gruposIndex.slice()
-    .sort(function (a, b) { return a.orden - b.orden; })
-    .map(function (g) { return g.grupoId; });
-  const gruposOrdenados = catalogadosOrdenados.concat(sinCatalogar);
-
-  gruposOrdenados.forEach(function (gid) {
-    const catalogo = gruposIndex.find(function (g) { return g.grupoId === gid; });
-    const nombreMostrado = catalogo ? catalogo.nombreGrupo : (gid || 'Sin categoría');
-    const deEsteGrupo = listasIndex
-      .filter(function (l) { return (l.categoria || '') === gid; })
-      .sort(function (a, b) { return (a.orden || 999999) - (b.orden || 999999); });
-
-    html += '<div class="arbol-subtitulo">' + escaparHtml(nombreMostrado) + '</div>';
-    html += '<div class="cards-grid" data-grupo-id="' + escaparHtml(gid) + '">';
-    html += deEsteGrupo.length
-      ? deEsteGrupo.map(function (l) {
-          const esFav = favoritosActuales.indexOf(l.nombreTab) !== -1;
-          return '' +
-            '<button class="card card-lista' + (puedeEditarListas ? ' con-drag' : '') + '" data-nombretab="' + l.nombreTab + '" onclick="abrirLista(\'' + l.nombreTab + '\')">' +
-              (puedeEditarListas ? '<span class="drag-handle" title="Arrastrar para mover de grupo o reordenar" onclick="event.stopPropagation()">⠿</span>' : '') +
-              '<span class="btn-favorito' + (esFav ? ' activo' : '') + '" onclick="event.stopPropagation(); toggleFavorito(\'' + l.nombreTab + '\')">' + (esFav ? '★' : '☆') + '</span>' +
-              '<span class="card-categoria-chip">' + escaparHtml(nombreMostrado) + '</span>' +
-              '<div class="card-titulo">' + escaparHtml(l.nombreVisible) + '</div>' +
-            '</button>';
-        }).join('')
-      : '<div class="grupo-vacio">Sin listas en este grupo' + (puedeEditarListas ? ' — arrastrá una acá' : '') + '.</div>';
-    html += '</div>';
-  });
-
-  document.getElementById('main-view').innerHTML = html;
+  usuarios.forEach(function (u) { html += panelListas_('u:' + u, nombreDe_(u), otros[u], ''); });
+  main.innerHTML = html;
   inicializarDragDropListasHub_();
 }
 
-// ── DRAG & DROP EN LISTAS (batch 2, v3.1.0) ──────────────────
+function ordenarPanel_(panel, listas) {
+  const orden = (LD.orden && LD.orden[panel]) || [];
+  return listas.slice().sort(function (a, b) {
+    const ia = orden.indexOf(a.id), ib = orden.indexOf(b.id);
+    if (ia === -1 && ib === -1) return a.id - b.id;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
+
+function panelListas_(panel, titulo, listas, vacio) {
+  const ordenadas = ordenarPanel_(panel, listas);
+  return '<div class="listas-panel">' +
+    '<div class="arbol-subtitulo">' + escaparHtml(titulo) + (panel.indexOf('u:') === 0 ? ' <span class="panel-sub">listas públicas</span>' : '') + '</div>' +
+    '<div class="cards-grid" data-panel="' + escaparHtml(panel) + '">' +
+      (ordenadas.length ? ordenadas.map(tarjetaLista_).join('') : '<div class="grupo-vacio">' + escaparHtml(vacio) + '</div>') +
+    '</div></div>';
+}
+
+function tarjetaLista_(l) {
+  const r = l.resumen || {};
+  const c = colorLista_(l.color);
+  const chips = [];
+  if (r.vencidas) chips.push('<span class="chip-ind rojo">' + r.vencidas + (r.vencidas === 1 ? ' vencida' : ' vencidas') + '</span>');
+  if (r.criticas) chips.push('<span class="chip-ind critica">' + r.criticas + (r.criticas === 1 ? ' crítica' : ' críticas') + '</span>');
+  const muestraAvance = (l.columnas || []).indexOf('avance') !== -1 && r.avance !== null && r.avance !== undefined;
+  return '<div class="card card-lista" data-lista-id="' + l.id + '" style="border-left:5px solid ' + c.solido + '" onclick="abrirLista(' + l.id + ')">' +
+    '<span class="drag-handle" title="Arrastrar para ordenar" onclick="event.stopPropagation()">⠿</span>' +
+    '<span class="btn-favorito' + (l.favorito ? ' activo' : '') + '" title="' + (l.favorito ? 'Quitar de favoritos' : 'Marcar como favorita') + '" onclick="event.stopPropagation(); toggleFavorito(' + l.id + ')">' + (l.favorito ? '★' : '☆') + '</span>' +
+    (l.esDueno ? '<span class="card-categoria-chip">' + (l.publica ? 'Pública' : 'Privada') + '</span>' : '<span class="card-categoria-chip">de ' + escaparHtml(nombreDe_(l.usuario)) + '</span>') +
+    '<div class="card-titulo">' + escaparHtml(l.nombre) + '</div>' +
+    '<div class="card-ind">' + (r.items || 0) + ((r.items || 0) === 1 ? ' ítem' : ' ítems') + ' · ' + (r.pendientes || 0) + ((r.pendientes || 0) === 1 ? ' pendiente' : ' pendientes') + '</div>' +
+    (chips.length ? '<div class="card-chips">' + chips.join('') + '</div>' : '') +
+    (muestraAvance ? '<div class="card-avance">' + barraAvance_(r.avance, true) + '</div>' : '') +
+  '</div>';
+}
+
+// ── DRAG & DROP (orden personal por panel) ────────────────────
 function destruirSortablesListasHub_() {
   sortablesListasHub.forEach(function (s) { s.destroy(); });
   sortablesListasHub = [];
 }
-
 function inicializarDragDropListasHub_() {
-  // Favoritos — reordenar es dato personal, sin gate de puedeEditarListas
-  const stripEl = document.getElementById('favoritos-strip');
-  if (stripEl && stripEl.classList.contains('favoritos-strip')) {
-    sortablesListasHub.push(new Sortable(stripEl, {
-      animation: 150,
-      onEnd: onDragEndFavoritos_
+  if (typeof Sortable === 'undefined') return;
+  Array.prototype.forEach.call(document.querySelectorAll('.cards-grid[data-panel]'), function (grid) {
+    sortablesListasHub.push(new Sortable(grid, {
+      handle: '.drag-handle', draggable: '.card-lista', animation: 150,
+      onEnd: function () { guardarOrdenPanel_(grid); }
     }));
-  }
-
-  // Grupos — mover entre grupos existentes + reordenar dentro de uno,
-  // solo si el usuario tiene permiso de editar Listas en esta obra.
-  // draggable:'.card-lista' excluye el placeholder ".grupo-vacio" de
-  // los grupos sin listas — no es un ítem arrastrable ni cuenta para
-  // el orden, solo ocupa la zona de drop hasta que caiga algo (fix
-  // v3.1.1).
-  if (puedeEditarListas) {
-    Array.prototype.forEach.call(document.querySelectorAll('.cards-grid[data-grupo-id]'), function (grid) {
-      sortablesListasHub.push(new Sortable(grid, {
-        group: 'listas-grupos', // mismo nombre en todos los grids → habilita arrastrar entre grupos
-        handle: '.drag-handle',
-        draggable: '.card-lista',
-        animation: 150,
-        onEnd: onDragEndListaGrupo_
-      }));
-    });
-  }
-}
-
-async function onDragEndFavoritos_() {
-  const stripEl = document.getElementById('favoritos-strip');
-  const nuevoOrden = Array.prototype.map.call(stripEl.querySelectorAll('[data-nombretab]'), function (el) { return el.getAttribute('data-nombretab'); });
-  favoritosActuales = nuevoOrden; // optimista
-  try {
-    await llamarBackend('reordenarFavoritos', { obraId: obraActual.obraId, email: emailActual, ordenNombresTab: nuevoOrden });
-    mostrarToast('Orden de favoritas actualizado');
-  } catch (err) {
-    await mostrarAviso('No se pudo guardar el nuevo orden de favoritas. Se recarga la lista de favoritas.');
-    await recargarListasYGrupos_();
-    renderListasHub();
-  }
-}
-
-async function onDragEndListaGrupo_(evt) {
-  const grupoOrigenId = evt.from.getAttribute('data-grupo-id');
-  const grupoDestinoId = evt.to.getAttribute('data-grupo-id');
-  const nombreTab = evt.item.getAttribute('data-nombretab');
-  const cambioDeGrupo = grupoOrigenId !== grupoDestinoId;
-
-  const ordenDestino = Array.prototype.map.call(evt.to.querySelectorAll('[data-nombretab]'), function (el) { return el.getAttribute('data-nombretab'); });
-  const ordenOrigen = cambioDeGrupo
-    ? Array.prototype.map.call(evt.from.querySelectorAll('[data-nombretab]'), function (el) { return el.getAttribute('data-nombretab'); })
-    : null;
-
-  // Actualiza el modelo local en memoria y repinta YA (fix v3.1.1):
-  // antes se esperaba a un re-render disparado por otra acción (F5,
-  // tocar un favorito) para que el chip mostrara el grupo correcto —
-  // ahora, como SortableJS ya movió la card en el DOM, un
-  // renderListasHub() inmediato deja todo consistente sin esperar
-  // la ida y vuelta al backend.
-  const item = listasIndex.find(function (l) { return l.nombreTab === nombreTab; });
-  if (item && cambioDeGrupo) item.categoria = grupoDestinoId;
-  ordenDestino.forEach(function (nt, i) {
-    const l = listasIndex.find(function (l) { return l.nombreTab === nt; });
-    if (l) l.orden = i + 1;
   });
-  if (ordenOrigen) {
-    ordenOrigen.forEach(function (nt, i) {
-      const l = listasIndex.find(function (l) { return l.nombreTab === nt; });
-      if (l) l.orden = i + 1;
-    });
-  }
-  renderListasHub();
-
+}
+async function guardarOrdenPanel_(grid) {
+  const panel = grid.getAttribute('data-panel');
+  const ids = Array.prototype.map.call(grid.querySelectorAll('[data-lista-id]'), function (el) { return Number(el.getAttribute('data-lista-id')); });
+  LD.orden[panel] = ids;
   try {
-    if (cambioDeGrupo) {
-      await llamarBackend('moverListaAGrupo', { obraId: obraActual.obraId, nombreTab: nombreTab, nuevoGrupoId: grupoDestinoId, email: emailActual });
-    }
-    await llamarBackend('reordenarListasEnGrupo', { obraId: obraActual.obraId, grupoId: grupoDestinoId, ordenNombresTab: ordenDestino, email: emailActual });
-    if (ordenOrigen) {
-      await llamarBackend('reordenarListasEnGrupo', { obraId: obraActual.obraId, grupoId: grupoOrigenId, ordenNombresTab: ordenOrigen, email: emailActual });
-    }
-    mostrarToast(cambioDeGrupo ? 'Lista movida de grupo' : 'Orden actualizado');
+    const r = await llamarBackend('listaOrden', { obraId: obraActual.obraId, panel: panel, ids: ids });
+    if (!r.ok) throw new Error(r.error);
+    mostrarToast('Orden guardado');
   } catch (err) {
-    await mostrarAviso('No se pudo guardar el cambio (' + err.message + '). Se recarga la vista.');
-    await recargarListasYGrupos_();
+    mostrarAviso('No se pudo guardar el orden. Se recarga la vista.');
     renderListasHub();
   }
 }
 
-// Recarga listasIndex/gruposIndex/favoritosActuales desde el backend
-// — usado para volver a un estado consistente si un drag falla
-// (permiso denegado a mitad de sesión, red caída, etc.) y, desde
-// v7.1.0, también por el botón Actualizar de Listas.
-// Devuelve true/false (éxito) — los llamados de rollback existentes lo
-// ignoran a propósito (se quedan con el último estado conocido en
-// silencio), el botón Actualizar sí lo usa para avisar si falló.
-async function recargarListasYGrupos_() {
+async function toggleFavorito(id) {
   try {
-    // FIX v8.2.0 — antes 3 llamadas en paralelo (Promise.all), 3 POST
-    // simultáneos a la misma implementación de Apps Script; sospechoso
-    // de disparar el 404 intermitente del hop de redirect propio de
-    // los Web Apps (script.googleusercontent.com/macros/echo, ver
-    // investigación de esta sesión). Ahora 1 sola llamada consolidada,
-    // mismo criterio que ya usa inicializarObra_ desde v7.0.0.
-    const res = await llamarBackend('recargarListasHome', { obraId: obraActual.obraId, email: emailActual });
-    if (!res.ok) throw new Error(res.error || 'no se pudo recargar Listas');
-    listasIndex = res.listas || listasIndex;
-    gruposIndex = res.grupos || gruposIndex;
-    favoritosActuales = res.favoritos || favoritosActuales;
-    return true;
-  } catch (err) {
-    return false; // si falla, se queda con el último estado conocido — llamarBackend() ya reintentó 1 vez por dentro
-  }
+    const r = await llamarBackend('listaFavorito', { listaId: id });
+    if (!r.ok) { mostrarAviso(r.error || 'No se pudo actualizar el favorito.'); return; }
+    LD.listas.forEach(function (l) { if (l.id === id) l.favorito = r.favorito; });
+    if (listaMeta && listaMeta.id === id) { listaMeta.favorito = r.favorito; actualizarBotonFavoritoGrande(); }
+  } catch (err) { mostrarAviso('No se pudo actualizar el favorito.'); return; }
+  if (vistaActual === 'listas') renderListasHub(false);
 }
-
-// NUEVO v7.1.0 — handler del botón Actualizar del Home de Listas:
-// releer listas+grupos+favoritos (mismo criterio que la carga inicial
-// de esta vista) y re-renderizar.
-async function actualizarListasHub_() {
-  const btn = document.getElementById('btn-listas-actualizar');
-  if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
-  const ok = await recargarListasYGrupos_();
-  renderListasHub(); // repinta con lo nuevo (o lo último conocido si falló) — esto ya reconstruye el botón en estado normal
-  if (!ok) mostrarToast('No se pudo actualizar Listas');
-}
-
-async function toggleFavorito(nombreTab) {
-  const esFav = favoritosActuales.indexOf(nombreTab) !== -1;
-  try {
-    if (esFav) {
-      await llamarBackend('desmarcarFavorito', { obraId: obraActual.obraId, nombreLista: nombreTab, email: emailActual });
-      favoritosActuales = favoritosActuales.filter(function (f) { return f !== nombreTab; });
-    } else {
-      await llamarBackend('marcarFavorito', { obraId: obraActual.obraId, nombreLista: nombreTab, email: emailActual });
-      favoritosActuales.push(nombreTab);
-    }
-  } catch (err) {
-    mostrarAviso('No se pudo actualizar el favorito.');
-    return;
-  }
-  if (vistaActual === 'listas') renderListasHub();
-  if (vistaActual === 'lista-detalle' && listaAbierta === nombreTab) actualizarBotonFavoritoGrande();
-}
-
 function actualizarBotonFavoritoGrande() {
   const btn = document.getElementById('btn-favorito-grande');
-  if (!btn) return;
-  const esFav = favoritosActuales.indexOf(listaAbierta) !== -1;
-  btn.classList.toggle('activo', esFav);
-  btn.textContent = esFav ? '★' : '☆';
+  if (!btn || !listaMeta) return;
+  btn.classList.toggle('activo', !!listaMeta.favorito);
+  btn.textContent = listaMeta.favorito ? '★' : '☆';
 }
 
-// ── DETALLE DE LISTA (Tabulator) ──────────────────────────────
-async function abrirLista(nombreTab) {
+async function restaurarLista(id) {
+  const l = LD.listas.find(function (x) { return x.id === id; });
+  if (!(await mostrarConfirm('Restaurar lista', '¿Restaurar "' + (l ? l.nombre : '') + '"? Vuelve a Mis listas con todas sus filas' + (l && l.publica ? ', y los demás la vuelven a ver.' : '.'), { textoAceptar: 'Restaurar' }))) return;
+  try {
+    const r = await llamarBackend('listaOcultar', { listaId: id, oculta: false });
+    if (!r.ok) { mostrarAviso(r.error || 'No se pudo restaurar.'); return; }
+    mostrarToast('Lista restaurada');
+    renderListasHub();
+  } catch (err) { mostrarAviso(err.message); }
+}
+
+// ── MODAL: Nueva lista / Configurar lista ─────────────────────
+function siguienteColorLibre_() {
+  const usados = LD.listas.filter(function (l) { return l.esDueno && !l.oculta; }).map(function (l) { return l.color; });
+  return ORDEN_COLORES_LISTA.find(function (c) { return usados.indexOf(c) === -1; }) || 'azul';
+}
+function abrirModalConfigLista(id) {
+  const l = id ? (listaMeta && listaMeta.id === id ? listaMeta : LD.listas.find(function (x) { return x.id === id; })) : null;
+  listaEnConfig = l ? l.id : null;
+  const color = l ? l.color : siguienteColorLibre_();
+  document.getElementById('config-lista-titulo').textContent = l ? 'Configurar lista' : 'Nueva lista';
+  document.getElementById('config-lista-nombre').value = l ? l.nombre : '';
+  document.getElementById('config-lista-publica').checked = l ? !!l.publica : false;
+  document.getElementById('config-lista-colores').innerHTML = ORDEN_COLORES_LISTA.map(function (k) {
+    const p = PALETA_LISTAS[k];
+    return '<button type="button" class="swatch-lista' + (k === color ? ' sel' : '') + '" data-color="' + k + '" title="' + p.nombre + '" style="background:' + p.solido + '"></button>';
+  }).join('');
+  document.querySelectorAll('#config-lista-colores .swatch-lista').forEach(function (b) {
+    b.onclick = function () { document.querySelectorAll('#config-lista-colores .swatch-lista').forEach(function (x) { x.classList.remove('sel'); }); b.classList.add('sel'); };
+  });
+  const cols = l ? (l.columnas || []) : [];
+  document.getElementById('config-lista-columnas').innerHTML = COLS_OCULTABLES.map(function (c) {
+    return '<label class="check-col"><input type="checkbox" value="' + c.k + '"' + (cols.indexOf(c.k) !== -1 ? ' checked' : '') + '> ' + c.t + '</label>';
+  }).join('');
+  document.getElementById('btn-borrar-lista').classList.toggle('hidden', !l);
+  document.getElementById('config-lista-error').classList.remove('visible');
+  document.getElementById('modal-config-lista').classList.remove('hidden');
+  setTimeout(function () { document.getElementById('config-lista-nombre').focus(); }, 50);
+}
+function cerrarModalConfigLista() { document.getElementById('modal-config-lista').classList.add('hidden'); listaEnConfig = null; }
+
+async function guardarConfigLista() {
+  const nombre = document.getElementById('config-lista-nombre').value.trim();
+  const err = document.getElementById('config-lista-error');
+  if (!nombre) { err.textContent = 'Escribí un nombre para la lista.'; err.classList.remove('hidden'); err.classList.add('visible'); return; }
+  const sel = document.querySelector('#config-lista-colores .swatch-lista.sel');
+  const params = {
+    obraId: obraActual.obraId, listaId: listaEnConfig, nombre: nombre, color: sel ? sel.dataset.color : 'azul',
+    publica: document.getElementById('config-lista-publica').checked,
+    columnas: Array.prototype.map.call(document.querySelectorAll('#config-lista-columnas input:checked'), function (i) { return i.value; })
+  };
+  const btn = document.getElementById('btn-guardar-config-lista');
+  btn.disabled = true;
+  try {
+    const r = await llamarBackend(listaEnConfig ? 'listaConfigurar' : 'listaCrear', params);
+    if (!r.ok) { err.textContent = r.error || 'No se pudo guardar.'; err.classList.remove('hidden'); err.classList.add('visible'); return; }
+    const eraNueva = !listaEnConfig, id = listaEnConfig || r.id;
+    cerrarModalConfigLista();
+    mostrarToast(eraNueva ? 'Lista creada' : 'Lista actualizada');
+    if (eraNueva || vistaActual === 'lista-detalle') { await cargarListasHome_().catch(function () {}); abrirLista(id); }
+    else renderListasHub();
+  } catch (e) {
+    err.textContent = e.message; err.classList.remove('hidden'); err.classList.add('visible');
+  } finally { btn.disabled = false; }
+}
+
+async function borrarListaDesdeConfig() {
+  const id = listaEnConfig;
+  const l = LD.listas.find(function (x) { return x.id === id; }) || listaMeta;
+  const ok = await mostrarConfirm('Borrar lista',
+    'La lista "' + (l ? l.nombre : '') + '" se oculta: sale del Home y de los favoritos de todos. Sus filas y comentarios quedan guardados y la podés restaurar desde "Listas borradas", al pie de Mis listas.',
+    { danger: true, textoAceptar: 'Borrar lista' });
+  if (!ok) return;
+  try {
+    const r = await llamarBackend('listaOcultar', { listaId: id, oculta: true });
+    if (!r.ok) { mostrarAviso(r.error || 'No se pudo borrar.'); return; }
+    cerrarModalConfigLista();
+    mostrarToast('Lista borrada (la podés restaurar)');
+    renderListasHub();
+  } catch (e) { mostrarAviso(e.message); }
+}
+
+// ── DETALLE DE UNA LISTA ──────────────────────────────────────
+async function abrirLista(id) {
   vistaActual = 'lista-detalle';
   marcarNavActiva('lista-detalle');
   destruirTablaSiExiste();
-  listaAbierta = nombreTab;
-
-  const meta = listasIndex.find(function (l) { return l.nombreTab === nombreTab; }) || { nombreVisible: nombreTab };
-  const esFav = favoritosActuales.indexOf(nombreTab) !== -1;
-
-  // Solo título + breadcrumb + "cargando" al principio — los botones,
-  // el buscador y el paginado se agregan recién cuando la lista
-  // terminó de cargar (antes aparecían activos sin datos detrás)
-  document.getElementById('main-view').innerHTML =
+  destruirSortablesListasHub_();
+  listaAbierta = id;
+  const main = document.getElementById('main-view');
+  main.innerHTML = '<div class="breadcrumb-item" onclick="renderListasHub()" style="cursor:pointer;color:var(--muted);font-size:.78rem;margin-bottom:16px;display:inline-block">‹ Listas</div>' +
+    '<div class="estado-vacio" id="lista-cargando"><div class="spinner"></div>Cargando…</div>';
+  try {
+    if (!LD.catalogos.length) await cargarListasHome_();
+    const r = await llamarBackend('listaAbrir', { listaId: id });
+    if (!r.ok) throw new Error(r.error || 'No se pudo abrir la lista.');
+    if (listaAbierta !== id) return;
+    listaMeta = r.lista;
+    datosListaAbierta = r.filas || [];
+  } catch (err) {
+    const c = document.getElementById('lista-cargando');
+    if (c) c.innerHTML = escaparHtml(err.message) + '<br><br><button class="btn-accion" style="width:auto" onclick="renderListasHub()">Volver a Listas</button>';
+    return;
+  }
+  filtrosLista = leerFiltros_(id);
+  registrarActividad_('ver_lista', listaMeta.nombre, 'OK', { lista: id, dueno: listaMeta.esDueno });
+  const c = colorLista_(listaMeta.color);
+  const esDueno = listaMeta.esDueno;
+  main.innerHTML =
     '<div class="breadcrumb-item" onclick="renderListasHub()" style="cursor:pointer;color:var(--muted);font-size:.78rem;margin-bottom:16px;display:inline-block">‹ Listas</div>' +
-    '<div class="lista-header">' +
+    '<div class="lista-header" style="border-left:6px solid ' + c.solido + ';padding-left:12px">' +
       '<div class="lista-header-titulo">' +
-        '<h2>' + escaparHtml(meta.nombreVisible) + '</h2>' +
+        '<h2>' + escaparHtml(listaMeta.nombre) + '</h2>' +
         '<span class="contador-filas" id="contador-filas"></span>' +
-        '<button id="btn-favorito-grande" class="btn-favorito-grande' + (esFav ? ' activo' : '') + '" onclick="toggleFavorito(\'' + nombreTab + '\')">' + (esFav ? '★' : '☆') + '</button>' +
+        (esDueno ? '<span class="card-categoria-chip">' + (listaMeta.publica ? 'Pública' : 'Privada') + '</span>' : '<span class="card-categoria-chip">de ' + escaparHtml(nombreDe_(listaMeta.usuario)) + ' · solo lectura</span>') +
+        '<button id="btn-favorito-grande" class="btn-favorito-grande' + (listaMeta.favorito ? ' activo' : '') + '" onclick="toggleFavorito(' + id + ')">' + (listaMeta.favorito ? '★' : '☆') + '</button>' +
       '</div>' +
-      '<div class="lista-header-acciones hidden" id="lista-header-acciones">' +
+      '<div class="lista-header-acciones" id="lista-header-acciones">' +
         '<div class="buscador-wrap">' +
-          '<input type="text" id="lista-buscador" class="input-buscador-inline" placeholder="Buscar…">' +
-          '<button class="btn-limpiar-buscador hidden" id="btn-limpiar-buscador" title="Borrar búsqueda">&times;</button>' +
+          '<input type="text" id="lista-buscador" class="input-buscador-inline" placeholder="Buscar en Tarea y Observaciones…" value="' + escaparHtml(filtrosLista.texto || '') + '">' +
+          '<button class="btn-limpiar-buscador' + (filtrosLista.texto ? '' : ' hidden') + '" id="btn-limpiar-buscador" title="Borrar búsqueda">&times;</button>' +
         '</div>' +
-        '<button class="btn-toolbar" id="btn-actualizar-lista">Actualizar</button>' +
+        '<button class="btn-toolbar" id="btn-actualizar-lista" onclick="actualizarListaActual()">Actualizar</button>' +
         '<button class="btn-toolbar" style="position:relative" onclick="abrirPanelFiltrosLista()">Filtros<span class="btn-filtros-badge hidden" id="btn-filtros-lista-badge" title="Quitar filtros" onclick="event.stopPropagation(); quitarFiltrosLista();">✕</span></button>' +
-        '<button class="btn-toolbar" onclick="abrirComentarios(\'' + nombreTab + '\')">Comentarios</button>' +
-        (puedeEditarListas ? '<button class="btn-toolbar principal" id="btn-agregar-fila">+ Agregar fila</button>' : '') +
+        '<button class="btn-toolbar" onclick="abrirComentarios(' + id + ')">Comentarios' + (listaMeta.comentarios ? ' (' + listaMeta.comentarios + ')' : '') + '</button>' +
+        '<button class="btn-toolbar" id="btn-exportar-lista" onclick="exportarListaExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar a Excel</button>' +
+        (esDueno ? '<button class="btn-toolbar" id="btn-config-lista" onclick="abrirModalConfigLista(' + id + ')">Configurar</button>' : '') +
+        (esDueno ? '<button class="btn-toolbar principal" id="btn-agregar-fila" onclick="abrirModalFilaLista(' + id + ', null)">+ Agregar fila</button>' : '') +
       '</div>' +
     '</div>' +
-    '<div class="estado-vacio" id="lista-cargando"><div class="spinner"></div>Cargando…</div>' +
-    '<div class="tabla-lista-wrap hidden" id="tabla-lista-contenedor"></div>';
-
-  terminoBusquedaLista = '';
-  const inputBuscador = document.getElementById('lista-buscador');
-  const btnLimpiarBuscador = document.getElementById('btn-limpiar-buscador');
-  inputBuscador.addEventListener('input', function () {
-    terminoBusquedaLista = this.value.trim();
-    btnLimpiarBuscador.classList.toggle('hidden', this.value === '');
-    if (tablaListaDT) tablaListaDT.search(terminoBusquedaLista).draw();
+    '<div class="tabla-lista-wrap hidden" id="tabla-lista-contenedor"></div>' +
+    '<div class="lista-totales" id="lista-totales"></div>';
+  const inp = document.getElementById('lista-buscador'), btnL = document.getElementById('btn-limpiar-buscador');
+  let deb = null;
+  inp.addEventListener('input', function () {
+    btnL.classList.toggle('hidden', this.value === '');
+    clearTimeout(deb);
+    const v = this.value;
+    deb = setTimeout(function () { filtrosLista.texto = v.trim(); guardarFiltros_(); montarTablaLista(); }, 200);
   });
-  btnLimpiarBuscador.addEventListener('click', function () {
-    inputBuscador.value = '';
-    terminoBusquedaLista = '';
-    btnLimpiarBuscador.classList.add('hidden');
-    inputBuscador.focus();
-    if (tablaListaDT) tablaListaDT.search('').draw();
-  });
-
-  const btnAgregarFila = document.getElementById('btn-agregar-fila');
-  if (btnAgregarFila) {
-    // NUEVO v8.1.0 — "+ Agregar fila" ya no crea una fila vacía en el
-    // Sheet al tocar el botón (eso era guardado dinámico prematuro,
-    // exactamente lo que veníamos a sacar). Ahora abre el modal en
-    // modo alta; recién se llama a guardarFilaLista al confirmar, con
-    // la fila completa.
-    btnAgregarFila.addEventListener('click', function () { abrirModalFilaLista(nombreTab, null); });
-  }
-  document.getElementById('btn-actualizar-lista').addEventListener('click', function () { actualizarListaActual(); });
-
-  await cargarYMontarLista(nombreTab, true);
+  btnL.addEventListener('click', function () { inp.value = ''; btnL.classList.add('hidden'); filtrosLista.texto = ''; guardarFiltros_(); montarTablaLista(); inp.focus(); });
+  montarTablaLista();
 }
 
-/**
- * Carga (o recarga) el schema/datos de la lista abierta y monta la
- * grilla. `esPrimeraCarga` controla el estado visual de "Cargando…"
- * (solo se muestra la primera vez que se abre la lista).
- */
-async function cargarYMontarLista(nombreTab, esPrimeraCarga) {
-  try {
-    // FIX v8.2.0 — antes 2 llamadas en paralelo (Promise.all), 2 POST
-    // simultáneos a la misma implementación de Apps Script; sospechoso
-    // de disparar el 404 intermitente del hop de redirect propio de
-    // los Web Apps (script.googleusercontent.com/macros/echo, ver
-    // investigación de esta sesión). Ahora 1 sola llamada consolidada.
-    const res = await llamarBackend('leerListaCompleta', { obraId: obraActual.obraId, nombreLista: nombreTab });
-    // Mismo criterio que Notas desde v7.1.3: un ok:false del backend se
-    // trata como falla real, en vez de vaciar schema/datos en silencio
-    // y remontar la tabla vacía. En un refresh (esPrimeraCarga false)
-    // esto además evita pisar la tabla que ya estaba mostrando datos buenos.
-    if (!res.ok) throw new Error(res.error || 'no se pudo leer la lista');
-    schemaListaAbierta = res.schema || [];
-    datosListaAbierta = res.datos || []; // NUEVO v8.1.0 — hoisted a global, fuente de verdad en memoria (antes era local a esta función)
-    document.getElementById('contador-filas').textContent = datosListaAbierta.length + (datosListaAbierta.length === 1 ? ' fila' : ' filas');
-    if (esPrimeraCarga) {
-      document.getElementById('lista-cargando').classList.add('hidden');
-      document.getElementById('lista-header-acciones').classList.remove('hidden');
-    }
-    destruirTablaSiExiste();
-    montarTablaLista(nombreTab, schemaListaAbierta, datosListaAbierta);
-  } catch (err) {
-    if (esPrimeraCarga) {
-      document.getElementById('lista-cargando').textContent = 'No se pudo cargar la lista.';
-    } else {
-      mostrarAviso('No se pudo actualizar la lista — se mantienen los últimos datos cargados.');
-    }
-  }
-}
-
-/**
- * Botón "Actualizar" — por si otro usuario cargó/modificó datos, o
- * agregó una opción nueva a listaValores desde el backend, mientras
- * esta lista estaba abierta. Refresca listaValores (global, todas las
- * listas de valores) además del schema/datos de esta lista puntual,
- * y reconstruye la grilla — así los selects reflejan opciones nuevas.
- */
 async function actualizarListaActual() {
-  if (!listaAbierta) return;
+  if (!listaMeta) return;
   const btn = document.getElementById('btn-actualizar-lista');
-  btn.disabled = true;
-  const textoOriginal = btn.textContent;
-  btn.textContent = 'Actualizando…';
+  if (btn) { btn.disabled = true; btn.textContent = 'Actualizando…'; }
   try {
-    const resValores = await llamarBackend('leerListaValores', { obraId: obraActual.obraId });
-    valoresListas = (resValores.ok && resValores.valores) ? resValores.valores : valoresListas;
-    await cargarYMontarLista(listaAbierta, false);
-  } catch (err) {
-    mostrarAviso('No se pudo actualizar.');
-  }
-  btn.disabled = false;
-  btn.textContent = textoOriginal;
+    await cargarListasHome_();
+    const r = await llamarBackend('listaAbrir', { listaId: listaMeta.id });
+    if (!r.ok) throw new Error(r.error);
+    listaMeta = r.lista; datosListaAbierta = r.filas || [];
+    montarTablaLista();
+  } catch (err) { mostrarAviso('No se pudo actualizar la lista — se mantienen los últimos datos cargados.'); }
+  if (btn) { btn.disabled = false; btn.textContent = 'Actualizar'; }
 }
 
-function valoresParaTipo(tipoCampo) {
-  return valoresListas.filter(function (v) { return v.lista === tipoCampo; });
+// Filas que pasan los filtros (atajos + catálogos + texto sin acentos)
+function filasFiltradas_() {
+  const f = filtrosLista || { atajos: [], cats: {}, texto: '' };
+  const q = normBusq_(f.texto || '');
+  return datosListaAbierta.filter(function (r) {
+    if (f.atajos.indexOf('pendientes') !== -1 && estaCerrada_(r)) return false;
+    if (f.atajos.indexOf('vencidas') !== -1 && !esVencida_(r)) return false;
+    if (f.atajos.indexOf('criticas') !== -1 && !(esCritica_(r) && !estaCerrada_(r))) return false;
+    for (const cat in f.cats) {
+      const ids = f.cats[cat] || [];
+      if (ids.length && ids.indexOf(Number(r[cat])) === -1) return false;
+    }
+    if (q && normBusq_(r.tarea).indexOf(q) === -1 && normBusq_(r.observaciones).indexOf(q) === -1) return false;
+    return true;
+  });
+}
+function hayFiltros_() {
+  const f = filtrosLista; if (!f) return false;
+  return f.atajos.length > 0 || !!f.texto || Object.keys(f.cats).some(function (k) { return (f.cats[k] || []).length; });
 }
 
-// NUEVO v8.1.0 — reglas fijas de bloqueo, acordadas con Ale: ID nunca
-// se edita (ni en alta ni en edición — el backend lo autonumera y
-// "nunca se pisa por este camino", guardarFilaLista_ dixit); Item
-// identifica la fila y se puede escribir libremente al crearla, pero
-// una vez creada queda fijo — no depende de ninguna fila de schema
-// nueva, es una regla de código, igual para las 2 columnas.
-function campoBloqueado_(col, esEdicion) {
-  if (col.campo === 'id') return true;
-  if (col.campo === 'item') return esEdicion;
-  return false;
+function columnasTabla_() {
+  const vis = (listaMeta && listaMeta.columnas) || [];
+  const cols = [
+    { k: 'n', t: 'ID' }, { k: 'tarea', t: 'Tarea' },
+    { k: 'fecha', t: 'Fecha', w: '95px' }, { k: 'sector', t: 'Sector', w: '130px' }, { k: 'asignado', t: 'Asignado', w: '150px' },
+    { k: 'estado', t: 'Estado', w: '120px' }, { k: 'critico', t: 'Crítico', w: '80px' }, { k: 'observaciones', t: 'Observaciones', w: '220px' }
+  ];
+  COLS_OCULTABLES.forEach(function (c) { if (vis.indexOf(c.k) !== -1) cols.push({ k: c.k, t: c.t, w: c.k === 'avance' ? '150px' : (c.k === 'dias' ? '130px' : '100px') }); });
+  return cols;
+}
+function celda_(col, f) {
+  const k = col.k;
+  if (k === 'n') return { html: String(f.n), orden: f.n };
+  if (k === 'tarea' || k === 'observaciones') { const v = f[k] || ''; return { html: escaparHtml(v), title: v, trunc: true }; }
+  if (k === 'fecha') return { html: fmtFecha_(f.fecha), orden: f.fecha || '' };
+  if (CATALOGOS_FILA[k]) { const c = catPorId[f[k]]; return { html: tagCat_(f[k]), orden: c ? c.valor : '' }; }
+  if (k === 'cantidad' || k === 'valor') return { html: fmtNum_(f[k], 2), orden: f[k] === null || f[k] === undefined ? '' : Number(f[k]), num: true };
+  if (k === 'subtotal') { const s = subtotal_(f); return { html: fmtNum_(s, 2), orden: s === null ? '' : s, num: true }; }
+  if (k === 'avance') return { html: barraAvance_(f.avance), orden: f.avance === null || f.avance === undefined ? '' : f.avance };
+  if (k === 'orden') return { html: fmtNum_(f.orden, Number(f.orden) % 1 ? 2 : 0), orden: f.orden === null || f.orden === undefined ? '' : Number(f.orden), num: true };
+  if (k === 'dias') { const d = textoDias_(f), n = diasHasta_(f.fecha); return { html: d.txt ? '<span class="dias ' + d.cls + '">' + d.txt + '</span>' : '', orden: n === null ? '' : n }; }
+  return { html: '' };
 }
 
-// Valor mostrado/editado en el input de fecha (yyyy-mm-dd) a partir
-// de lo que venga del backend (string ISO o vacío) — mismo criterio
-// que ya usaba el editor 'date' de Tabulator, ahora como <input type=date>.
-function valorFechaInput_(v) {
-  if (!v) return '';
-  const d = new Date(v);
-  if (isNaN(d)) return '';
-  return d.toISOString().slice(0, 10);
+const IDX_ACCIONES_ = 2;
+function montarTablaLista() {
+  const cont = document.getElementById('tabla-lista-contenedor');
+  if (!cont || !listaMeta) return;
+  destruirTablaSiExiste();
+  const esDueno = listaMeta.esDueno;
+  const cols = columnasTabla_();
+  const conOrden = (listaMeta.columnas || []).indexOf('orden') !== -1;
+  const filas = filasFiltradas_().slice().sort(function (a, b) {
+    if (conOrden) {
+      const oa = a.orden === null || a.orden === undefined ? Infinity : Number(a.orden);
+      const ob = b.orden === null || b.orden === undefined ? Infinity : Number(b.orden);
+      if (oa !== ob) return oa - ob;
+    }
+    return a.n - b.n;
+  });
+  const thCols = cols.map(function (c, i) { return '<th' + (i >= 2 && c.w ? ' style="width:' + c.w + '"' : '') + '>' + escaparHtml(c.t) + '</th>'; });
+  if (esDueno) thCols.splice(IDX_ACCIONES_, 0, '<th class="acciones-col">Acciones</th>');
+  const tbody = filas.map(function (f) {
+    const tds = cols.map(function (c) {
+      const x = celda_(c, f);
+      const ord = x.orden !== undefined ? ' data-order="' + escaparHtml(String(x.orden)) + '"' : '';
+      const cls = (x.trunc ? 'celda-truncada' : '') + (x.num ? ' celda-num' : '');
+      return '<td' + (cls.trim() ? ' class="' + cls.trim() + '"' : '') + (x.title ? ' title="' + escaparHtml(x.title) + '"' : '') + ord + '>' + x.html + '</td>';
+    });
+    if (esDueno) tds.splice(IDX_ACCIONES_, 0, '<td class="acciones-col" style="white-space:nowrap;text-align:center">' +
+      '<button class="btn-fila-accion btn-editar-fila" title="Editar" onclick="abrirModalFilaLista(' + listaMeta.id + ', ' + f.n + ')">✎</button>' +
+      '<button class="btn-fila-accion btn-borrar-fila" title="Borrar" onclick="confirmarBorrarFila(' + listaMeta.id + ', ' + f.n + ')">🗑</button></td>');
+    return '<tr class="' + (esVencida_(f) ? 'fila-vencida' : '') + '">' + tds.join('') + '</tr>';
+  }).join('');
+  cont.classList.remove('hidden');
+  cont.innerHTML = '<table id="tabla-lista" class="display" style="width:100%"><thead><tr>' + thCols.join('') + '</tr></thead><tbody>' + tbody + '</tbody></table>';
+  tablaListaDT = $('#tabla-lista').DataTable({
+    language: _dtLangListas_(), pageLength: 20, lengthMenu: [10, 20, 50, 100], order: [],
+    dom: '<"dt-top"lip><"tabla-lista-scroll"t>', autoWidth: false,
+    columnDefs: esDueno ? [{ targets: IDX_ACCIONES_, orderable: false }] : []
+  });
+  actualizarContadorFilas(filas.length);
+  pintarTotalesLista_(filas);
+  actualizarBadgeFiltrosLista_();
+  ajustarAltoTablaLista_();
 }
 
-function formatoCeldaLista_(col, valor) {
-  if (valor === undefined || valor === null || valor === '') return '';
-  if (col.tipoCampo === 'fecha') {
-    const d = new Date(valor);
-    return isNaN(d) ? escaparHtml(String(valor)) : d.toLocaleDateString('es-AR');
-  }
-  if (col.tipoCampo.indexOf('listaValores_') === 0) {
-    const opciones = valoresParaTipo(col.tipoCampo);
-    const opcion = opciones.find(function (o) { return o.valor === valor; });
-    const bg = opcion ? colorTag(opcion.color) : 'var(--muted)';
-    return '<span class="tag-valor" style="background:' + bg + '">' + escaparHtml(String(valor)) + '</span>';
-  }
-  // FIX v8.1.1 — el corte a 140 caracteres en JS se saca: el truncado
-  // ahora es visual (CSS, 1 línea + ellipsis, ver .celda-truncada) y el
-  // texto completo se ve en el title (tooltip nativo) que arma
-  // montarTablaLista() por celda — acá siempre se devuelve completo.
-  return escaparHtml(String(valor));
+function pintarTotalesLista_(filas) {
+  const el = document.getElementById('lista-totales');
+  if (!el) return;
+  const vis = listaMeta.columnas || [];
+  if (vis.indexOf('subtotal') === -1 && vis.indexOf('valor') === -1) { el.innerHTML = ''; return; }
+  const tot = totalesPorMoneda_(filas);
+  el.innerHTML = tot.length ? '<b>Total</b> ' + tot.map(function (t) { return '<span class="total-mon">' + escaparHtml(t.moneda) + ' ' + fmtNum_(t.total, 2) + '</span>'; }).join(' · ') : '';
 }
-
-// FIX v8.1.1 — columnas de texto libre (sin tipo fijo de una lista de
-// valores) son las que pueden desbordar a 2da línea y estirar la fila;
-// numerico/fecha/listaValores_* son siempre cortos, no lo necesitan.
-function celdaEsTruncable_(col) {
-  return col.tipoCampo === 'texto_largo' || col.tipoCampo === 'texto_corto';
+function totalesPorMoneda_(filas) {
+  const acc = {}, orden = [];
+  filas.forEach(function (f) {
+    const s = subtotal_(f); if (s === null) return;
+    const m = catPorId[f.moneda] ? catPorId[f.moneda].valor : 'sin moneda';
+    if (!(m in acc)) { acc[m] = 0; orden.push(m); }
+    acc[m] += s;
+  });
+  orden.sort(function (a, b) { return a === 'sin moneda' ? 1 : b === 'sin moneda' ? -1 : a.localeCompare(b); });
+  return orden.map(function (m) { return { moneda: m, total: Math.round(acc[m] * 100) / 100 }; });
 }
 
 function _dtLangListas_() {
   return {
     search: 'Buscar:', lengthMenu: 'Mostrar _MENU_ filas',
     info: 'Mostrando _START_ a _END_ de _TOTAL_', infoEmpty: 'Sin filas',
-    infoFiltered: '(filtrado de _MAX_)', zeroRecords: 'Sin coincidencias.',
+    infoFiltered: '(filtrado de _MAX_)', zeroRecords: 'Sin filas para mostrar.',
     paginate: { first: '«', previous: '‹', next: '›', last: '»' }
   };
 }
 
-/**
- * Construye y monta la tabla de solo lectura (DataTables, patrón
- * DOM-sourced — mismo criterio que LibroObra/PdTT): arma el HTML del
- * thead/tbody a mano desde `schema`+`datos`, lo inserta, y recién
- * ahí instancia $().DataTable() sobre la tabla ya poblada. Reemplaza
- * a montarTabulator() — la edición inline sale de la tabla, ahora es
- * pura vista (sort/filtro/paginación/badges) + columna de acciones.
- */
-// FIX v8.3.1 (punto 7) — la columna Acciones (editar/borrar) pasa de
-// ir al final (obligaba a hacer scroll horizontal completo para
-// llegar) a ser la 3ra columna fija a la izquierda, junto a ID e
-// Item. `IDX_ACCIONES_` es la posición (0-indexada) donde se inserta
-// en cada fila del thead/tbody, sea cual sea el schema de la lista —
-// siempre después de ID+Item, que son las 2 columnas que ya vienen
-// fijas por convención de código (ver campoBloqueado_).
-const IDX_ACCIONES_ = 2;
-
-function montarTablaLista(nombreTab, schema, datos) {
-  const cont = document.getElementById('tabla-lista-contenedor');
-  const colsConFiltro = schema.filter(function (c) { return c.tipoCampo.indexOf('listaValores_') === 0; });
-  // FIX v8.4.0 — se resetean los filtros del panel lateral cada vez
-  // que se abre/recarga una lista (los índices de columna no
-  // significan lo mismo de una lista a otra).
-  schemaListaFiltrable_ = colsConFiltro;
-  filtrosListaActivos_ = {};
-
-  // Inserta la celda de Acciones en la posición IDX_ACCIONES_ de un
-  // array de celdas ya armado a partir del schema (thead principal o
-  // tbody) — centraliza el único lugar donde se decide dónde va la
-  // columna, para no repetir el splice 2 veces.
-  function conAcciones_(celdas, celdaAcciones) {
-    if (!puedeEditarListas) return celdas;
-    const copia = celdas.slice();
-    copia.splice(IDX_ACCIONES_, 0, celdaAcciones);
-    return copia;
-  }
-
-  // FIX v8.4.5 — con `table-layout: fixed` (necesario para que el
-  // sticky de ID/Tarea/Acciones no se desalinee, ver v8.4.3) el
-  // navegador reparte el ancho sobrante en PARTES IGUALES entre las
-  // columnas sin ancho declarado — con muchas columnas (ej. 12
-  // "Documento") eso aplastaba Área/Estado hasta que sus badges se
-  // pisaban entre sí. Se le da un ancho de arranque a cada columna
-  // según su tipo, para que fixed tenga de dónde repartir en vez de
-  // dividir todo por igual.
-  function anchoColumna_(col) {
-    if (col.tipoCampo === 'fecha') return '95px';
-    if (col.tipoCampo === 'numerico') return '80px';
-    if (col.tipoCampo.indexOf('listaValores_') === 0) return '130px';
-    if (col.tipoCampo === 'texto_largo') return '220px';
-    return '160px'; // texto_corto y cualquier tipo no contemplado
-  }
-
-  // FIX v8.4.8 — ID y Tarea (schema[0] y schema[1]) ya tienen su ancho
-  // resuelto por la regla CSS de nth-child(1)/nth-child(2) (fijas por
-  // convención de código, igual que Acciones) — llevar ADEMÁS un
-  // `style="width:..."` propio acá (por venir del mismo schema.map que
-  // el resto de las columnas) pisaba esa regla externa sin querer (el
-  // inline gana sin necesitar !important) y era la causa real del
-  // "agujero" que reportó Ale entre Tarea y Acciones: el `left` de
-  // Acciones asume los anchos de la regla CSS, no los que terminaban
-  // rindiendo ID/Tarea por el inline. A partir de acá, esas 2 columnas
-  // no llevan `style` propio — quedan 100% gobernadas por el CSS.
-  const theadHtml = '<tr>' + conAcciones_(schema.map(function (col, i) {
-    const styleAncho = i < IDX_ACCIONES_ ? '' : ' style="width:' + anchoColumna_(col) + '"';
-    return '<th' + styleAncho + '>' + escaparHtml(col.etiqueta || col.campo) + '</th>';
-  }), '<th class="acciones-col">Acciones</th>').join('') + '</tr>';
-
-  const tbodyHtml = datos.map(function (fila) {
-    const celdaAcciones = '<td class="acciones-col" style="white-space:nowrap;text-align:center">' +
-        '<button class="btn-fila-accion btn-editar-fila" title="Editar" onclick="abrirModalFilaLista(\'' + nombreTab + '\', \'' + fila.id + '\')">✎</button>' +
-        '<button class="btn-fila-accion btn-borrar-fila" title="Borrar" onclick="confirmarBorrarFila(\'' + nombreTab + '\', \'' + fila.id + '\')">🗑</button>' +
-      '</td>';
-    const celdas = conAcciones_(schema.map(function (col) {
-      const valor = fila[col.campo];
-      // FIX v8.1.1 — celdas de texto libre truncan a 1 línea (CSS) y
-      // llevan el texto completo en el title (tooltip nativo al pasar
-      // el mouse); el resto de los tipos queda igual que antes.
-      if (celdaEsTruncable_(col) && valor !== undefined && valor !== null && valor !== '') {
-        return '<td class="celda-truncada" title="' + escaparHtml(String(valor)) + '">' + formatoCeldaLista_(col, valor) + '</td>';
-      }
-      return '<td>' + formatoCeldaLista_(col, valor) + '</td>';
-    }), celdaAcciones);
-    return '<tr>' + celdas.join('') + '</tr>';
-  }).join('');
-
-  // FIX v8.1.1 — el contenedor nace oculto (`hidden` agregado en abrirLista())
-  // para no mostrar la caja vacía con fondo/borde/sombra mientras carga; recién
-  // se muestra acá, junto con la tabla ya armada.
-  cont.classList.remove('hidden');
-  cont.innerHTML = '<table id="tabla-lista" class="display" style="width:100%"><thead>' + theadHtml + '</thead><tbody>' + tbodyHtml + '</tbody></table>';
-
-  // FIX v8.4.0 — se saca scrollX/scrollY/fixedColumns de DataTables por
-  // completo (ver Handoff_PreKOM_v8_4_0.md para el porqué: 3 entregas
-  // peleando contra esa combinación de la librería, con PdTT como
-  // referencia de que ni scrollX ni FixedColumns hacen falta). La tabla
-  // vuelve a ser una tabla común — "columnas fijas" y "header fijo" se
-  // resuelven con `position: sticky` de CSS puro sobre la tabla real
-  // (ver .tabla-lista-scroll y las reglas de thead th / nth-child más
-  // abajo), y el `dom` envuelve la tabla en un div propio
-  // (".tabla-lista-scroll") para poder acotarle un alto máximo por JS
-  // (ver ajustarAltoTablaLista_) sin depender del scrollY de DataTables.
-  tablaListaDT = $('#tabla-lista').DataTable({
-    language: _dtLangListas_(),
-    pageLength: 10,
-    lengthMenu: [10, 20, 50],
-    order: [],
-    dom: '<"dt-top"lip><"tabla-lista-scroll"t>', // sin 'f' (buscador global propio) y sin dt-bot — todo el bloque de controles arriba
-    autoWidth: false, // FIX v8.4.8 — DataTables recalculaba y reescribía por su cuenta el `width` inline de cada <th> después de cada render (con su propio criterio, formato "width: Npx;"), pisando tanto la regla CSS de sticky como nuestros propios anchos — 2da causa real (con la de arriba) del "agujero" entre columnas fijas
-    columnDefs: puedeEditarListas ? [{ targets: IDX_ACCIONES_, orderable: false }] : []
-  });
-
-  if (terminoBusquedaLista) tablaListaDT.search(terminoBusquedaLista).draw();
-  ajustarAltoTablaLista_();
-}
-
-// FIX v8.4.0 — reemplaza al `scrollY` fijo de DataTables: mide en vivo
-// cuánto espacio libre queda desde el borde superior de la tabla hasta
-// el fondo de la ventana, y se lo pone como `max-height` al wrapper
-// que arma el propio `dom` de DataTables (".tabla-lista-scroll"). Con
-// `max-height` en vez de un alto fijo, una lista chica (6 filas) no
-// genera ningún scroll de más — el mismo criterio de "alto real
-// medido por JS" que ya usa iniciarMedicionHeader_() para --header-h.
+// Alto máximo de la tabla según el espacio libre (igual que v8.4.x)
 function ajustarAltoTablaLista_() {
   const scrollBox = document.querySelector('#tabla-lista-contenedor .tabla-lista-scroll');
   if (!scrollBox) return;
-  // FIX v8.4.1 — el margen real no es el padding-bottom de .view (60px)
-  // solo: hay que sumarle el padding-bottom + borde de .tabla-lista-wrap
-  // (14px + 1px) que quedan DEBAJO de este mismo div, dentro de la
-  // página. Total 75px.
-  const margenInferior = 75;
+  const margenInferior = 110;
   const top = scrollBox.getBoundingClientRect().top;
-  let alto = window.innerHeight - top - margenInferior;
-  scrollBox.style.maxHeight = Math.max(alto, 220) + 'px';
-
-  // FIX v8.4.3 — red de seguridad: los 75px de v8.4.1 seguían dejando
-  // un resto de scroll de página en la prueba real (Ale) — algo no
-  // contemplado en la cuenta a mano (candidato más probable: la
-  // tipografía terminando de cargar después de esta medición, que
-  // corre muy temprano). En vez de perseguir el número exacto a mano
-  // de nuevo, se mide el sobrante REAL de la página ya con el
-  // max-height de arriba aplicado, y si todavía sobra algo, se le
-  // resta a la tabla — autocorregible pase lo que pase debajo.
-  const sobrante = document.documentElement.scrollHeight - window.innerHeight;
-  if (sobrante > 0) {
-    scrollBox.style.maxHeight = Math.max(alto - sobrante, 220) + 'px';
-  }
-
-  // FIX v8.4.8 — diagnosticado con Ale por consola en su notebook
-  // (devicePixelRatio: 1.25): con escalado NO entero (125%/150%,
-  // típico en notebooks — no pasa en su monitor de 23" a 100%), el
-  // navegador redondea a píxel físico al pintar, y puede quedar un
-  // resto MENOR A 1px CSS que `scrollHeight`/`innerHeight` (ya
-  // redondeados a px CSS) no llegan a reflejar — el "sobrante" de
-  // arriba da 0 aunque en pantalla sí se termine dibujando 1px físico
-  // de scroll de más. No se puede medir ese resto (por eso no se
-  // detectaba con la red de seguridad ya existente), así que se
-  // descuenta un colchón fijo chico, solo cuando el escalado es
-  // fraccionario.
-  if (window.devicePixelRatio % 1 !== 0) {
-    scrollBox.style.maxHeight = Math.max(parseFloat(scrollBox.style.maxHeight) - 2, 220) + 'px';
-  }
-}
-// FIX v8.4.3 — si la tipografía (DM Sans) todavía no había terminado
-// de cargar en el primer cálculo, puede correr el alto de filas/header
-// un poco después y dejar un resto de scroll que la corrección de
-// arriba no llegó a ver. Se re-mide una vez más cuando las fuentes
-// terminan de cargar, sea cual sea la lista abierta en ese momento.
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(function () { ajustarAltoTablaLista_(); });
+  const alto = window.innerHeight - top - margenInferior;
+  scrollBox.style.maxHeight = Math.max(alto, 260) + 'px';
 }
 window.addEventListener('resize', ajustarAltoTablaLista_);
 
-// ── Panel lateral de Filtros (Listas) ───────────────────────
-// FIX v8.4.0 (reemplaza el <select> por columna que vivía dentro del
-// thead, ver punto reportado por Ale: se rompía visualmente al
-// combinar sticky + scroll horizontal). Reutiliza el mismo patrón de
-// panel lateral que ya usa Comentarios (overlay + <aside>
-// deslizando desde la derecha, ver #comentarios-panel).
-// FIX v8.6.7 — rediseño pedido por Ale: el <select> (1 valor por
-// columna, con botón "Aplicar") pasa a una grilla de chips
-// coloreados (patrón adaptado de .faceta-chip de BDC), acumulables
-// dentro de una misma columna (OR) y entre columnas (AND, como ya
-// era), aplicando el filtro al toque de cada clic — sin botón
-// Aplicar. Las opciones de cada chip salen de los valores que
-// REALMENTE aparecen en `datosListaAbierta` (Nivel A, confirmado por
-// Ale) en vez del listado fijo del schema (`valoresParaTipo`) — así
-// nunca se ve un chip sin ninguna fila, ni falta uno que sí tiene
-// datos. El contador de cada chip es fijo (se calcula 1 vez al abrir
-// el panel, sobre el total de la lista) — no se recalcula cruzando
-// con los demás filtros tildados (eso sería Nivel B, descartado).
-let schemaListaFiltrable_ = [];
-let filtrosListaActivos_ = {}; // { campo: Set(valores) }
-
-// Valores realmente presentes en datosListaAbierta para una columna,
-// con su cantidad de filas y color (colorTag de la opción del schema
-// que matchea, si existe — si un valor está en los datos pero ya no
-// en el schema, se muestra igual con el color gris por defecto).
-function valoresRealesColumna_(col) {
-  const conteo = {};
-  datosListaAbierta.forEach(function (fila) {
-    const v = fila[col.campo];
-    if (v === undefined || v === null || v === '') return;
-    conteo[v] = (conteo[v] || 0) + 1;
-  });
-  const opcionesSchema = valoresParaTipo(col.tipoCampo);
-  return Object.keys(conteo).sort().map(function (valor) {
-    const opcion = opcionesSchema.find(function (o) { return o.valor === valor; });
-    const hex = opcion ? colorTag(opcion.color) : '#64748b';
-    return { valor: valor, cantidad: conteo[valor], hex: /^#/.test(hex) ? hex : '#64748b' };
-  });
+function actualizarContadorFilas(nVisibles) {
+  const el = document.getElementById('contador-filas');
+  if (!el) return;
+  const total = datosListaAbierta.length;
+  const n = nVisibles === undefined ? total : nVisibles;
+  el.textContent = (n === total ? total : n + ' de ' + total) + (total === 1 ? ' ítem' : ' ítems');
 }
 
+// ── Panel lateral de Filtros ──────────────────────────────────
 function abrirPanelFiltrosLista() {
-  const body = document.getElementById('filtros-lista-body');
-  if (!schemaListaFiltrable_.length) {
-    body.innerHTML = '<div class="comentarios-vacio">Esta lista no tiene columnas filtrables.</div>';
-  } else {
-    body.innerHTML = schemaListaFiltrable_.map(function (col) {
-      const activos = filtrosListaActivos_[col.campo] || new Set();
-      const chips = valoresRealesColumna_(col).map(function (o) {
-        return htmlChipFiltro_(col.campo, o, activos.has(o.valor));
-      }).join('');
-      return '<div class="form-campo" data-campo-filtro="' + col.campo + '">' +
-        '<label>' + escaparHtml(col.etiqueta || col.campo) + '</label>' +
-        '<div class="filtro-chip-grid">' + chips + '</div>' +
-      '</div>';
-    }).join('');
-  }
+  const f = filtrosLista;
+  const atajos = [['pendientes', 'Solo pendientes'], ['vencidas', 'Solo vencidas'], ['criticas', 'Solo críticas']];
+  let html = '<div class="form-campo"><label>Atajos</label><div class="filtro-chip-grid">' + atajos.map(function (a) {
+    const act = f.atajos.indexOf(a[0]) !== -1;
+    return '<span class="filtro-chip' + (act ? ' activa' : '') + '" style="' + (act ? 'background:#0f172a;color:#fff;border-color:#0f172a' : 'background:#f1f5f9;color:#334155') + '" onclick="toggleAtajoFiltro_(\'' + a[0] + '\')">' + a[1] + '</span>';
+  }).join('') + '</div></div>';
+  ['sector', 'asignado', 'estado', 'critico', 'marca'].forEach(function (cat) {
+    if (cat === 'marca' && (listaMeta.columnas || []).indexOf('marca') === -1) return;
+    const conteo = {};
+    datosListaAbierta.forEach(function (r) { if (r[cat]) conteo[r[cat]] = (conteo[r[cat]] || 0) + 1; });
+    const ids = Object.keys(conteo).map(Number).sort(function (a, b) { const ca = catPorId[a] || {}, cb = catPorId[b] || {}; return (ca.orden || 0) - (cb.orden || 0); });
+    if (!ids.length) return;
+    const act = f.cats[cat] || [];
+    html += '<div class="form-campo"><label>' + CATALOGOS_FILA[cat] + '</label><div class="filtro-chip-grid">' + ids.map(function (id) {
+      const c = catPorId[id] || { valor: '¿?', color: 'gris' }, p = colorLista_(c.color), on = act.indexOf(id) !== -1;
+      return '<span class="filtro-chip' + (on ? ' activa' : '') + '" style="' + (on ? 'background:' + p.solido + ';border-color:' + p.solido + ';color:#fff' : 'background:' + p.bg + ';color:' + p.fg) + '" onclick="toggleFiltroLista_(\'' + cat + '\',' + id + ')">' +
+        escaparHtml(c.valor) + '<span class="filtro-chip-count">' + conteo[id] + '</span></span>';
+    }).join('') + '</div></div>';
+  });
+  document.getElementById('filtros-lista-body').innerHTML = html;
   document.getElementById('filtros-lista-overlay').classList.add('visible');
   document.getElementById('filtros-lista-panel').classList.add('abierto');
 }
-
 function cerrarPanelFiltrosLista() {
   document.getElementById('filtros-lista-overlay').classList.remove('visible');
   document.getElementById('filtros-lista-panel').classList.remove('abierto');
 }
-
-// Arma el HTML de 1 chip — inactivo: fondo tenue del color propio
-// (hexToRgba_ al 18%, mismo mecanismo que el Marco de Notas);
-// activo: sólido, mismo look que el badge .tag-valor de la celda.
-function htmlChipFiltro_(campo, o, activo) {
-  const estilo = activo
-    ? 'background:' + o.hex + ';border-color:' + o.hex + ';color:#fff'
-    : 'background:' + hexToRgba_(o.hex, .18) + ';border-color:transparent;color:' + o.hex;
-  return '<span class="filtro-chip' + (activo ? ' activa' : '') + '" style="' + estilo + '" ' +
-    'data-campo="' + campo + '" data-valor="' + escaparHtml(o.valor) + '" onclick="toggleFiltroLista_(\'' + campo + '\',\'' + escaparHtml(o.valor).replace(/'/g, "\\'") + '\')">' +
-    escaparHtml(o.valor) + '<span class="filtro-chip-count">' + o.cantidad + '</span>' +
-  '</span>';
+function toggleAtajoFiltro_(a) {
+  const i = filtrosLista.atajos.indexOf(a);
+  if (i === -1) filtrosLista.atajos.push(a); else filtrosLista.atajos.splice(i, 1);
+  guardarFiltros_(); montarTablaLista(); abrirPanelFiltrosLista();
 }
-
-// Toggle de 1 chip: entra/sale del Set de esa columna, aplica el
-// filtro al toque (sin botón Aplicar) y repinta solo ese chip (el
-// resto del panel no cambia — Nivel A, sin recalculo cruzado).
-function toggleFiltroLista_(campo, valor) {
-  if (!filtrosListaActivos_[campo]) filtrosListaActivos_[campo] = new Set();
-  const set = filtrosListaActivos_[campo];
-  if (set.has(valor)) set.delete(valor); else set.add(valor);
-  if (set.size === 0) delete filtrosListaActivos_[campo];
-  aplicarFiltrosListaEnVivo_();
-  // Repinta el grid completo de esa columna (más simple y seguro que
-  // tocar el estilo inline a mano por chip).
-  const col = schemaListaFiltrable_.find(function (c) { return c.campo === campo; });
-  const cont = document.querySelector('#filtros-lista-body [data-campo-filtro="' + campo + '"] .filtro-chip-grid');
-  if (col && cont) {
-    const activos = filtrosListaActivos_[campo] || new Set();
-    cont.innerHTML = valoresRealesColumna_(col).map(function (o) {
-      return htmlChipFiltro_(campo, o, activos.has(o.valor));
-    }).join('');
-  }
+function toggleFiltroLista_(cat, id) {
+  const arr = filtrosLista.cats[cat] = filtrosLista.cats[cat] || [];
+  const i = arr.indexOf(id);
+  if (i === -1) arr.push(id); else arr.splice(i, 1);
+  if (!arr.length) delete filtrosLista.cats[cat];
+  guardarFiltros_(); montarTablaLista(); abrirPanelFiltrosLista();
 }
-
-// Aplica todos los filtros activos contra la tabla — dentro de una
-// columna, varios valores tildados = OR (regex con alternancia);
-// entre columnas = AND (cada .column().search() de DataTables se
-// combina así por default).
-function aplicarFiltrosListaEnVivo_() {
-  schemaListaFiltrable_.forEach(function (col) {
-    const idxSchema = schemaListaAbierta.indexOf(col);
-    const idxDT = (puedeEditarListas && idxSchema >= IDX_ACCIONES_) ? idxSchema + 1 : idxSchema;
-    const activos = filtrosListaActivos_[col.campo];
-    const regex = (activos && activos.size)
-      ? '^(' + Array.from(activos).map(function (v) { return $.fn.dataTable.util.escapeRegex(v); }).join('|') + ')$'
-      : '';
-    tablaListaDT.column(idxDT).search(regex, true, false);
-  });
-  tablaListaDT.draw();
-  actualizarBadgeFiltrosLista_();
-}
-
 function quitarFiltrosLista() {
-  filtrosListaActivos_ = {};
-  tablaListaDT.columns().search('').draw();
-  actualizarBadgeFiltrosLista_();
+  filtrosLista = { atajos: [], cats: {}, texto: '' };
+  guardarFiltros_();
+  const inp = document.getElementById('lista-buscador'); if (inp) inp.value = '';
+  const b = document.getElementById('btn-limpiar-buscador'); if (b) b.classList.add('hidden');
+  montarTablaLista();
   if (document.getElementById('filtros-lista-panel').classList.contains('abierto')) abrirPanelFiltrosLista();
 }
-
-// Bolita naranja sobre el botón "Filtros" cuando hay algún filtro
-// activo — para que no quede un filtro aplicado "invisible" para Ale.
 function actualizarBadgeFiltrosLista_() {
   const badge = document.getElementById('btn-filtros-lista-badge');
-  if (!badge) return;
-  const hayActivos = Object.keys(filtrosListaActivos_).length > 0;
-  badge.classList.toggle('hidden', !hayActivos);
+  if (badge) badge.classList.toggle('hidden', !hayFiltros_());
 }
 
-/**
- * Modal única de alta/edición — arma el formulario dinámicamente
- * desde `schemaListaAbierta`. filaId null → modo alta (formulario
- * vacío, sin columna ID — el backend la autonumera al guardar). Con
- * filaId → modo edición (formulario precargado desde datosListaAbierta,
- * ID e Item bloqueados).
- */
-function abrirModalFilaLista(nombreTab, filaId) {
-  filaEnEdicionId = filaId;
-  const esEdicion = filaId !== null;
-  const fila = esEdicion ? (datosListaAbierta.find(function (f) { return String(f.id) === String(filaId); }) || {}) : {};
-
-  // FIX v8.3.1 (punto 9): ID ya no se muestra como campo (en ningún
-  // modo) — el título lo reemplaza, "Editar fila #N".
-  document.getElementById('fila-lista-titulo').textContent = esEdicion ? ('Editar fila #' + escaparHtml(String(filaId))) : 'Agregar fila';
-
-  let htmlFijo = '';
-  const formHtml = schemaListaAbierta.map(function (col) {
-    if (col.campo === 'id') return ''; // nunca se muestra — autonumérico, ver título
-    const bloqueado = campoBloqueado_(col, esEdicion);
-    const requerido = col.condicion === 'requerido' && !bloqueado;
-    const valor = fila[col.campo];
-    const idInput = 'campo-fila-' + col.campo;
-    const disabledAttr = bloqueado ? ' disabled' : '';
-    const requiredMarca = requerido ? '<span class="req-marca">*</span>' : '';
-
-    let inputHtml;
-    if (col.tipoCampo === 'numerico') {
-      inputHtml = '<input type="number" id="' + idInput + '" value="' + (valor !== undefined && valor !== null ? escaparHtml(String(valor)) : '') + '"' + disabledAttr + '>';
-    } else if (col.tipoCampo === 'fecha') {
-      inputHtml = '<input type="date" id="' + idInput + '" value="' + valorFechaInput_(valor) + '"' + disabledAttr + '>';
-    } else if (col.tipoCampo === 'texto_largo') {
-      inputHtml = '<textarea id="' + idInput + '"' + disabledAttr + '>' + (valor ? escaparHtml(String(valor)) : '') + '</textarea>';
-    } else if (col.tipoCampo.indexOf('listaValores_') === 0) {
-      const opciones = valoresParaTipo(col.tipoCampo);
-      const options = '<option value=""></option>' + opciones.map(function (o) {
-        return '<option value="' + escaparHtml(o.valor) + '"' + (valor === o.valor ? ' selected' : '') + '>' + escaparHtml(o.valor) + '</option>';
-      }).join('');
-      inputHtml = '<select id="' + idInput + '"' + disabledAttr + '>' + options + '</select>';
-    } else {
-      inputHtml = '<input type="text" id="' + idInput + '" value="' + (valor ? escaparHtml(String(valor)) : '') + '"' + disabledAttr + '>';
-    }
-
-    // FIX v8.1.1 — grilla de 2 columnas: texto_largo ocupa la fila
-    // completa (campo-full), el resto comparte fila de a 2 para
-    // aprovechar el ancho del modal wide.
-    const claseAncho = col.tipoCampo === 'texto_largo' ? ' campo-full' : '';
-
-    const divHtml = '<div class="form-campo' + claseAncho + '" data-campo="' + col.campo + '" data-requerido="' + requerido + '">' +
-      '<label for="' + idInput + '">' + escaparHtml(col.etiqueta || col.campo) + requiredMarca + '</label>' +
-      inputHtml +
-      '<div class="form-campo-error hidden"></div>' +
-    '</div>';
-
-    // FIX v8.3.1 (punto 10): el campo "item" se separa del resto —
-    // queda fijo debajo del título en vez de scrollear con el resto
-    // del formulario (misma columna que ya va fija en la tabla).
-    if (col.campo === 'item') { htmlFijo = divHtml; return ''; }
-    return divHtml;
-  }).join('');
-
-  document.getElementById('fila-lista-campo-fijo').innerHTML = htmlFijo;
-  document.getElementById('fila-lista-form').innerHTML = formHtml;
+// ── Modal de alta / edición de fila (solo el dueño) ───────────
+function abrirModalFilaLista(listaId, n) {
+  if (!listaMeta || !listaMeta.esDueno) return;
+  filaEnEdicionId = n;
+  const f = n !== null ? (datosListaAbierta.find(function (x) { return x.n === n; }) || {}) : {};
+  document.getElementById('fila-lista-titulo').textContent = n !== null ? 'Editar fila #' + n : 'Agregar fila';
+  const vis = listaMeta.columnas || [];
+  function campo(k, etiqueta, req, input, full) {
+    return '<div class="form-campo' + (full ? ' campo-full' : '') + '" data-campo="' + k + '" data-requerido="' + !!req + '">' +
+      '<label for="campo-fila-' + k + '">' + etiqueta + (req ? '<span class="req-marca">*</span>' : '') + '</label>' + input +
+      '<div class="form-campo-error hidden"></div></div>';
+  }
+  function sel(k) {
+    return '<select id="campo-fila-' + k + '"><option value=""></option>' + opcionesCat_(k, f[k]).map(function (c) {
+      return '<option value="' + c.id + '"' + (String(c.id) === String(f[k]) ? ' selected' : '') + '>' + escaparHtml(c.valor) + (c.activo ? '' : ' (inactivo)') + '</option>';
+    }).join('') + '</select>';
+  }
+  function num(k, paso) { return '<input type="number" step="' + paso + '" id="campo-fila-' + k + '" value="' + (f[k] === null || f[k] === undefined ? '' : escaparHtml(String(f[k]))) + '">'; }
+  document.getElementById('fila-lista-campo-fijo').innerHTML = campo('tarea', 'Tarea', true, '<textarea id="campo-fila-tarea" rows="2">' + escaparHtml(f.tarea || '') + '</textarea>', true);
+  let html = campo('fecha', 'Fecha', false, '<input type="date" id="campo-fila-fecha" value="' + (f.fecha ? String(f.fecha).slice(0, 10) : '') + '">') +
+    campo('sector', 'Sector', true, sel('sector')) + campo('asignado', 'Asignado', false, sel('asignado')) +
+    campo('estado', 'Estado', true, sel('estado')) + campo('critico', 'Crítico', false, sel('critico'));
+  if (vis.indexOf('marca') !== -1) html += campo('marca', 'Marca', false, sel('marca'));
+  if (vis.indexOf('cantidad') !== -1) html += campo('cantidad', 'Cantidad', false, num('cantidad', '0.01'));
+  if (vis.indexOf('unidad') !== -1) html += campo('unidad', 'Unidad', false, sel('unidad'));
+  if (vis.indexOf('moneda') !== -1) html += campo('moneda', 'Moneda', false, sel('moneda'));
+  if (vis.indexOf('valor') !== -1) html += campo('valor', 'Valor', false, num('valor', '0.01'));
+  if (vis.indexOf('orden') !== -1) html += campo('orden', 'Orden', false, num('orden', '1'));
+  if (vis.indexOf('avance') !== -1) {
+    avanceModal = f.avance === null || f.avance === undefined ? null : Number(f.avance);
+    html += campo('avance', 'Avance', false, '<div class="avance-botones" id="campo-fila-avance">' +
+      [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map(function (v) { return '<button type="button" class="av-btn' + (avanceModal === v ? ' sel' : '') + '" data-av="' + v + '">' + v + '</button>'; }).join('') +
+      '<button type="button" class="av-btn av-limpiar" data-av="" title="Sin avance">—</button></div>', true);
+  }
+  html += campo('observaciones', 'Observaciones', false, '<textarea id="campo-fila-observaciones" rows="3">' + escaparHtml(f.observaciones || '') + '</textarea>', true);
+  document.getElementById('fila-lista-form').innerHTML = html;
+  document.querySelectorAll('#campo-fila-avance .av-btn').forEach(function (b) {
+    b.onclick = function () {
+      avanceModal = b.dataset.av === '' ? null : Number(b.dataset.av);
+      document.querySelectorAll('#campo-fila-avance .av-btn').forEach(function (x) { x.classList.toggle('sel', x.dataset.av !== '' && Number(x.dataset.av) === avanceModal); });
+    };
+  });
   bloquearModalFilaLista_(false);
   document.getElementById('modal-fila-lista').classList.remove('hidden');
+  setTimeout(function () { const t = document.getElementById('campo-fila-tarea'); if (t) t.focus(); }, 50);
 }
-
-function cerrarModalFilaLista_() {
-  document.getElementById('modal-fila-lista').classList.add('hidden');
-  filaEnEdicionId = null;
+function cerrarModalFilaLista_() { document.getElementById('modal-fila-lista').classList.add('hidden'); filaEnEdicionId = null; }
+function bloquearModalFilaLista_(b) {
+  ['btn-cerrar-fila-lista', 'btn-cancelar-fila-lista', 'btn-guardar-fila-lista'].forEach(function (id) { document.getElementById(id).disabled = b; });
 }
-
-function bloquearModalFilaLista_(bloqueado) {
-  document.getElementById('btn-cerrar-fila-lista').disabled = bloqueado;
-  document.getElementById('btn-cancelar-fila-lista').disabled = bloqueado;
-  document.getElementById('btn-guardar-fila-lista').disabled = bloqueado;
-}
-
 document.getElementById('btn-cerrar-fila-lista').addEventListener('click', cerrarModalFilaLista_);
 document.getElementById('btn-cancelar-fila-lista').addEventListener('click', cerrarModalFilaLista_);
 
 document.getElementById('btn-guardar-fila-lista').addEventListener('click', async function () {
-  const esEdicion = filaEnEdicionId !== null;
-  const nombreTab = listaAbierta;
-
-  // Validación de obligatorios — recorre solo los campos realmente
-  // presentes en el formulario (en alta, ID no está; los bloqueados
-  // ya vienen marcados como no-requeridos desde abrirModalFilaLista).
-  let primerCampoConError = null;
-  // FIX v8.3.1: el campo "item" vive ahora en #fila-lista-campo-fijo
-  // (fuera de #fila-lista-form, ver punto 10) — hay que barrer los 2
-  // contenedores para no dejarlo afuera de la validación.
+  let primero = null;
   document.querySelectorAll('#fila-lista-campo-fijo .form-campo, #fila-lista-form .form-campo').forEach(function (div) {
-    const requerido = div.dataset.requerido === 'true';
     const input = div.querySelector('input, select, textarea');
-    const errorDiv = div.querySelector('.form-campo-error');
-    const vacio = !input.value || !input.value.trim();
-    if (requerido && vacio) {
-      div.classList.add('con-error');
-      errorDiv.textContent = 'Este campo es obligatorio.';
-      errorDiv.classList.remove('hidden');
-      if (!primerCampoConError) primerCampoConError = input;
-    } else {
-      div.classList.remove('con-error');
-      errorDiv.classList.add('hidden');
-    }
+    const err = div.querySelector('.form-campo-error');
+    if (div.dataset.requerido === 'true' && input && !String(input.value || '').trim()) {
+      div.classList.add('con-error'); err.textContent = 'Este campo es obligatorio.'; err.classList.remove('hidden');
+      if (!primero) primero = input;
+    } else { div.classList.remove('con-error'); err.classList.add('hidden'); }
   });
-  if (primerCampoConError) { primerCampoConError.focus(); return; }
-
-  // Arma la fila a enviar — un solo POST con todo junto, sea alta o
-  // edición. Los campos bloqueados (ID siempre; Item solo en edición)
-  // no se mandan: no cambiaron, y en el caso de ID directamente no
-  // tiene sentido (guardarFilaLista_ nunca lo pisa por este camino).
-  const filaAEnviar = {};
-  if (esEdicion) filaAEnviar.id = filaEnEdicionId;
-  // FIX v8.3.1: mismo motivo que la validación de arriba — el campo
-  // "item" vive en #fila-lista-campo-fijo, hay que incluirlo acá para
-  // que se siga mandando al backend.
+  if (primero) { primero.focus(); return; }
+  const fila = {};
+  if (filaEnEdicionId !== null) fila.n = filaEnEdicionId;
   document.querySelectorAll('#fila-lista-campo-fijo .form-campo, #fila-lista-form .form-campo').forEach(function (div) {
-    const campo = div.dataset.campo;
+    const k = div.dataset.campo;
+    if (k === 'avance') { fila.avance = avanceModal; return; }
     const input = div.querySelector('input, select, textarea');
-    if (input.disabled) return;
-    filaAEnviar[campo] = input.value;
+    if (input) fila[k] = input.value;
   });
-
   bloquearModalFilaLista_(true);
-  const btnGuardar = document.getElementById('btn-guardar-fila-lista');
-  const textoOriginal = btnGuardar.textContent;
-  btnGuardar.textContent = 'Guardando…';
+  const btn = this, txt = btn.textContent;
+  btn.textContent = 'Guardando…';
   try {
-    const res = await llamarBackend('guardarFilaLista', {
-      obraId: obraActual.obraId, nombreLista: nombreTab, fila: filaAEnviar, email: emailActual
-    });
-    if (!res.ok) {
-      mostrarAviso(res.error || 'No se pudo guardar la fila.');
-      bloquearModalFilaLista_(false);
-      btnGuardar.textContent = textoOriginal;
-      return;
-    }
-    if (esEdicion) {
-      const filaExistente = datosListaAbierta.find(function (f) { return String(f.id) === String(filaEnEdicionId); });
-      if (filaExistente) Object.assign(filaExistente, filaAEnviar);
-    } else {
-      const filaNueva = { id: res.id };
-      schemaListaAbierta.forEach(function (col) { if (!(col.campo in filaNueva)) filaNueva[col.campo] = filaAEnviar[col.campo] || ''; });
-      datosListaAbierta.push(filaNueva);
-    }
+    const r = await llamarBackend('filaGuardar', { listaId: listaMeta.id, fila: fila });
+    if (!r.ok) { mostrarAviso(r.error || 'No se pudo guardar la fila.'); bloquearModalFilaLista_(false); btn.textContent = txt; return; }
+    const i = datosListaAbierta.findIndex(function (x) { return x.n === r.fila.n; });
+    if (i === -1) datosListaAbierta.push(r.fila); else datosListaAbierta[i] = r.fila;
     cerrarModalFilaLista_();
-    destruirTablaSiExiste();
-    montarTablaLista(nombreTab, schemaListaAbierta, datosListaAbierta);
-    actualizarContadorFilas();
+    montarTablaLista();
+    mostrarToast(i === -1 ? 'Fila #' + r.fila.n + ' agregada' : 'Fila #' + r.fila.n + ' guardada');
   } catch (err) {
-    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
+    mostrarAviso(err.message || 'No se pudo conectar con el servidor.');
     bloquearModalFilaLista_(false);
-    btnGuardar.textContent = textoOriginal;
-    return;
   }
-  btnGuardar.textContent = textoOriginal;
+  btn.textContent = txt;
 });
 
-async function confirmarBorrarFila(nombreTab, filaId) {
-  const ok = await mostrarConfirm('Borrar fila', '¿Borrar esta fila (id=' + filaId + ')? No se puede deshacer.', { danger: true, textoAceptar: 'Borrar' });
+async function confirmarBorrarFila(listaId, n) {
+  const f = datosListaAbierta.find(function (x) { return x.n === n; });
+  const ok = await mostrarConfirm('Borrar fila #' + n,
+    '"' + (f ? f.tarea : '') + '" se oculta de la lista (queda guardada en la base). El número ' + n + ' no se vuelve a usar.',
+    { danger: true, textoAceptar: 'Borrar' });
   if (!ok) return;
-  borrarFilaListaFrontend(nombreTab, filaId);
-}
-
-async function borrarFilaListaFrontend(nombreTab, filaId) {
   try {
-    const res = await llamarBackend('borrarFilaLista', {
-      obraId: obraActual.obraId, nombreLista: nombreTab, filaId: filaId, email: emailActual
-    });
-    if (!res.ok) { mostrarAviso(res.error || 'No se pudo borrar la fila.'); return; }
-    datosListaAbierta = datosListaAbierta.filter(function (f) { return String(f.id) !== String(filaId); });
-    destruirTablaSiExiste();
-    montarTablaLista(nombreTab, schemaListaAbierta, datosListaAbierta);
-    actualizarContadorFilas();
-  } catch (err) {
-    mostrarAviso(err.message || 'No se pudo conectar con el backend.');
+    const r = await llamarBackend('filaOcultar', { listaId: listaId, n: n });
+    if (!r.ok) { mostrarAviso(r.error || 'No se pudo borrar la fila.'); return; }
+    datosListaAbierta = datosListaAbierta.filter(function (x) { return x.n !== n; });
+    montarTablaLista();
+    mostrarToast('Fila #' + n + ' borrada');
+  } catch (err) { mostrarAviso(err.message || 'No se pudo conectar con el servidor.'); }
+}
+
+// ── Exportar a Excel (columnas visibles, filas filtradas) ─────
+function exportarListaExcel() {
+  if (!listaMeta) return;
+  if (typeof XLSX === 'undefined') { mostrarAviso('No se pudo cargar el generador de Excel (sin conexión). Probá de nuevo en un momento.'); return; }
+  const cols = columnasTabla_();
+  const filas = filasFiltradas_().slice().sort(function (a, b) { return a.n - b.n; });
+  const aoa = [cols.map(function (c) { return c.t; })];
+  filas.forEach(function (f) {
+    aoa.push(cols.map(function (c) {
+      const k = c.k;
+      if (k === 'n') return f.n;
+      if (k === 'fecha') return f.fecha ? fmtFecha_(f.fecha) : '';
+      if (CATALOGOS_FILA[k]) return catPorId[f[k]] ? catPorId[f[k]].valor : '';
+      if (k === 'cantidad' || k === 'valor' || k === 'orden') return f[k] === null || f[k] === undefined ? '' : Number(f[k]);
+      if (k === 'subtotal') { const s = subtotal_(f); return s === null ? '' : s; }
+      if (k === 'avance') return f.avance === null || f.avance === undefined ? '' : f.avance / 100;
+      if (k === 'dias') return textoDias_(f).txt;
+      return f[k] || '';
+    }));
+  });
+  const tot = totalesPorMoneda_(filas);
+  if (tot.length) {
+    aoa.push([]);
+    tot.forEach(function (t) { aoa.push(['Total ' + t.moneda, t.total]); });
   }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map(function (c) { return { wch: c.k === 'tarea' || c.k === 'observaciones' ? 45 : c.k === 'n' ? 6 : 14 }; });
+  const iAv = cols.findIndex(function (c) { return c.k === 'avance'; });
+  for (let r = 1; r <= filas.length; r++) {
+    cols.forEach(function (c, i) {
+      const ref = XLSX.utils.encode_cell({ r: r, c: i }), cell = ws[ref];
+      if (!cell || cell.t !== 'n') return;
+      if (i === iAv) cell.z = '0%';
+      else if (c.k === 'cantidad' || c.k === 'valor' || c.k === 'subtotal') cell.z = '#,##0.00';
+    });
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Lista');
+  const limpio = function (s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, ''); };
+  const archivo = limpio(obraActual.nombreObra) + '_' + (limpio(listaMeta.nombre) || 'Lista') + '_' + hoyISO_() + '.xlsx';
+  XLSX.writeFile(wb, archivo);
+  registrarActividad_('lista_exportar', listaMeta.nombre, 'OK', { filas: filas.length, filtrada: hayFiltros_() });
+  mostrarToast('Excel descargado');
 }
 
-function actualizarContadorFilas() {
-  const el = document.getElementById('contador-filas');
-  if (!el) return;
-  el.textContent = datosListaAbierta.length + (datosListaAbierta.length === 1 ? ' fila' : ' filas');
-}
-
-// ── PANEL LATERAL DE COMENTARIOS ──────────────────────────────
-async function abrirComentarios(nombreTab) {
-  comentariosListaAbierta = nombreTab;
-  const meta = listasIndex.find(function (l) { return l.nombreTab === nombreTab; }) || { nombreVisible: nombreTab };
-  document.getElementById('comentarios-titulo').textContent = 'Comentarios — ' + meta.nombreVisible;
+// ── PANEL LATERAL DE COMENTARIOS (de una lista) ───────────────
+async function abrirComentarios(listaId) {
+  comentariosListaAbierta = listaId;
+  comentariosContenidoAbierto = null;
+  document.getElementById('comentarios-titulo').textContent = 'Comentarios — ' + (listaMeta ? listaMeta.nombre : '');
   document.getElementById('comentarios-overlay').classList.add('visible');
   document.getElementById('comentarios-panel').classList.add('abierto');
   document.getElementById('comentario-input').value = '';
   await cargarComentarios();
 }
-
 function cerrarComentarios() {
   document.getElementById('comentarios-overlay').classList.remove('visible');
   document.getElementById('comentarios-panel').classList.remove('abierto');
   comentariosListaAbierta = null;
-  comentariosContenidoAbierto = null; // NUEVO v4.0.0 (batch 3)
+  comentariosContenidoAbierto = null;
 }
-
 async function cargarComentarios() {
   const body = document.getElementById('comentarios-body');
   body.innerHTML = '<div class="comentarios-vacio">Cargando…</div>';
   try {
-    const res = await llamarBackend('leerComentarios', { obraId: obraActual.obraId, nombreLista: comentariosListaAbierta });
-    const comentarios = (res.ok && res.comentarios) ? res.comentarios : [];
-    renderComentarios(comentarios);
+    const res = await llamarBackend('leerComentarios', { nombreLista: comentariosListaAbierta });
+    renderComentarios((res.ok && res.comentarios) ? res.comentarios : []);
   } catch (err) {
     body.innerHTML = '<div class="comentarios-vacio">No se pudieron cargar los comentarios.</div>';
   }
 }
-
 function renderComentarios(comentarios) {
   const body = document.getElementById('comentarios-body');
-  if (!comentarios.length) {
-    body.innerHTML = '<div class="comentarios-vacio">Todavía no hay comentarios en esta lista.</div>';
-    return;
-  }
+  if (!comentarios.length) { body.innerHTML = '<div class="comentarios-vacio">Todavía no hay comentarios en esta lista.</div>'; return; }
   body.innerHTML = comentarios.map(function (c) {
-    const esAutor = String(c.usuario || '').trim().toLowerCase() === String(emailActual || '').trim().toLowerCase();
-    const fecha = c.fecha ? new Date(c.fecha).toLocaleString('es-AR') : '';
-    return '' +
-      '<div class="comentario-item">' +
-        '<span class="comentario-autor">' + escaparHtml(c.usuario) + '</span>' +
-        '<span class="comentario-fecha">' + fecha + '</span>' +
-        '<div class="comentario-texto">' + escaparHtml(c.texto) + '</div>' +
-        (esAutor ? '<button class="comentario-ocultar" onclick="ocultarComentarioFrontend(' + c.id + ')">Ocultar</button>' : '') +
-      '</div>';
+    const esAutor = String(c.usuario || '').toLowerCase() === String(emailActual || '').toLowerCase();
+    return '<div class="comentario-item">' +
+      '<span class="comentario-autor">' + escaparHtml(nombreDe_(c.usuario)) + '</span>' +
+      '<span class="comentario-fecha">' + (c.fecha ? new Date(c.fecha).toLocaleString('es-AR') : '') + '</span>' +
+      '<div class="comentario-texto">' + escaparHtml(c.texto) + '</div>' +
+      (esAutor ? '<button class="comentario-ocultar" onclick="ocultarComentarioFrontend(' + c.id + ')">Ocultar</button>' : '') +
+    '</div>';
   }).join('');
 }
 
