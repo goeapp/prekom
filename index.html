@@ -1064,9 +1064,9 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
     <div id="paso-codigo" class="login-paso">
       <div class="caja-title">Ingresá el código</div>
-      <div class="caja-desc">Te enviamos un código de 6 dígitos a <strong id="email-confirmado"></strong>. Vence en 10 minutos.</div>
+      <div class="caja-desc">Te enviamos un código a <strong id="email-confirmado"></strong>. Vence en 10 minutos.</div>
       <div id="login-error-pin" class="msg-error"></div>
-      <input type="text" id="input-pin" class="input-pin" maxlength="6" inputmode="numeric" placeholder="······">
+      <input type="text" id="input-pin" class="input-pin" maxlength="10" inputmode="numeric" autocomplete="one-time-code" placeholder="········">
       <button class="btn-accion" id="btn-validar-pin">Ingresar</button>
       <button class="btn-secundario" id="btn-reenviar-pin">Reenviar código</button>
       <button class="btn-secundario" id="btn-cambiar-email" style="margin-top:6px" onclick="document.getElementById('input-pin').value='';mostrarPasoLogin('email')">Usar otro email</button>
@@ -1320,7 +1320,10 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 
 <script>
 // ============================================================
-// PreKOM — index_prekom_v9_0_0.html — lógica
+// PreKOM — index_prekom_v9_0_1.html — lógica
+// v9.0.1 (14-oct-2026) — FIX: el código de Supabase llega con 8 dígitos y el
+// campo cortaba en 6 (maxlength). Ahora acepta de 6 a 10, como BDC/Admin, y el
+// texto ya no dice "6 dígitos".
 // v9.0.0 (14-oct-2026) — MIGRACIÓN A SUPABASE (patrón BDC v7 / LO v8).
 // Diseño cerrado: Diseno_PreKOM_v9_0_0.md.
 //  · Login: código por mail de Supabase Auth (reemplaza pwa_pin). La
@@ -1606,7 +1609,7 @@ table.dataTable tbody td { border-bottom: 1px solid var(--border) !important; pa
 // inicializarObra_ vía batchGet (Advanced Sheets API); el contrato de
 // la action 'inicializarObra' es idéntico, solo bump de versión para
 // marcar el cambio de arquitectura. Ver gas_prekom_v7_0_0.gs.
-const APP_VERSION = 'v9.0.0';
+const APP_VERSION = 'v9.0.1';
 
 // Misma paleta que PALETA_COLORES_FONDO en el backend (gas_prekom_v2.00.gs)
 // — el frontend no inventa colores propios, usa exactamente estos 16 hex.
@@ -2459,7 +2462,7 @@ async function validarCodigo_() {
   const errBox = document.getElementById('login-error-pin');
   errBox.classList.remove('visible');
   if (!/^\d{6,10}$/.test(pin)) {
-    errBox.textContent = 'El código tiene 6 dígitos.';
+    errBox.textContent = 'Revisá el código: son los números que llegaron por mail.';
     errBox.classList.add('visible');
     return;
   }
